@@ -1,0 +1,36 @@
+# This file contains metadata for your plugin. Since 
+# version 2.0 of QGIS this is the proper way to supply 
+# information about a plugin. The old method of 
+# embedding metadata in __init__.py will 
+# is no longer supported since version 2.0.
+
+# This file should be included when you package your plugin.# Mandatory items:
+
+[general]
+name=Interactive Map Tracking
+qgisMinimumVersion=2.6
+description=A QGIS 2.6 plugin to track camera of user , AND/OR to autocommit/refresh edit on PostGIS vector layer
+version=1.0
+author=Lionel Atty, IGN, SIDT
+email=remi.cura@gmail.com
+
+# End of mandatory metadata
+
+# Recommended items:
+
+# Uncomment the following line and add your changelog:
+# changelog=
+
+# Tags are comma separated with spaces allowed
+tags=postgis, attribute edit, database, editing, feature, field, geometry, layers, metadata, statistics, vector, autocommit, tracking, camera, mapcanvas, autorefresh, events, trigger, concurrent editing, real time
+
+homepage=http://remi-c.github.io/interactive_map_tracking
+tracker=https://github.com/Remi-C/interactive_map_tracking/issues
+repository=https://github.com/Remi-C/interactive_map_tracking
+icon=icon.png
+# experimental flag
+experimental=False
+
+# deprecated flag (applies to the whole plugin, not just a single version)
+deprecated=False
+
