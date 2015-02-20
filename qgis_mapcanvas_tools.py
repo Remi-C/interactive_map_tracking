@@ -45,7 +45,7 @@ def refreshMapCanvas(iface):
     iface.mapCanvas().zoomByFactor(1.0 + DEFAULT_SEGMENT_EPSILON, mapRect.center())
 
 
-def findLayerInMapCanvas(_mapCanvas, _layername):
+def find_layer_in_mapcanvas(_mapCanvas, _layername):
     """ Finding the index of an item given a list containing it in Python
     url : http://stackoverflow.com/questions/176918/finding-the-index-of-an-item-given-a-list-containing-it-in-python
 
@@ -57,9 +57,42 @@ def findLayerInMapCanvas(_mapCanvas, _layername):
 
     :rtype : QGIS layer
     """
-    iLayerSearch = [iLayer for iLayer in range(_mapCanvas.layerCount()) if
+    index_layer_searched = [iLayer for iLayer in range(_mapCanvas.layerCount()) if
                     _mapCanvas.layer(iLayer).name() == _layername]
-    if not iLayerSearch:
+    if not index_layer_searched:
         return None
     else:
-        return _mapCanvas.layer(iLayerSearch[0])
+        return _mapCanvas.layer(index_layer_searched[0])
+
+def find_layer_in_mapcanvas(_mapCanvas, _layername):
+    """ Finding the index of an item given a list containing it in Python
+    url : http://stackoverflow.com/questions/176918/finding-the-index-of-an-item-given-a-list-containing-it-in-python
+
+    :param _mapCanvas:
+    :type _mapCanvas:
+
+    :param _layername:
+    :type _layername:
+
+    :rtype : QGIS layer
+    """
+    index_layer_searched = [iLayer for iLayer in range(_mapCanvas.layerCount()) if _mapCanvas.layer(iLayer).name() == _layername]
+    if not index_layer_searched:
+        return None
+    else:
+        return _mapCanvas.layer(index_layer_searched[0])
+
+def find_layer_in_qgis_legend_interface(_iface, _layername):
+    """
+
+    :param _iface:
+    :param _layername:
+    :return:
+    """
+    try:
+        layer_searched = [layer_searched
+                          for layer_searched in _iface.legendInterface().layers()
+                          if layer_searched.name() == _layername]
+        return layer_searched[0]
+    except:
+        return None
