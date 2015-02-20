@@ -108,6 +108,7 @@ class interactive_map_tracking:
         self.trackposition_queue = Queue.LifoQueue()
         self.cron_trackposition = QTimer()
         self.cron_trackposition.timeout.connect(self.cronTrackPositionEvent)
+        self.cron_trackposition_delay = 2000    # 2000ms = 2s
 
         # user-id:
         # from user id OS
@@ -557,7 +558,7 @@ class interactive_map_tracking:
             self.connectSignalForExtentsChanged()
 
             if self.bUseMutexAndBetaFunctionalities:
-                self.cron_trackposition.start(500)  # 500 ms
+                self.cron_trackposition.start(self.cron_trackposition_delay)  # add a delay (con_trackposition_delay) in QTimer
         else:
             self.disconnectSignalForExtentsChanged()
 
@@ -580,7 +581,7 @@ class interactive_map_tracking:
         self.bUseMutexAndBetaFunctionalities = self.dlg.enableUseMutexForTP.isChecked()
 
         if self.dlg.enableUseMutexForTP.isChecked() and self.dlg.enableTrackPosition.isChecked():
-            self.cron_trackposition.start(500)  # 500 ms
+            self.cron_trackposition.start(self.cron_trackposition_delay)  # add a delay (con_trackposition_delay) in QTimer
         else:
             if self.cron_trackposition.isActive():
                 self.cron_trackposition.stop()
@@ -617,7 +618,7 @@ class interactive_map_tracking:
                 self.refreshComboBoxLayers()
                 self.connectSignalForExtentsChanged()
                 if self.bUseMutexAndBetaFunctionalities:
-                    self.cron_trackposition.start(500)  # 500 ms
+                    self.cron_trackposition.start(self.cron_trackposition_delay)  # add a delay (con_trackposition_delay) in QTimer
         else:
             self.dlg.enableAutoSave.setDisabled(True)
             self.dlg.enableTrackPosition.setDisabled(True)
