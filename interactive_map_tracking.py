@@ -876,7 +876,6 @@ class interactive_map_tracking:
             if resultCommit == True:
                 qgis_log_tools.logMessageINFO("Location saved in layer: " + layer_to_commit.name())
                 # TODO: clear the queue (modify/optimize this 'dummy' strategy)
-                # self.trackposition_queue.queue.clear()
                 while not self.trackposition_queue.empty():
                     self.trackposition_queue.get()  # as docs say: Remove and return an item from the queue.
             else:
