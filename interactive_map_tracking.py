@@ -107,7 +107,7 @@ class interactive_map_tracking:
 
         self.trackposition_queue = Queue.LifoQueue()
         self.cron_trackposition = QTimer()
-        self.cron_trackposition.timeout.connect(self.cronTrackPositionEvent)
+        self.cron_trackposition.timeout.connect(self.cron_track_position_event)
         self.cron_trackposition_delay = 2000    # 2000ms = 2s
 
         # user-id:
@@ -697,7 +697,6 @@ class interactive_map_tracking:
 
         :param bWithProjectionInCRSLayer: Option [default=True].
          If True, project the QGIS MapCanvas extent (QGIS World CRS) into Layer CRS
-
         :type bWithProjectionInCRSLayer: bool
 
         :param bUseEmptyFields: Option [default=False]
@@ -714,8 +713,7 @@ class interactive_map_tracking:
         # retrieve layer name from GUI (IMT)
         layerNameForTrackingPosition = self.dlg.trackingPositionLayerCombo.currentText()
         # search this layer
-        #layerPolygonExtent = qgis_mapcanvas_tools.find_layer_in_mapcanvas(mapCanvas, layerNameForTrackingPosition)
-        layerPolygonExtent = qgis_mapcanvas_tools.find_layer_in_qgis_legend_interface(self.iface, layerNameForTrackingPosition)
+        layerPolygonExtent = imt_tools.find_layer_in_qgis_legend_interface(self.iface, layerNameForTrackingPosition)
         if layerPolygonExtent is None:
             qgis_log_tools.logMessageWARNING("No layer found for tracking position")
             return 0
@@ -819,7 +817,6 @@ class interactive_map_tracking:
         layerPolygonExtent.addFeatures([fet], True)
 
         ## NEED TO OPTIMIZE ##
-        #
         # layerPolygonExtent.updateFields()
         # layerPolygonExtent.updateExtents()
         ## NEED TO OPTIMIZE ##
@@ -849,7 +846,7 @@ class interactive_map_tracking:
         #
         return resultCommit
 
-    def cronTrackPositionEvent(self):
+    def cron_track_position_event(self):
         """ [BETA] Action perform when the QTimer for Tracking Position is time out
         Try to enqueue request from Tracking Position to amortize the cost&effect on QGIS GUI
 
@@ -865,7 +862,7 @@ class interactive_map_tracking:
             qgis_log_tools.logMessage("consume a commitChanges request for this layer: " + layer_name_to_commit)
 
 
-            layer_to_commit = qgis_mapcanvas_tools.find_layer_in_qgis_legend_interface(self.iface, layer_name_to_commit)
+            layer_to_commit = imt_tools.find_layer_in_qgis_legend_interface(self.iface, layer_name_to_commit)
             # if layer_to_commit is None:
             #     qgis_log_tools.logMessageWARNING("No layer found for tracking position")
             #     return 0

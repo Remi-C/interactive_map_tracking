@@ -81,18 +81,3 @@ def find_layer_in_mapcanvas(_mapCanvas, _layername):
         return None
     else:
         return _mapCanvas.layer(index_layer_searched[0])
-
-def find_layer_in_qgis_legend_interface(_iface, _layername):
-    """
-
-    :param _iface:
-    :param _layername:
-    :return:
-    """
-    try:
-        layer_searched = [layer_searched
-                          for layer_searched in _iface.legendInterface().layers()
-                          if layer_searched.name() == _layername]
-        return layer_searched[0]
-    except:
-        return None
