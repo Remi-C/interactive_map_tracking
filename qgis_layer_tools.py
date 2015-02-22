@@ -207,18 +207,19 @@ def filter_layer_trackingposition_required_fields(layer, list_fields=["user_id",
     :param layer: QGIS layer to commit
     :type layer: QgsMapLayer
 
-    :return: Result of the filter
-    :rtype: bool
+    :return: Result list of indices for fields given (in list fields)
+    or return empty list if problem (don't found fields)
+    :rtype: list[int]
     """
     try:
         fields = layer.dataProvider().fields()
         # get fields name from the layer
         field_names = [field.name() for field in fields]
         #
-        [field_names.index(name_field) for name_field in list_fields]
+        list_id_fields = [field_names.index(name_field) for name_field in list_fields]
     except:
-            return False
-    return True
+            return []
+    return list_id_fields
 
 def filter_layer_for_trackingposition(layer):
     """ Helper to decided if 'layer' is compatible for Tracking Position

@@ -48,6 +48,17 @@ import imt_tools
 from PyQt4.QtCore import QTimer
 import Queue
 
+from collections import namedtuple
+
+# import logging
+#
+# # logging.shutdown()
+# reload(logging)
+#
+# class QGISHandler(logging.Handler):
+# def emit(self, record):
+#         msg = self.format(record)
+#         QgsMessageLog.logMessage(msg)
 
 class interactive_map_tracking:
     """QGIS Plugin Implementation."""
@@ -96,6 +107,7 @@ class interactive_map_tracking:
         self.bSignalForExtentsChangedConnected = False
 
         self.idCameraPositionLayerInBox = 0
+        self.currentLayerForTrackingPosition = None
 
         self.bSignalForProjectReadConnected = True
         QObject.connect(self.iface, SIGNAL("projectRead()"), self.qgisInterfaceProjectRead)
@@ -105,10 +117,28 @@ class interactive_map_tracking:
         self.QMCanvasExtentsChanged = QMutex()
         self.QMCanvasExtentsChangedAndRenderComplete = QMutex()
 
-        self.trackposition_queue = Queue.LifoQueue()
-        self.cron_trackposition = QTimer()
-        self.cron_trackposition.timeout.connect(self.cron_track_position_event)
-        self.cron_trackposition_delay = 2000    # 2000ms = 2s
+        self.tp_queue_layer_to_commit = Queue.LifoQueue()
+        self.qtimer_tp_layer_to_commit = QTimer()
+        #self.qtimer_tp_layer_to_commit.timeout.connect(self.qtimer_tp_layer_to_commit_event)
+        self.qtimer_tp_layer_to_commit_delay = 2000  # 2000ms = 2s
+
+        #url: https://docs.python.org/2/library/collections.html#collections.namedtuple
+        # Definition : namedtuples 'type'
+        self.TP_NAMEDTUPLE_LET = namedtuple('TP_NAMEDTUPLE_LET', ['layer', 'extent', 'w_time'])
+        self.TP_NAMEDTUPLE_ET = namedtuple('TP_NAMEDTUPLE_ET', ['extent', 'w_time'])
+        # LIFO Queue to save (in real time) requests for tracking position
+        self.tp_queue_namedtuple = Queue.LifoQueue()
+        #
+        self.qtimer_tracking_position = QTimer()
+        self.qtimer_tracking_position.timeout.connect(self.qtimer_tracking_position_event)
+
+        """
+        Delay on manager of trackposition requests
+        can be interesting to evaluate/benchmark the impact on this value
+        """
+        # self.qtimer_tracking_position_delay = 5000  # in ms
+        # self.qtimer_tracking_position_delay = 10  # in ms
+        self.qtimer_tracking_position_delay = 500   # in ms
 
         # user-id:
         # from user id OS
@@ -116,7 +146,15 @@ class interactive_map_tracking:
         # try to use IP to identify the user
         user_ip = imt_tools.get_lan_ip()
         #
-        self.trackposition_user_name = os_username + " (" + user_ip + ")"
+        self.tp_user_name = os_username + " (" + user_ip + ")"
+
+        qgis_logger = qgis_log_tools.QGISLogger()
+        qgis_logger.log("test1")
+        qgis_logger.log("test2")
+
+        self.tp_id_user_id = 0
+        self.tp_id_w_time = 0
+        self.values = []
 
     # noinspection PyMethodMayBeStatic
     def tr(self, message):
@@ -230,8 +268,12 @@ class interactive_map_tracking:
         self.dlg.enableAutoSave.clicked.connect(self.enabled_autosave)
         # activate/desactive tracking position
         self.dlg.enableTrackPosition.clicked.connect(self.enabled_trackposition)
+        # box for tracking layers
         self.dlg.refreshLayersListForTrackPosition.clicked.connect(self.refreshComboBoxLayers)
+        QObject.connect(self.dlg.trackingPositionLayerCombo, SIGNAL("currentIndexChanged ( const QString & )"),
+                        self.currentIndexChangedTPLCB)
 
+        # Dev Debug
         self.dlg.enableLogging.clicked.connect(self.enableLogging)
         self.dlg.enableUseMutexForTP.clicked.connect(self.enableUseMutexForTP)
 
@@ -273,7 +315,7 @@ class interactive_map_tracking:
         # Run the dialog event loop
         result = self.dlg.exec_()
 
-        self.cron_trackposition.stop()
+        self.qtimer_tp_layer_to_commit.stop()
 
         # See if OK was pressed
         if result:
@@ -440,7 +482,7 @@ class interactive_map_tracking:
 
             qgis_log_tools.logMessageINFO("Change Layer: layer.name=" + layer.name())
         else:
-            qgis_log_tools.logMessageINFO("No layer selected")
+            qgis_log_tools.logMessageINFO("No layer selected (for ITP)")
 
     def qgisInterfaceProjectRead(self):
         """ Action when the signal: 'Project Read' from QGIS Inteface is emitted&captured """
@@ -488,39 +530,114 @@ class interactive_map_tracking:
         """ Action when the signal: 'Render Complete' from QGIS MapCanvas is emitted&captured (after a emitted&captured signal: 'Extent Changed') """
         #
         if self.bUseMutexAndBetaFunctionalities:
-            with QMutexLocker(self.QMCanvasExtentsChangedAndRenderComplete):
-                try:
-                    QObject.disconnect(self.iface.mapCanvas(), SIGNAL("renderComplete(QPainter*)"),
-                                       self.canvasExtentsChangedAndRenderComplete)
-                    #
-                    self.update_track_position()
-                except:
-                    # import sys
-                    #qgis_log_tools.logMessageCRITICAL("Exception intercepted : " + sys.exc_info()[0])
-                    qgis_log_tools.logMessageCRITICAL("Exception intercepted : ")
+            # with QMutexLocker(self.QMCanvasExtentsChangedAndRenderComplete):
+            #     try:
+            #         QObject.disconnect(self.iface.mapCanvas(), SIGNAL("renderComplete(QPainter*)"),
+            #                            self.canvasExtentsChangedAndRenderComplete)
+            #         #
+            #         self.update_track_position()
+            #     except:
+            #         # import sys
+            #         #qgis_log_tools.logMessageCRITICAL("Exception intercepted : " + sys.exc_info()[0])
+            #         qgis_log_tools.logMessageCRITICAL("Exception intercepted : ")
+            QObject.disconnect(self.iface.mapCanvas(), SIGNAL("renderComplete(QPainter*)"),
+                               self.canvasExtentsChangedAndRenderComplete)
+            #
+            self.update_track_position()
         else:
             QObject.disconnect(self.iface.mapCanvas(), SIGNAL("renderComplete(QPainter*)"),
                                self.canvasExtentsChangedAndRenderComplete)
             #
             self.update_track_position()
 
+    def filter_layer_for_tracking_position(layer):
+        # set Attributes for Layer in DB
+        # On récupère automatiquement le nombre de champs qui compose les features présentes dans ce layer
+        # How to get field names in pyqgis 2.0
+        # url: http://gis.stackexchange.com/questions/76364/how-to-get-field-names-in-pyqgis-2-0
+        dataProvider = layer.dataProvider()
+
+        # Return a map of indexes with field names for this layer.
+        # url: http://qgis.org/api/classQgsVectorDataProvider.html#a53f4e62cb05889ecf9897fc6a015c296
+        fields = dataProvider.fields()
+
+        # get fields name from the layer
+        field_names = [field.name() for field in fields]
+
+        # find index for field 'user-id'
+        id_user_id_field = imt_tools.find_index_field_by_name(field_names, "user_id")
+        if id_user_id_field == -1:
+            qgis_log_tools.logMessageWARNING(
+                "No \"user_id\"::text field attributes found in layer: " + layer.name())
+            return -1
+
+        # find index for field 'writing_time'
+        id_w_time_field = imt_tools.find_index_field_by_name(field_names, "w_time")
+        if id_w_time_field == -1:
+            qgis_log_tools.logMessageWARNING(
+                "No \"w_time\"::text attributes found in layer: " + layer.name())
+            return -1
+
+        return [id_user_id_field, id_w_time_field]
+
+    def currentIndexChangedTPLCB(self, layer_name):
+        """
+
+        :param layer_name:
+        :return:
+
+        """
+        qgis_log_tools.logMessageINFO("Launch 'currentIndexChangedTPLCB(self, layer_name=" + layer_name + ")' ...")
+        # layer_name == "" when when we clear the combobox (for example)
+        if layer_name == "":
+            return
+
+        layer_for_tp = imt_tools.find_layer_in_qgis_legend_interface(self.iface, layer_name)
+
+        list_id_fields = qgis_layer_tools.filter_layer_trackingposition_required_fields(layer_for_tp)
+
+        self.tp_id_user_id = list_id_fields[0]
+        self.tp_id_w_time = list_id_fields[1]
+
+        dataProvider = layer_for_tp.dataProvider()
+
+        # Return a map of indexes with field names for this layer.
+        # url: http://qgis.org/api/classQgsVectorDataProvider.html#a53f4e62cb05889ecf9897fc6a015c296
+        fields = dataProvider.fields()
+
+        # set the fields
+        # reset all fields in None
+        self.values = [None for i in range(fields.count())]
+        # set some fields (user_id, time)
+        self.values[self.tp_id_user_id] = self.tp_user_name
+
     def refreshComboBoxLayers(self):
         """ Action when the Combo Box attached to refreshing layers for tracking position is clicked """
         #
         qgis_log_tools.logMessageINFO("Launch 'refreshComboBoxLayers(...)' ...")
+
         self.dlg.trackingPositionLayerCombo.clear()
+
         layers = QgsMapLayerRegistry.instance().mapLayers().values()
         for layer in layers:
             # filter on layers to add in combobox
             if qgis_layer_tools.filter_layer_for_trackingposition(layer):
                 self.dlg.trackingPositionLayerCombo.addItem(layer.name(), layer)
+                # default search layer
                 if layer.name() == "camera_position":
                     self.idCameraPositionLayerInBox = self.dlg.trackingPositionLayerCombo.count() - 1
                     #
                     qgis_log_tools.logMessageINFO("camera_position layer found - id in combobox: " + str(
                         self.dlg.trackingPositionLayerCombo.currentIndex()))
-        #
+
+        # update GUI
         self.dlg.trackingPositionLayerCombo.setCurrentIndex(self.idCameraPositionLayerInBox)
+
+        try:
+            selected_layer_for_tracking = layers[self.idCameraPositionLayerInBox]
+            self.currentLayerForTrackingPosition = selected_layer_for_tracking
+        except:
+            pass
 
     def enabled_autosave(self):
         """ Action when the checkbox 'Enable Auto-Save and Refresh' is clicked """
@@ -558,13 +675,18 @@ class interactive_map_tracking:
             self.connectSignalForExtentsChanged()
 
             if self.bUseMutexAndBetaFunctionalities:
-                self.cron_trackposition.start(self.cron_trackposition_delay)  # add a delay (con_trackposition_delay) in QTimer
+                # add a delay (con_trackposition_delay) in QTimer
+                self.qtimer_tp_layer_to_commit.start(self.qtimer_tp_layer_to_commit_delay)
+                # add a delay (con_trackposition_delay) in QTimer
+                self.qtimer_tracking_position.start(self.qtimer_tracking_position_delay)
         else:
             self.disconnectSignalForExtentsChanged()
 
             # if self.bUseMutexAndBetaFunctionalities:
-            if self.cron_trackposition.isActive():
-                self.cron_trackposition.stop()
+            if self.qtimer_tp_layer_to_commit.isActive():
+                self.qtimer_tp_layer_to_commit.stop()
+            if self.qtimer_tracking_position.isActive():
+                self.qtimer_tracking_position.stop()
 
     def enableLogging(self):
         """ Action when the checkbox 'Enable LOGging' is clicked """
@@ -581,10 +703,15 @@ class interactive_map_tracking:
         self.bUseMutexAndBetaFunctionalities = self.dlg.enableUseMutexForTP.isChecked()
 
         if self.dlg.enableUseMutexForTP.isChecked() and self.dlg.enableTrackPosition.isChecked():
-            self.cron_trackposition.start(self.cron_trackposition_delay)  # add a delay (con_trackposition_delay) in QTimer
+            # add a delay (con_trackposition_delay) in QTimer
+            self.qtimer_tp_layer_to_commit.start(self.qtimer_tp_layer_to_commit_delay)
+            # add a delay (con_trackposition_delay) in QTimer
+            self.qtimer_tracking_position.start(self.qtimer_tracking_position_delay)
         else:
-            if self.cron_trackposition.isActive():
-                self.cron_trackposition.stop()
+            if self.qtimer_tp_layer_to_commit.isActive():
+                self.qtimer_tp_layer_to_commit.stop()
+            if self.qtimer_tracking_position.isActive():
+                self.qtimer_tracking_position.stop()
 
     def enabled_plugin(self):
         """ Action when the checkbox 'Enable SteetGen3 Plugin' is clicked
@@ -618,7 +745,10 @@ class interactive_map_tracking:
                 self.refreshComboBoxLayers()
                 self.connectSignalForExtentsChanged()
                 if self.bUseMutexAndBetaFunctionalities:
-                    self.cron_trackposition.start(self.cron_trackposition_delay)  # add a delay (con_trackposition_delay) in QTimer
+                    # add a delay (con_trackposition_delay) in QTimer
+                    self.qtimer_tp_layer_to_commit.start(self.qtimer_tp_layer_to_commit_delay)
+                    # add a delay (con_trackposition_delay) in QTimer
+                    self.qtimer_tracking_position.start(self.qtimer_tracking_position_delay)
         else:
             self.dlg.enableAutoSave.setDisabled(True)
             self.dlg.enableTrackPosition.setDisabled(True)
@@ -633,8 +763,10 @@ class interactive_map_tracking:
             if self.dlg.enableTrackPosition.isChecked():
                 self.disconnectSignalForExtentsChanged()
                 # if self.bUseMutexAndBetaFunctionalities:
-                if self.cron_trackposition.isActive():
-                    self.cron_trackposition.stop()
+                if self.qtimer_tp_layer_to_commit.isActive():
+                    self.qtimer_tp_layer_to_commit.stop()
+                if self.qtimer_tracking_position.isActive():
+                    self.qtimer_tracking_position.stop()
 
         return resultCommit
 
@@ -696,148 +828,101 @@ class interactive_map_tracking:
             - w_time: text
 
         :param bWithProjectionInCRSLayer: Option [default=True].
-         If True, project the QGIS MapCanvas extent (QGIS World CRS) into Layer CRS
+         If True, project the QGIS MapCanvas extent (QGIS World CRS) into Layer CRS (CRS=Coordinates Reference System)
         :type bWithProjectionInCRSLayer: bool
 
         :param bUseEmptyFields: Option [default=False]
-         If True, don't set the field (user_id, w_time)
-         If False, use a autogenerate id for user (user name from OS + ip) and current date time (from QDateTime time stamp)
+         If True, don't set fields (user_id, w_time)
+         If False, use a auto-generate id for user (user-name from OS + IP Lan) and current date time (from time stamp os into QDateTime string format)
         :type bUseEmptyFields: bool
 
         """
 
-        mapCanvas = self.iface.mapCanvas()
-
-        # TODO: optimize this: not needed to check/test/find in realtime the layer (for tracking position)
-        # # NEED TO OPTIMIZE ##
-        # retrieve layer name from GUI (IMT)
-        layerNameForTrackingPosition = self.dlg.trackingPositionLayerCombo.currentText()
-        # search this layer
-        layerPolygonExtent = imt_tools.find_layer_in_qgis_legend_interface(self.iface, layerNameForTrackingPosition)
-        if layerPolygonExtent is None:
-            qgis_log_tools.logMessageWARNING("No layer found for tracking position")
-            return 0
-        ## NEED TO OPTIMIZE ##
-
-        mapcanvas_extent = mapCanvas.extent()
-
-        # filtre sur la taille de l'extent
-        try:
-            threshold = int(self.dlg.threshold_extent.text())
-        except Exception:
-            qgis_log_tools.logMessageWARNING("Threshold can only be a number")
+        if self.currentLayerForTrackingPosition is None:
             return -1
 
-        if max(mapcanvas_extent.width(), mapcanvas_extent.height()) > threshold:
-            qgis_log_tools.logMessageWARNING("MapCanvas extent size exceed the Threshold size for tracking")
-            qgis_log_tools.logMessageWARNING(
-                "-> MapCanvas extent size= " + str(max(mapcanvas_extent.width(), mapcanvas_extent.height())) +
-                "\tThreshold size= " + str(threshold))
-            return -2
+        mapCanvas = self.iface.mapCanvas()
+        mapcanvas_extent = mapCanvas.extent()
 
-        #
-        list_points_from_mapcanvas = imt_tools.construct_listpoints_from_extent(mapcanvas_extent)
-
-        ## NEED TO OPTIMIZE ##
-        if bWithProjectionInCRSLayer:
-            # url: http://qgis.org/api/classQgsMapCanvas.html#af0ffae7b5e5ec8b29764773fa6a74d58
-            extent_src_crs = mapCanvas.mapSettings().destinationCrs()
-            # url: http://qgis.org/api/classQgsMapLayer.html#a40b79e2d6043f8ec316a28cb17febd6c
-            extent_dst_crs = layerPolygonExtent.crs()
-            # url: http://docs.qgis.org/testing/en/docs/pyqgis_developer_cookbook/crs.html
-            xform = QgsCoordinateTransform(extent_src_crs, extent_dst_crs)
-            #
-            list_points = [xform.transform(point) for point in list_points_from_mapcanvas]
-        else:
-            list_points = list_points_from_mapcanvas
-        ## NEED TO OPTIMIZE ##
-
-        gPolygon = QgsGeometry.fromPolygon([list_points])
-
-        fet = QgsFeature()
-
-        fet.setGeometry(gPolygon)
-
-        # set Attributes for Layer in DB
-        # On récupère automatiquement le nombre de champs qui compose les features présentes dans ce layer
-        # How to get field names in pyqgis 2.0
-        # url: http://gis.stackexchange.com/questions/76364/how-to-get-field-names-in-pyqgis-2-0
-        dataProvider = layerPolygonExtent.dataProvider()
-
-        # Return a map of indexes with field names for this layer.
-        # url: http://qgis.org/api/classQgsVectorDataProvider.html#a53f4e62cb05889ecf9897fc6a015c296
-        fields = dataProvider.fields()
-
-        if bUseEmptyFields:
-            # how to fill a list with 0 using python
-            # url: http://stackoverflow.com/questions/5908420/how-to-fill-a-list-with-0-using-python
-            #from itertools import repeat
-            #values = list(repeat(None, fields.count()))
-            values = [None for i in range(fields.count())]
-        else:
-            ## NEED TO OPTIMIZE ##
-            # get fields name from the layer
-            field_names = [field.name() for field in fields]
-
-            # find index for field 'user-id'
-            id_user_id_field = imt_tools.find_index_field_by_name(field_names, "user_id")
-            if id_user_id_field == -1:
-                qgis_log_tools.logMessageWARNING(
-                    "No \"user_id\"::text field attributes found in layer: " + layerPolygonExtent.name())
-                return -1
-
-            # find index for field 'writing_time'
-            id_w_time_field = imt_tools.find_index_field_by_name(field_names, "w_time")
-            if id_w_time_field == -1:
-                qgis_log_tools.logMessageWARNING(
-                    "No \"w_time\"::text attributes found in layer: " + layerPolygonExtent.name())
-                return -1
-            ## NEED TO OPTIMIZE ##
-
-            # # Retrieve informations
-            # static information (for a session)
-            user_name = self.trackposition_user_name
-
-            # get the current time in a Qt string format
-            timestamp_string = imt_tools.get_timestamp_from_qt_string_format()
-
-            # set the fields
-            # reset all fields in None
-            values = [None for i in range(fields.count())]
-            # set some fields (user_id, time)
-            values[id_user_id_field] = user_name
-            values[id_w_time_field] = timestamp_string
-
-        fet.setAttributes(values)
-
-        # How can I programatically create and add features to a memory layer in QGIS 1.9?
-        # url: http://gis.stackexchange.com/questions/60473/how-can-i-programatically-create-and-add-features-to-a-memory-layer-in-qgis-1-9
-        # write the layer and send request to DB
-        layerPolygonExtent.startEditing()
-        layerPolygonExtent.addFeatures([fet], True)
-
-        ## NEED TO OPTIMIZE ##
-        # layerPolygonExtent.updateFields()
-        # layerPolygonExtent.updateExtents()
-        ## NEED TO OPTIMIZE ##
+        layer_for_polygon_extent = self.currentLayerForTrackingPosition
 
         if self.bUseMutexAndBetaFunctionalities:
             #self.trackposition_queue.put(layerPolygonExtent)
             # with self.trackposition_queue.mutex:
-            self.trackposition_queue.put(layerPolygonExtent.name())
+            #self.tp_queue_layer_to_commit.put(layer_for_polygon_extent.name())
+
+            self.tp_queue_namedtuple.put(
+                self.TP_NAMEDTUPLE_LET(
+                    layer_for_polygon_extent,
+                    mapcanvas_extent,
+                    imt_tools.get_timestamp_from_qt_string_format()
+                )
+            )
+
             resultCommit = True
         else:
+             # filter on extent size
+            try:
+                threshold = int(self.dlg.threshold_extent.text())
+            except Exception:
+                qgis_log_tools.logMessageWARNING("Threshold can only be a number")
+                return -1
+
+            if max(mapcanvas_extent.width(), mapcanvas_extent.height()) > threshold:
+                qgis_log_tools.logMessageWARNING("MapCanvas extent size exceed the Threshold size for tracking")
+                qgis_log_tools.logMessageWARNING(
+                    "-> MapCanvas extent size= " + str(max(mapcanvas_extent.width(), mapcanvas_extent.height())) +
+                    "\tThreshold size= " + str(threshold))
+                return -2
+
+            # get the list points from the current extent (from QGIS MapCanvas)
+            list_points_from_mapcanvas = imt_tools.construct_listpoints_from_extent(mapcanvas_extent)
+
+            ## NEED TO OPTIMIZE ##
+            if bWithProjectionInCRSLayer:
+                # url: http://qgis.org/api/classQgsMapCanvas.html#af0ffae7b5e5ec8b29764773fa6a74d58
+                extent_src_crs = mapCanvas.mapSettings().destinationCrs()
+                # url: http://qgis.org/api/classQgsMapLayer.html#a40b79e2d6043f8ec316a28cb17febd6c
+                extent_dst_crs = layer_for_polygon_extent.crs()
+                # url: http://docs.qgis.org/testing/en/docs/pyqgis_developer_cookbook/crs.html
+                xform = QgsCoordinateTransform(extent_src_crs, extent_dst_crs)
+                #
+                list_points = [xform.transform(point) for point in list_points_from_mapcanvas]
+            else:
+                list_points = list_points_from_mapcanvas
+            ## NEED TO OPTIMIZE ##
+
+            # list of lists of points
+            gPolygon = QgsGeometry.fromPolygon([list_points])
+
+            fet = QgsFeature()
+
+            fet.setGeometry(gPolygon)
+
+            if bUseEmptyFields:
+                pass
+            else:
+                # update the time stamp attribute
+                self.values[self.tp_id_w_time] = imt_tools.get_timestamp_from_qt_string_format()
+
+            fet.setAttributes(self.values)
+
+            # How can I programatically create and add features to a memory layer in QGIS 1.9?
+            # url: http://gis.stackexchange.com/questions/60473/how-can-i-programatically-create-and-add-features-to-a-memory-layer-in-qgis-1-9
+            # write the layer and send request to DB
+            layer_for_polygon_extent.startEditing()
+            layer_for_polygon_extent.addFeatures([fet], False)  # bool_makeSelected=False
             #
-            resultCommit = layerPolygonExtent.commitChanges()
+            resultCommit = layer_for_polygon_extent.commitChanges()
             #
             if resultCommit:
-                qgis_log_tools.logMessageINFO("Location saved in layer: " + layerPolygonExtent.name())
+                qgis_log_tools.logMessageINFO("Location saved in layer: " + layer_for_polygon_extent.name())
             else:
                 qgis_log_tools.logMessageCRITICAL(
-                    "saving position failed : are you sure the selected tracking layer: " + layerPolygonExtent.name() +
+                    "saving position failed : are you sure the selected tracking layer: " + layer_for_polygon_extent.name() +
                     "has at least 2 attributes : \"user_id\"::text and \"w_time\"::text")
 
-                commitErrorString = layerPolygonExtent.commitErrors()[2]
+                commitErrorString = layer_for_polygon_extent.commitErrors()[2]
                 commitErrorStringShort = commitErrorString[commitErrorString.rfind(":") + 2:len(
                     commitErrorString)]  # +2 to skip ': ' prefix of commitError msg
                 self.iface.messageBar().pushMessage("IMT. ERROR : " + "\"" + commitErrorStringShort + "\"",
@@ -846,48 +931,153 @@ class interactive_map_tracking:
         #
         return resultCommit
 
-    def cron_track_position_event(self):
+    def qtimer_tp_layer_to_commit_event(self):
         """ [BETA] Action perform when the QTimer for Tracking Position is time out
         Try to enqueue request from Tracking Position to amortize the cost&effect on QGIS GUI
 
         """
 
-        qgis_log_tools.logMessage("launch conTrackPositionEvent(...)")
-
+        # #qgis_log_tools.logMessage("launch cron_track_position_event(...)")
+        # qgis_log_tools.QGISLogger().log("launch cron_track_position_event(...)")
         #
-        # with self.trackposition_queue.mutex:
-        if not self.trackposition_queue.empty():
+        # #
+        # # with self.trackposition_queue.mutex:
+        # if not self.tp_queue_layer_to_commit.empty():
+        #
+        #     layer_name_to_commit = str(self.tp_queue_layer_to_commit.get())
+        #     qgis_log_tools.logMessage("consume a commitChanges request for this layer: " + layer_name_to_commit)
+        #
+        #     layer_to_commit = imt_tools.find_layer_in_qgis_legend_interface(self.iface, layer_name_to_commit)
+        #     # if layer_to_commit is None:
+        #     #     qgis_log_tools.logMessageWARNING("No layer found for tracking position")
+        #     #     return 0
+        #     try:
+        #         result_commit = layer_to_commit.commitChanges()
+        #     except:
+        #         qgis_log_tools.logMessageWARNING("No layer found for tracking position")
+        #         return 0
+        #
+        #     #
+        #     if result_commit:
+        #         qgis_log_tools.logMessageINFO("Location saved in layer: " + layer_to_commit.name())
+        #         # TODO: clear the queue (modify/optimize this 'dummy' strategy)
+        #         while not self.tp_queue_layer_to_commit.empty():
+        #             self.tp_queue_layer_to_commit.get()  # as docs say: Remove and return an item from the queue.
+        #     else:
+        #         qgis_log_tools.logMessageCRITICAL(
+        #             "saving position failed : are you sure the selected tracking layer: " + layer_to_commit.name() +
+        #             "has at least 2 attributes : \"user_id\"::text and \"w_time\"::text")
+        #         # get the last element of the list
+        #         # url: http://stackoverflow.com/questions/930397/getting-the-last-element-of-a-list-in-python
+        #         commit_error_string = layer_to_commit.commitErrors()[-1]
+        #         # format the string error
+        #         commit_error_string_short = commit_error_string[commit_error_string.rfind(":") + 2:len(
+        #             commit_error_string)]  # +2 to skip ': ' prefix of commitError msg
+        #         self.iface.messageBar().pushMessage("IMT. ERROR : " + "\"" + commit_error_string_short + "\"",
+        #                                             "",
+        #                                             QgsMessageBar.CRITICAL, 0)
 
-            layer_name_to_commit = str(self.trackposition_queue.get())
-            qgis_log_tools.logMessage("consume a commitChanges request for this layer: " + layer_name_to_commit)
 
+    def qtimer_tracking_position_event(self):
+        """ [BETA] Action perform when the QTimer for Tracking Position is time out
+        Try to enqueue request from Tracking Position to amortize the cost&effect on QGIS GUI
 
-            layer_to_commit = imt_tools.find_layer_in_qgis_legend_interface(self.iface, layer_name_to_commit)
-            # if layer_to_commit is None:
-            #     qgis_log_tools.logMessageWARNING("No layer found for tracking position")
-            #     return 0
+        """
+        # qgis_log_tools.QGISLogger().log("qtimer_tracking_position_event(...)")
+        #qgis_log_tools.logMessage("qtimer_tracking_position_event(...)")
+
+        try:
+            threshold = int(self.dlg.threshold_extent.text())
+        except Exception:
+            qgis_log_tools.logMessageWARNING("Threshold can only be a number")
+            return -1
+
+        mapCanvas = self.iface.mapCanvas()
+
+        qgis_log_tools.logMessage("size of tq_queue_namedtuple :" + str(self.tp_queue_namedtuple.qsize()))
+
+        dict_key_l_values_et = {}
+
+        while not self.tp_queue_namedtuple.empty():
+            tp_tuple = self.tp_queue_namedtuple.get()
+            # url: http://stackoverflow.com/questions/20585920/how-to-add-multiple-values-to-a-dictionary-key-in-python
+            dict_key_l_values_et.setdefault(tp_tuple.layer, []).append(self.TP_NAMEDTUPLE_ET(tp_tuple.extent, tp_tuple.w_time))
+
+        # url: http://qgis.org/api/classQgsMapCanvas.html#af0ffae7b5e5ec8b29764773fa6a74d58
+        extent_src_crs = mapCanvas.mapSettings().destinationCrs()
+
+        for layer in dict_key_l_values_et.keys():
+            layer_to_commit = layer
+            list_fets = []
+
+            # url: http://qgis.org/api/classQgsMapLayer.html#a40b79e2d6043f8ec316a28cb17febd6c
+            extent_dst_crs = layer_to_commit.crs()
+            # url: http://docs.qgis.org/testing/en/docs/pyqgis_developer_cookbook/crs.html
+            xform = QgsCoordinateTransform(extent_src_crs, extent_dst_crs)
+
+            for tp_namedtuple in dict_key_l_values_et[layer]:
+                #qgis_log_tools.logMessage("consume a request track_position in queue ...")
+
+                mapcanvas_extent = tp_namedtuple.extent
+                w_time = tp_namedtuple.w_time
+
+                qgis_log_tools.logMessage(
+                    "Request track_position description: \n" +
+                    "\tLayer name: " + layer_to_commit.name() + "\n"
+                    "\tw_time: " + w_time)
+
+                try:
+                    #result_commit = layer_to_commit.commitChanges()
+
+                    # filter on extent size
+                    if max(mapcanvas_extent.width(), mapcanvas_extent.height()) > threshold:
+                        qgis_log_tools.logMessageWARNING("MapCanvas extent size exceed the Threshold size for tracking")
+                        qgis_log_tools.logMessageWARNING(
+                            "MapCanvas extent size= " + str(max(mapcanvas_extent.width(), mapcanvas_extent.height())) +
+                            "\tThreshold size= " + str(threshold))
+                        return -2
+
+                    # get the list points from the current extent (from QGIS MapCanvas)
+                    list_points_from_mapcanvas = imt_tools.construct_listpoints_from_extent(mapcanvas_extent)
+
+                    ## NEED TO OPTIMIZE ##
+                    # TODO: add a option for this feature (Projected points in CRS destination layer) in GUI
+                    bWithProjectionInCRSLayer = True
+                    if bWithProjectionInCRSLayer:
+                        #
+                        list_points = [xform.transform(point) for point in list_points_from_mapcanvas]
+                    else:
+                        list_points = list_points_from_mapcanvas
+                    ## NEED TO OPTIMIZE ##
+
+                    # list of lists of points
+                    gPolygon = QgsGeometry.fromPolygon([list_points])
+
+                    fet = QgsFeature()
+
+                    fet.setGeometry(gPolygon)
+
+                    # update the time stamp attribute
+                    self.values[self.tp_id_w_time] = imt_tools.get_timestamp_from_qt_string_format()
+
+                    fet.setAttributes(self.values)
+                    # fet.setAttribute({self.tp_id_w_time: imt_tools.get_timestamp_from_qt_string_format()})
+
+                    list_fets.append(fet)
+                except:
+                    qgis_log_tools.logMessageCRITICAL("####################### Error here ! Strange ! ####################### ")
+                    return 0
+
+            qgis_log_tools.logMessage("size of list_fets :" + str(len(list_fets)))
+            #
+            # How can I programatically create and add features to a memory layer in QGIS 1.9?
+            # url: http://gis.stackexchange.com/questions/60473/how-can-i-programatically-create-and-add-features-to-a-memory-layer-in-qgis-1-9
+            # write the layer and send request to DB
+            layer_to_commit.startEditing()
+            layer_to_commit.addFeatures(list_fets, False)  # bool_makeSelected=False
+
+            #
             try:
                 resultCommit = layer_to_commit.commitChanges()
             except:
-                qgis_log_tools.logMessageWARNING("No layer found for tracking position")
-                return 0
-
-            #
-            if resultCommit == True:
-                qgis_log_tools.logMessageINFO("Location saved in layer: " + layer_to_commit.name())
-                # TODO: clear the queue (modify/optimize this 'dummy' strategy)
-                while not self.trackposition_queue.empty():
-                    self.trackposition_queue.get()  # as docs say: Remove and return an item from the queue.
-            else:
-                qgis_log_tools.logMessageCRITICAL(
-                    "saving position failed : are you sure the selected tracking layer: " + layer_to_commit.name() +
-                    "has at least 2 attributes : \"user_id\"::text and \"w_time\"::text")
-                # get the last element of the list
-                # url: http://stackoverflow.com/questions/930397/getting-the-last-element-of-a-list-in-python
-                commitErrorString = layer_to_commit.commitErrors()[-1]
-                # format the string error
-                commitErrorStringShort = commitErrorString[commitErrorString.rfind(":") + 2:len(
-                    commitErrorString)]  # +2 to skip ': ' prefix of commitError msg
-                self.iface.messageBar().pushMessage("IMT. ERROR : " + "\"" + commitErrorStringShort + "\"",
-                                                    "",
-                                                    QgsMessageBar.CRITICAL, 0)
+                pass
