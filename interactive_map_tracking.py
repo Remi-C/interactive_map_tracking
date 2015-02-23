@@ -137,12 +137,6 @@ class interactive_map_tracking:
         self.tp_dict_key_l_values_listfeatures = {}
         self.tp_list_mutex_ltc = QMutex()
         self.tp_list_layers_to_commit = []
-        # for timing
-        import time
-        current_time = time.time()
-        self.tp_time_last_construct_geom = current_time
-        self.tp_time_last_send_geom_to_layer = current_time
-        self.tp_time_last_send_layer_to_dp = current_time
         #
         self.qtimer_tracking_position_rtt_to_memory = QTimer()
         self.qtimer_tracking_position_rtt_to_memory.timeout.connect(self.tracking_position_rtt_to_memory)
@@ -154,9 +148,17 @@ class interactive_map_tracking:
         self.qtimer_tracking_position_layers_to_commit.timeout.connect(self.tracking_position_layers_to_commit)
         # OPTIONS: timing reactions
         self.tp_threshold_time_for_realtime_tracking_position = 0.125     # i.e. 8hz => (max) 8 tracking positions record per second
-        self.tp_threshold_time_for_construct_geom = 0.200
-        self.tp_threshold_time_for_sending_geom_to_layer = 0.250
-        self.tp_threshold_time_for_sending_layer_to_dp = 0.350
+        self.tp_threshold_time_for_construct_geom = 0.200           # add to reference timing: tracking_position
+        self.tp_threshold_time_for_sending_geom_to_layer = 0.250    # add to reference timing: construct_geom
+        self.tp_threshold_time_for_sending_layer_to_dp = 0.500      # add to reference timing: sending_geom_to_layer
+        #
+        self.delta_time_still_moving = 0.750    # delta time used to decide if the user still moving on the map
+        # for timing
+        import time
+        current_time = time.time()
+        self.tp_time_last_construct_geom = current_time + self.tp_threshold_time_for_realtime_tracking_position + self.tp_threshold_time_for_construct_geom
+        self.tp_time_last_send_geom_to_layer = self.tp_time_last_construct_geom + self.tp_threshold_time_for_sending_geom_to_layer
+        self.tp_time_last_send_layer_to_dp = self.tp_time_last_send_geom_to_layer + self.tp_threshold_time_for_sending_layer_to_dp
         """
         Delay on manager of trackposition requests
         can be interesting to evaluate/benchmark the impact on this value
@@ -908,9 +910,10 @@ class interactive_map_tracking:
             else:
                 tp_delta_time_rt = rt_ntuple.w_time - self.tp_rt_ntuples_let.w_time
                 if tp_delta_time_rt >= self.tp_threshold_time_for_realtime_tracking_position:
-                    self.tp_queue_rt_ntuples_let.put(rt_ntuple)
-                    #
                     self.tp_rt_ntuples_let = rt_ntuple
+                    #
+                    with QMutexLocker(self.tp_queue_mutex):
+                        self.tp_queue_rt_ntuples_let.put(rt_ntuple)
                     #
                     qgis_log_tools.logMessageINFO("New tracking position - elapsed time: " + str(tp_delta_time_rt))
 
@@ -1006,6 +1009,7 @@ class interactive_map_tracking:
                     tp_tuple = self.tp_queue_rt_ntuples_let.get()
                     # url: http://stackoverflow.com/questions/20585920/how-to-add-multiple-values-to-a-dictionary-key-in-python
                     self.tp_dict_key_l_values_et.setdefault(tp_tuple.layer, []).append(self.TP_NAMEDTUPLE_ET(tp_tuple.extent, tp_tuple.w_time))
+                    qgis_log_tools.logMessageINFO("append tuples")
             # release the mutex on: tp_dict_key_l_values_et
         # release the mutex: tp_queue_mutex
 
@@ -1018,33 +1022,30 @@ class interactive_map_tracking:
         current_time = time.time()
         delta_time_construct_geom = current_time - self.tp_time_last_construct_geom
         if delta_time_construct_geom >= self.tp_threshold_time_for_construct_geom:
-            # update timer
-            self.tp_time_last_construct_geom = current_time
+            with QMutexLocker(self.tp_dict_mutex_let):
+                ## NEED TO OPTIMIZE ##
+                try:
+                    threshold = int(self.dlg.threshold_extent.text())
+                except Exception:
+                    qgis_log_tools.logMessageWARNING("Threshold can only be a number")
+                    return -1
+                ## NEED TO OPTIMIZE ##
 
-            ## NEED TO OPTIMIZE ##
-            try:
-                threshold = int(self.dlg.threshold_extent.text())
-            except Exception:
-                qgis_log_tools.logMessageWARNING("Threshold can only be a number")
-                return -1
-            ## NEED TO OPTIMIZE ##
+                mapCanvas = self.iface.mapCanvas()
 
-            mapCanvas = self.iface.mapCanvas()
+                # url: http://qgis.org/api/classQgsMapCanvas.html#af0ffae7b5e5ec8b29764773fa6a74d58
+                extent_src_crs = mapCanvas.mapSettings().destinationCrs()
 
-            # url: http://qgis.org/api/classQgsMapCanvas.html#af0ffae7b5e5ec8b29764773fa6a74d58
-            extent_src_crs = mapCanvas.mapSettings().destinationCrs()
+                for layer in self.tp_dict_key_l_values_et.keys():
+                    layer_to_commit = layer
 
-            for layer in self.tp_dict_key_l_values_et.keys():
-                layer_to_commit = layer
+                    # url: http://qgis.org/api/classQgsMapLayer.html#a40b79e2d6043f8ec316a28cb17febd6c
+                    extent_dst_crs = layer_to_commit.crs()
+                    # url: http://docs.qgis.org/testing/en/docs/pyqgis_developer_cookbook/crs.html
+                    xform = QgsCoordinateTransform(extent_src_crs, extent_dst_crs)
 
-                # url: http://qgis.org/api/classQgsMapLayer.html#a40b79e2d6043f8ec316a28cb17febd6c
-                extent_dst_crs = layer_to_commit.crs()
-                # url: http://docs.qgis.org/testing/en/docs/pyqgis_developer_cookbook/crs.html
-                xform = QgsCoordinateTransform(extent_src_crs, extent_dst_crs)
+                    tp_list_fets = []
 
-                tp_list_fets = []
-
-                with QMutexLocker(self.tp_dict_mutex_let):
                     # pop key from tracking position dictionary
                     list_ntuples = self.tp_dict_key_l_values_et.pop(layer)
                     for tp_namedtuple in list_ntuples:
@@ -1085,7 +1086,13 @@ class interactive_map_tracking:
                         fet.setAttributes(self.values)
 
                         with QMutexLocker(self.tp_list_mutex_ltc):
+                            qgis_log_tools.logMessageINFO("append features")
+
                             tp_list_fets.append(fet)
+
+                            # update timer
+                            current_time = time.time()
+                            self.tp_time_last_construct_geom = current_time
 
                     qgis_log_tools.logMessage("size of tp_list_fets :" + str(len(tp_list_fets)))
 
@@ -1099,28 +1106,36 @@ class interactive_map_tracking:
 
         """
         current_time = time.time()
-        delta_time_send_geom_to_layer = current_time - self.tp_time_last_send_geom_to_layer
-        if delta_time_send_geom_to_layer >= self.tp_threshold_time_for_sending_geom_to_layer:
-            # update timer
-            self.tp_time_last_send_geom_to_layer = current_time
+        #delta_time_send_geom_to_layer = current_time - self.tp_time_last_send_geom_to_layer
+        delta_time_send_geom_to_layer = self.tp_time_last_construct_geom - self.tp_time_last_send_geom_to_layer
+        #qgis_log_tools.logMessageINFO("delta_time_send_geom_to_layer: " + str(current_time - self.tp_time_last_construct_geom))
+        b_still_moving = (current_time - self.tp_time_last_construct_geom) <= self.delta_time_still_moving
+        if delta_time_send_geom_to_layer >= self.tp_threshold_time_for_sending_geom_to_layer \
+                and not b_still_moving:
 
-            for layer in self.tp_dict_key_l_values_listfeatures.keys():
-                qgis_log_tools.logMessageINFO("Send Geometries to layer (start edit)")
+            with QMutexLocker(self.tp_dict_mutex_llf):
+                for layer in self.tp_dict_key_l_values_listfeatures.keys():
+                    qgis_log_tools.logMessageINFO("Send Geometries to layer (start edit)")
 
-                with QMutexLocker(self.tp_dict_mutex_llf):
                     # from the dict we retrieve a list of list
-                    # TODO: need to be tested and verified
-                    tp_list_fets = self.tp_dict_key_l_values_listfeatures.pop(layer)[0]
+                    tp_list_of_list_fets = self.tp_dict_key_l_values_listfeatures.pop(layer)
 
-                #
-                # How can I programatically create and add features to a memory layer in QGIS 1.9?
-                # url: http://gis.stackexchange.com/questions/60473/how-can-i-programatically-create-and-add-features-to-a-memory-layer-in-qgis-1-9
-                # write the layer and send request to DB
-                layer.startEditing()
-                layer.addFeatures(tp_list_fets, False)  # bool_makeSelected=False
+                    qgis_log_tools.logMessageINFO("len(tp_list_of_list_fets): " + str(len(tp_list_of_list_fets)))
+                    #
+                    # How can I programatically create and add features to a memory layer in QGIS 1.9?
+                    # url: http://gis.stackexchange.com/questions/60473/how-can-i-programatically-create-and-add-features-to-a-memory-layer-in-qgis-1-9
+                    # write the layer and send request to DB
+                    layer.startEditing()
+                    for tp_list_fets in tp_list_of_list_fets:
+                        layer.addFeatures(tp_list_fets, False)  # bool_makeSelected=False
 
-                with QMutexLocker(self.tp_list_mutex_ltc):
-                    self.tp_list_layers_to_commit.append(layer)
+                    with QMutexLocker(self.tp_list_mutex_ltc):
+                        self.tp_list_layers_to_commit.append(layer)
+                        qgis_log_tools.logMessageINFO("append to layers_to_commit")
+
+                        # update timer
+                        current_time = time.time()
+                        self.tp_time_last_send_geom_to_layer = current_time
 
     def tracking_position_layers_to_commit(self):
         """
@@ -1129,15 +1144,24 @@ class interactive_map_tracking:
 
         """
         current_time = time.time()
-        delta_time_send_layer_to_dp = current_time - self.tp_time_last_send_layer_to_dp
-        if delta_time_send_layer_to_dp >= self.tp_threshold_time_for_sending_layer_to_dp:
-            self.tp_time_last_send_layer_to_dp = current_time
+        delta_time_send_layer_to_dp = current_time - self.tp_time_last_send_geom_to_layer
+        # qgis_log_tools.logMessageINFO("delta_time_send_layer_to_dp: " + str(delta_time_send_layer_to_dp) + "\tself.tp_threshold_time_for_sending_layer_to_dp: " + str(self.tp_threshold_time_for_sending_layer_to_dp))
+        # qgis_log_tools.logMessageINFO("self.tp_time_last_send_layer_to_dp: " + str(self.tp_time_last_send_layer_to_dp))
+        # qgis_log_tools.logMessageINFO("self.tp_time_last_send_geom_to_layer: " + str(self.tp_time_last_send_geom_to_layer))
 
-            while self.tp_list_layers_to_commit != []:
-                qgis_log_tools.logMessageINFO("Send Layer (changed) to DataProvider (commitChanges)")
-                layer_to_commit = self.tp_list_layers_to_commit.pop()
-                #
-                try:
-                    resultCommit = layer_to_commit.commitChanges()
-                except:
-                    pass
+        bTimeToCommit = delta_time_send_layer_to_dp > self.tp_threshold_time_for_sending_layer_to_dp
+
+        if bTimeToCommit:
+            with QMutexLocker(self.tp_list_mutex_ltc):
+                while self.tp_list_layers_to_commit != []:
+                    qgis_log_tools.logMessageINFO("Send Layer (changed) to DataProvider (commitChanges)")
+                    layer_to_commit = self.tp_list_layers_to_commit.pop()
+                    #
+                    try:
+                        resultCommit = layer_to_commit.commitChanges()
+                        qgis_log_tools.logMessageINFO("commit change layer")
+
+                        current_time = time.time()
+                        self.tp_time_last_send_layer_to_dp = current_time
+                    except:
+                        pass
