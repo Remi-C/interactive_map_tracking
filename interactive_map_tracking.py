@@ -714,7 +714,8 @@ class interactive_map_tracking:
         # retrieve layer name from GUI (IMT)
         layerNameForTrackingPosition = self.dlg.trackingPositionLayerCombo.currentText()
         # search this layer
-        layerPolygonExtent = qgis_mapcanvas_tools.findLayerInMapCanvas(mapCanvas, layerNameForTrackingPosition)
+        #layerPolygonExtent = qgis_mapcanvas_tools.find_layer_in_mapcanvas(mapCanvas, layerNameForTrackingPosition)
+        layerPolygonExtent = qgis_mapcanvas_tools.find_layer_in_qgis_legend_interface(self.iface, layerNameForTrackingPosition)
         if layerPolygonExtent is None:
             qgis_log_tools.logMessageWARNING("No layer found for tracking position")
             return 0
@@ -863,7 +864,8 @@ class interactive_map_tracking:
             layer_name_to_commit = str(self.trackposition_queue.get())
             qgis_log_tools.logMessage("consume a commitChanges request for this layer: " + layer_name_to_commit)
 
-            layer_to_commit = qgis_mapcanvas_tools.findLayerInMapCanvas(self.iface.mapCanvas(), layer_name_to_commit)
+            #layer_to_commit = qgis_mapcanvas_tools.find_layer_in_mapcanvas(self.iface.mapCanvas(), layer_name_to_commit)
+            layer_to_commit = qgis_mapcanvas_tools.find_layer_in_qgis_legend_interface(self.iface, layer_name_to_commit)
             if layer_to_commit is None:
                 qgis_log_tools.logMessageWARNING("No layer found for tracking position")
                 return 0
@@ -874,7 +876,6 @@ class interactive_map_tracking:
             if resultCommit == True:
                 qgis_log_tools.logMessageINFO("Location saved in layer: " + layer_to_commit.name())
                 # TODO: clear the queue (modify/optimize this 'dummy' strategy)
-                # self.trackposition_queue.queue.clear()
                 while not self.trackposition_queue.empty():
                     self.trackposition_queue.get()  # as docs say: Remove and return an item from the queue.
             else:
