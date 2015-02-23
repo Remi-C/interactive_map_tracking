@@ -149,19 +149,19 @@ class interactive_map_tracking:
         # OPTIONS: timing reactions
         # TODO : think about time and chaining condition
         self.tp_threshold_time_for_realtime_tracking_position = 0.125     # i.e. 8hz => (max) 8 tracking positions record per second
-        self.tp_threshold_time_for_tp_to_mem = 0.125                # add to reference timing: realtime_tracking_position
-        self.tp_threshold_time_for_construct_geom = 5.00            # add to reference timing: tp_to_mem
-        self.tp_threshold_time_for_sending_geom_to_layer = 0.250    # add to reference timing: construct_geom
-        self.tp_threshold_time_for_sending_layer_to_dp = 0.500      # add to reference timing: sending_geom_to_layer
+        self.tp_threshold_time_for_tp_to_mem = 0.000                # add to reference timing: realtime_tracking_position
+        self.tp_threshold_time_for_construct_geom = 0.125            # add to reference timing: tp_to_mem
+        self.tp_threshold_time_for_sending_geom_to_layer = 0.250     # add to reference timing: construct_geom
+        self.tp_threshold_time_for_sending_layer_to_dp = 0.333       # add to reference timing: sending_geom_to_layer
         #
         self.delta_time_still_moving = 0.750    # delta time used to decide if the user still moving on the map
         # for timing
         import time
         current_time = time.time()
-        self.tp_time_last_tp_to_mem = current_time - self.tp_threshold_time_for_realtime_tracking_position - self.tp_threshold_time_for_tp_to_mem
-        self.tp_time_last_construct_geom = self.tp_time_last_tp_to_mem - self.tp_threshold_time_for_construct_geom
-        self.tp_time_last_send_geom_to_layer = self.tp_time_last_construct_geom - self.tp_threshold_time_for_sending_geom_to_layer
-        self.tp_time_last_send_layer_to_dp = self.tp_time_last_send_geom_to_layer - self.tp_threshold_time_for_sending_layer_to_dp
+        self.tp_time_last_tp_to_mem = current_time
+        self.tp_time_last_construct_geom = current_time
+        self.tp_time_last_send_geom_to_layer = current_time
+        self.tp_time_last_send_layer_to_dp = current_time
         """
         Delay on manager of trackposition requests
         can be interesting to evaluate/benchmark the impact on this value
@@ -1002,13 +1002,10 @@ class interactive_map_tracking:
         Try to enqueue request from Tracking Position to amortize the cost&effect on QGIS GUI
 
         """
-        if self.tp_rt_ntuples_let == {}:
-            return
         current_time = time.time()
         delta_time_mem = current_time - self.tp_time_last_tp_to_mem
         # qgis_log_tools.logMessageINFO("delta_time_mem: " + str(delta_time_mem))
-        # if delta_time_mem >= self.tp_threshold_time_for_tp_to_mem:
-        if True:
+        if delta_time_mem >= self.tp_threshold_time_for_tp_to_mem:
             # qgis_log_tools.QGISLogger().log("qtimer_tracking_position_event(...)")
             #qgis_log_tools.logMessage("qtimer_tracking_position_event(...)")
 
@@ -1039,8 +1036,8 @@ class interactive_map_tracking:
 
         """
         current_time = time.time()
-        delta_time_construct_geom = (current_time - self.tp_time_last_tp_to_mem) + (self.tp_time_last_tp_to_mem - self.tp_time_last_construct_geom)
-        # qgis_log_tools.logMessageINFO("delta_time_construct_geom: " + str(delta_time_construct_geom))
+        delta_time_construct_geom = (current_time - self.tp_time_last_tp_to_mem)
+        #qgis_log_tools.logMessageINFO("delta_time_construct_geom: " + str(delta_time_construct_geom))
 
         if delta_time_construct_geom >= self.tp_threshold_time_for_construct_geom:
             with QMutexLocker(self.tp_dict_mutex_let):
@@ -1127,10 +1124,8 @@ class interactive_map_tracking:
 
         """
         current_time = time.time()
-        #delta_time_send_geom_to_layer = current_time - self.tp_time_last_send_geom_to_layer
-        # delta_time_send_geom_to_layer = self.tp_time_last_construct_geom - self.tp_time_last_send_geom_to_layer
-        delta_time_send_geom_to_layer = (current_time - self.tp_time_last_construct_geom) + (self.tp_time_last_construct_geom - self.tp_time_last_send_layer_to_dp)
-        # qgis_log_tools.logMessageINFO("delta_time_send_geom_to_layer: " + str(current_time - self.tp_time_last_construct_geom))
+        delta_time_send_geom_to_layer = (current_time - self.tp_time_last_construct_geom)
+        #qgis_log_tools.logMessageINFO("delta_time_send_geom_to_layer: " + str(current_time - self.tp_time_last_construct_geom))
         b_still_moving = (current_time - self.tp_time_last_construct_geom) <= self.delta_time_still_moving
         if delta_time_send_geom_to_layer >= self.tp_threshold_time_for_sending_geom_to_layer \
                 and not b_still_moving:
@@ -1166,15 +1161,12 @@ class interactive_map_tracking:
 
         """
         current_time = time.time()
-        delta_time_send_layer_to_dp = (current_time - self.tp_time_last_send_geom_to_layer) + (self.tp_time_last_send_geom_to_layer - self.tp_time_last_send_layer_to_dp)
-        # delta_time_send_layer_to_dp = current_time - self.tp_time_last_send_geom_to_layer
-        # qgis_log_tools.logMessageINFO("delta_time_send_layer_to_dp: " + str(delta_time_send_layer_to_dp) + "\tself.tp_threshold_time_for_sending_layer_to_dp: " + str(self.tp_threshold_time_for_sending_layer_to_dp))
+        delta_time_send_layer_to_dp = (current_time - self.tp_time_last_send_geom_to_layer)
+        #qgis_log_tools.logMessageINFO("delta_time_send_layer_to_dp: " + str(delta_time_send_layer_to_dp))
         # qgis_log_tools.logMessageINFO("self.tp_time_last_send_layer_to_dp: " + str(self.tp_time_last_send_layer_to_dp))
         # qgis_log_tools.logMessageINFO("self.tp_time_last_send_geom_to_layer: " + str(self.tp_time_last_send_geom_to_layer))
 
-        bTimeToCommit = delta_time_send_layer_to_dp > self.tp_threshold_time_for_sending_layer_to_dp
-
-        if bTimeToCommit:
+        if delta_time_send_layer_to_dp >= self.tp_threshold_time_for_sending_layer_to_dp:
             with QMutexLocker(self.tp_list_mutex_ltc):
                 while self.tp_list_layers_to_commit != []:
                     qgis_log_tools.logMessageINFO("Send Layer (changed) to DataProvider (commitChanges)")
