@@ -19,3 +19,5 @@ This plug-in add 2 features to QGIS, the user choose what feature he uses
 * QGIS uses a sophisticated Do/Undo mechanism with a delayed writing system. However, when working with a data base that generates geometry on the fly (trigger), it is essential to commit each change immediately.
 * The plug-in does exactly that : each modification (geometry or attribute) is saved immediately to the layer, and the canvas is re-rendered.
 * this instantaneous commit allow to __create new user interaction__ that are within the database, as opposed to be within QGIS. Thus, this interactions can be used in other GIS software, and can be much more complex.
+
+[[/Remi-C/interactive_map_tracking.wiki/images/plugin/logo_HQ.png]]
