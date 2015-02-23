@@ -69,69 +69,6 @@
 <li>The plug-in does exactly that : each modification (geometry or attribute) is saved immediately to the layer, and the canvas is re-rendered.</li>
 <li>this instantaneous commit allow to <strong>create new user interaction</strong> that are within the database, as opposed to be within QGIS. Thus, this interactions can be used in other GIS software, and can be much more complex.</li>
 </ul>
-
-<h2>
-<a id="installing-the-plug-in" class="anchor" href="#installing-the-plug-in" aria-hidden="true"><span class="octicon octicon-link"></span></a>Installing the plug-in</h2>
-
-<p>Installing this plug-in is extremely easy.<br>
-It can be installed using two methods : </p>
-
-<ul>
-<li>install from central plugin repository
-
-<ul>
-<li>in the option menu, check that QGIS proxy is correctly configured, so QGIS can access internet<br>
-(<code>Http_proxy</code>, <code>proxy.ign.fr:3128</code>)</li>
-<li>go in the plug-in menu, then select "Tracking And Autosave" for installation</li>
-<li>an icone will be added to QGIS tool bar, click on it to activate/desactivate/configure the plug-in afterward</li>
-</ul>
-</li>
-<li>install manually 
-
-<ul>
-<li>look for the folder <code>.qgis2</code>, it is at the root of your user folder 
-
-<ul>
-<li>linux : <code>/home/your_user_name</code>
-</li>
-<li>windows XP: <code>C:\Documents and Settings\your_user_name</code>
-</li>
-<li>windows 7 : <code>C:\Users\your_user_name</code>
-</li>
-</ul>
-</li>
-<li>copy the zipped plug-in (that you can get from this repository) to <code>.qgis2\python\plugins</code>
-</li>
-<li>unzip the plug-in here</li>
-<li>relaunch your QGIS</li>
-</ul>
-</li>
-</ul>
-
-<h2>
-<a id="configure-the-plug-in" class="anchor" href="#configure-the-plug-in" aria-hidden="true"><span class="octicon octicon-link"></span></a>Configure the plug-in</h2>
-
-<h2>
-<a id="using-the-plug-in--limitations" class="anchor" href="#using-the-plug-in--limitations" aria-hidden="true"><span class="octicon octicon-link"></span></a>Using the plug-in : Limitations</h2>
-
-<ul>
-<li>tracking
-
-<ul>
-<li>when the tracking layer is not diplayed, no tracking</li>
-<li>because the plug-in writes each camera position, it may slow navigation when using a lot of scroll/unscroll</li>
-</ul>
-</li>
-<li>Autosave/refresh
-
-<ul>
-<li>The Do/Undo feature can't be used</li>
-<li> when using the node tool, auto saving will loose the selection of nodes 
-##Improving the plug-in 
-This is an open source project, any test/idea/contribution is welcome.</li>
-</ul>
-</li>
-</ul>
         </section>
 
         <aside id="sidebar">
