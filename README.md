@@ -6,11 +6,11 @@ This plug-in was designed to allow __concurrent editing awareness or history of 
 ###feature
 This plug-in add 2 features to QGIS, the user choose what feature he uses
 
-![][https://raw.githubusercontent.com/wiki/Remi-C/interactive_map_tracking/images/plugin/logo_LQ.png]
+![](https://raw.githubusercontent.com/wiki/Remi-C/interactive_map_tracking/images/plugin/logo_LQ.png)
 
-![][https://raw.githubusercontent.com/wiki/Remi-C/interactive_map_tracking/images/plugin/multi_user_tracking_edited.png]
+![](https://raw.githubusercontent.com/wiki/Remi-C/interactive_map_tracking/images/plugin/multi_user_tracking_edited_LQ.png)
 
-![][https://raw.githubusercontent.com/wiki/Remi-C/interactive_map_tracking/images/plugin/edition_time_with_hexagonal_grid.pn]g
+![](https://raw.githubusercontent.com/wiki/Remi-C/interactive_map_tracking/images/plugin/edition_time_with_hexagonal_grid_LQ.png)
 
 
 ####tracking the position 
