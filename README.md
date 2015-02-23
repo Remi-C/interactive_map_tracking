@@ -6,6 +6,7 @@ This plug-in was designed to allow __concurrent editing awareness or history of 
 ###feature
 This plug-in add 2 features to QGIS, the user choose what feature he uses
 
+[[Remi-C/interactive_map_tracking.wiki/images/plugin/logo.png]]
 ####tracking the position 
 * each time the user change its position on QGIS map canvas, the screen rectangle is saved along with a user id and a timestamp. That is, if the user zoom level is compatible with edition (parameter)
 * with correct QGIS styling, this enable to see : 
