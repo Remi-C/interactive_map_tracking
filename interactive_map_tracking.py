@@ -106,7 +106,7 @@ class interactive_map_tracking:
         self.bSignalForLayerChangedConnected = False
         self.bSignalForExtentsChangedConnected = False
 
-        self.idCameraPositionLayerInBox = 0
+        # self.idCameraPositionLayerInBox = 0
         self.currentLayerForTrackingPosition = None
 
         self.bSignalForProjectReadConnected = True
@@ -117,17 +117,21 @@ class interactive_map_tracking:
         self.QMCanvasExtentsChanged = QMutex()
         self.QMCanvasExtentsChangedAndRenderComplete = QMutex()
 
-        self.tp_queue_layer_to_commit = Queue.LifoQueue()
-        self.qtimer_tp_layer_to_commit = QTimer()
-        #self.qtimer_tp_layer_to_commit.timeout.connect(self.qtimer_tp_layer_to_commit_event)
-        self.qtimer_tp_layer_to_commit_delay = 2000  # 2000ms = 2s
 
         #url: https://docs.python.org/2/library/collections.html#collections.namedtuple
         # Definition : namedtuples 'type'
         self.TP_NAMEDTUPLE_LET = namedtuple('TP_NAMEDTUPLE_LET', ['layer', 'extent', 'w_time'])
         self.TP_NAMEDTUPLE_ET = namedtuple('TP_NAMEDTUPLE_ET', ['extent', 'w_time'])
         # LIFO Queue to save (in real time) requests for tracking position
-        self.tp_queue_namedtuple = Queue.LifoQueue()
+        self.tp_queue_rt_ntuples_let = Queue.LifoQueue()
+        self.tp_queue_mutex = QMutex()
+        self.tp_rt_ntuples_let = {}
+        # for timing
+        import time
+        current_time = time.time()
+        self.tp_time_last_construct_geom = current_time
+        self.tp_time_last_send_geom_to_layer = current_time
+        self.tp_time_last_send_layer_to_dp = current_time
         #
         self.qtimer_tracking_position = QTimer()
         self.qtimer_tracking_position.timeout.connect(self.qtimer_tracking_position_event)
@@ -137,8 +141,8 @@ class interactive_map_tracking:
         can be interesting to evaluate/benchmark the impact on this value
         """
         # self.qtimer_tracking_position_delay = 5000  # in ms
-        # self.qtimer_tracking_position_delay = 10  # in ms
-        self.qtimer_tracking_position_delay = 500   # in ms
+        self.qtimer_tracking_position_delay = 10  # in ms
+        #self.qtimer_tracking_position_delay = 500   # in ms
 
         # user-id:
         # from user id OS
@@ -281,7 +285,6 @@ class interactive_map_tracking:
         # don't change the state (options) of the plugin
         self.dlg.buttonHide.clicked.connect(self.hide_plugin)
         #
-        self.idCameraPositionLayerInBox = 0
         self.refreshComboBoxLayers()
 
     def unload(self):
@@ -314,8 +317,6 @@ class interactive_map_tracking:
 
         # Run the dialog event loop
         result = self.dlg.exec_()
-
-        self.qtimer_tp_layer_to_commit.stop()
 
         # See if OK was pressed
         if result:
@@ -608,7 +609,7 @@ class interactive_map_tracking:
         # set the fields
         # reset all fields in None
         self.values = [None for i in range(fields.count())]
-        # set some fields (user_id, time)
+        # set user_id field (suppose constant for a layer (in QGIS session))
         self.values[self.tp_id_user_id] = self.tp_user_name
 
     def refreshComboBoxLayers(self):
@@ -618,26 +619,37 @@ class interactive_map_tracking:
 
         self.dlg.trackingPositionLayerCombo.clear()
 
+        idComboBoxIndex = -1
+        idComboBoxIndexForCameraPosition = -1
+
+        # dictionnary to link id on combobox and objects QGIS layer
+        dict_key_comboboxindex_value_layer = {}
+        #
         layers = QgsMapLayerRegistry.instance().mapLayers().values()
         for layer in layers:
             # filter on layers to add in combobox
             if qgis_layer_tools.filter_layer_for_trackingposition(layer):
+                idComboBoxIndex = self.dlg.trackingPositionLayerCombo.count()
+                dict_key_comboboxindex_value_layer[idComboBoxIndex] = layer
                 self.dlg.trackingPositionLayerCombo.addItem(layer.name(), layer)
                 # default search layer
                 if layer.name() == "camera_position":
-                    self.idCameraPositionLayerInBox = self.dlg.trackingPositionLayerCombo.count() - 1
+                    idComboBoxIndexForCameraPosition = idComboBoxIndex
                     #
                     qgis_log_tools.logMessageINFO("camera_position layer found - id in combobox: " + str(
-                        self.dlg.trackingPositionLayerCombo.currentIndex()))
+                        idComboBoxIndexForCameraPosition))
 
         # update GUI
-        self.dlg.trackingPositionLayerCombo.setCurrentIndex(self.idCameraPositionLayerInBox)
+        if idComboBoxIndexForCameraPosition != -1:
+            self.dlg.trackingPositionLayerCombo.setCurrentIndex(idComboBoxIndexForCameraPosition)
+            idComboBoxIndex = idComboBoxIndexForCameraPosition
 
-        try:
-            selected_layer_for_tracking = layers[self.idCameraPositionLayerInBox]
-            self.currentLayerForTrackingPosition = selected_layer_for_tracking
-        except:
-            pass
+        if idComboBoxIndex != -1:
+            try:
+                self.currentLayerForTrackingPosition = dict_key_comboboxindex_value_layer[idComboBoxIndex]
+                qgis_log_tools.logMessageINFO("Set the layer to: " + self.currentLayerForTrackingPosition.name())
+            except:
+                qgis_log_tools.logMessageINFO("!!! ERROR for selecting layer !!!")
 
     def enabled_autosave(self):
         """ Action when the checkbox 'Enable Auto-Save and Refresh' is clicked """
@@ -676,15 +688,10 @@ class interactive_map_tracking:
 
             if self.bUseMutexAndBetaFunctionalities:
                 # add a delay (con_trackposition_delay) in QTimer
-                self.qtimer_tp_layer_to_commit.start(self.qtimer_tp_layer_to_commit_delay)
-                # add a delay (con_trackposition_delay) in QTimer
                 self.qtimer_tracking_position.start(self.qtimer_tracking_position_delay)
         else:
             self.disconnectSignalForExtentsChanged()
 
-            # if self.bUseMutexAndBetaFunctionalities:
-            if self.qtimer_tp_layer_to_commit.isActive():
-                self.qtimer_tp_layer_to_commit.stop()
             if self.qtimer_tracking_position.isActive():
                 self.qtimer_tracking_position.stop()
 
@@ -704,12 +711,8 @@ class interactive_map_tracking:
 
         if self.dlg.enableUseMutexForTP.isChecked() and self.dlg.enableTrackPosition.isChecked():
             # add a delay (con_trackposition_delay) in QTimer
-            self.qtimer_tp_layer_to_commit.start(self.qtimer_tp_layer_to_commit_delay)
-            # add a delay (con_trackposition_delay) in QTimer
             self.qtimer_tracking_position.start(self.qtimer_tracking_position_delay)
         else:
-            if self.qtimer_tp_layer_to_commit.isActive():
-                self.qtimer_tp_layer_to_commit.stop()
             if self.qtimer_tracking_position.isActive():
                 self.qtimer_tracking_position.stop()
 
@@ -746,8 +749,6 @@ class interactive_map_tracking:
                 self.connectSignalForExtentsChanged()
                 if self.bUseMutexAndBetaFunctionalities:
                     # add a delay (con_trackposition_delay) in QTimer
-                    self.qtimer_tp_layer_to_commit.start(self.qtimer_tp_layer_to_commit_delay)
-                    # add a delay (con_trackposition_delay) in QTimer
                     self.qtimer_tracking_position.start(self.qtimer_tracking_position_delay)
         else:
             self.dlg.enableAutoSave.setDisabled(True)
@@ -762,9 +763,7 @@ class interactive_map_tracking:
                 self.disconnectSignalForLayerModified(self.currentLayer)
             if self.dlg.enableTrackPosition.isChecked():
                 self.disconnectSignalForExtentsChanged()
-                # if self.bUseMutexAndBetaFunctionalities:
-                if self.qtimer_tp_layer_to_commit.isActive():
-                    self.qtimer_tp_layer_to_commit.stop()
+
                 if self.qtimer_tracking_position.isActive():
                     self.qtimer_tracking_position.stop()
 
@@ -847,17 +846,26 @@ class interactive_map_tracking:
         layer_for_polygon_extent = self.currentLayerForTrackingPosition
 
         if self.bUseMutexAndBetaFunctionalities:
-            #self.trackposition_queue.put(layerPolygonExtent)
-            # with self.trackposition_queue.mutex:
-            #self.tp_queue_layer_to_commit.put(layer_for_polygon_extent.name())
-
-            self.tp_queue_namedtuple.put(
-                self.TP_NAMEDTUPLE_LET(
+            #
+            rt_ntuple = self.TP_NAMEDTUPLE_LET(
                     layer_for_polygon_extent,
                     mapcanvas_extent,
-                    imt_tools.get_timestamp_from_qt_string_format()
-                )
+                    # imt_tools.get_timestamp_from_qt_string_format()
+                    imt_tools.get_timestamp()
             )
+            #
+            if self.tp_rt_ntuples_let == {}:
+                self.tp_rt_ntuples_let = rt_ntuple
+                qgis_log_tools.logMessageINFO("New tracking position")
+            else:
+                tp_delta_time_rt = rt_ntuple.w_time - self.tp_rt_ntuples_let.w_time
+                tp_threshold_for_tp = 0.125 # i.e. 8hz => (max) 8 tracking positions record per second
+                if tp_delta_time_rt >= tp_threshold_for_tp:
+                    self.tp_queue_rt_ntuples_let.put(rt_ntuple)
+                    #
+                    self.tp_rt_ntuples_let = rt_ntuple
+                    #
+                    qgis_log_tools.logMessageINFO("New tracking position - elapsed time: " + str(tp_delta_time_rt))
 
             resultCommit = True
         else:
@@ -931,52 +939,6 @@ class interactive_map_tracking:
         #
         return resultCommit
 
-    def qtimer_tp_layer_to_commit_event(self):
-        """ [BETA] Action perform when the QTimer for Tracking Position is time out
-        Try to enqueue request from Tracking Position to amortize the cost&effect on QGIS GUI
-
-        """
-
-        # #qgis_log_tools.logMessage("launch cron_track_position_event(...)")
-        # qgis_log_tools.QGISLogger().log("launch cron_track_position_event(...)")
-        #
-        # #
-        # # with self.trackposition_queue.mutex:
-        # if not self.tp_queue_layer_to_commit.empty():
-        #
-        #     layer_name_to_commit = str(self.tp_queue_layer_to_commit.get())
-        #     qgis_log_tools.logMessage("consume a commitChanges request for this layer: " + layer_name_to_commit)
-        #
-        #     layer_to_commit = imt_tools.find_layer_in_qgis_legend_interface(self.iface, layer_name_to_commit)
-        #     # if layer_to_commit is None:
-        #     #     qgis_log_tools.logMessageWARNING("No layer found for tracking position")
-        #     #     return 0
-        #     try:
-        #         result_commit = layer_to_commit.commitChanges()
-        #     except:
-        #         qgis_log_tools.logMessageWARNING("No layer found for tracking position")
-        #         return 0
-        #
-        #     #
-        #     if result_commit:
-        #         qgis_log_tools.logMessageINFO("Location saved in layer: " + layer_to_commit.name())
-        #         # TODO: clear the queue (modify/optimize this 'dummy' strategy)
-        #         while not self.tp_queue_layer_to_commit.empty():
-        #             self.tp_queue_layer_to_commit.get()  # as docs say: Remove and return an item from the queue.
-        #     else:
-        #         qgis_log_tools.logMessageCRITICAL(
-        #             "saving position failed : are you sure the selected tracking layer: " + layer_to_commit.name() +
-        #             "has at least 2 attributes : \"user_id\"::text and \"w_time\"::text")
-        #         # get the last element of the list
-        #         # url: http://stackoverflow.com/questions/930397/getting-the-last-element-of-a-list-in-python
-        #         commit_error_string = layer_to_commit.commitErrors()[-1]
-        #         # format the string error
-        #         commit_error_string_short = commit_error_string[commit_error_string.rfind(":") + 2:len(
-        #             commit_error_string)]  # +2 to skip ': ' prefix of commitError msg
-        #         self.iface.messageBar().pushMessage("IMT. ERROR : " + "\"" + commit_error_string_short + "\"",
-        #                                             "",
-        #                                             QgsMessageBar.CRITICAL, 0)
-
 
     def qtimer_tracking_position_event(self):
         """ [BETA] Action perform when the QTimer for Tracking Position is time out
@@ -986,47 +948,54 @@ class interactive_map_tracking:
         # qgis_log_tools.QGISLogger().log("qtimer_tracking_position_event(...)")
         #qgis_log_tools.logMessage("qtimer_tracking_position_event(...)")
 
+        ## NEED TO OPTIMIZE ##
         try:
             threshold = int(self.dlg.threshold_extent.text())
         except Exception:
             qgis_log_tools.logMessageWARNING("Threshold can only be a number")
             return -1
+        ## NEED TO OPTIMIZE ##
 
         mapCanvas = self.iface.mapCanvas()
 
-        qgis_log_tools.logMessage("size of tq_queue_namedtuple :" + str(self.tp_queue_namedtuple.qsize()))
+        # Lock the mutex on Tracking Position queue
+        # because this queue is used on real tim tracking (with signal/event from QGIS GUI)
+        # so we can't be sure that this queue will not be modified when we will use it (in this "thread")
+        with QMutexLocker(self.tp_queue_mutex):
+            #qgis_log_tools.logMessage("size of tq_queue_namedtuple :" + str(self.tp_queue_rt_ntuples_let.qsize()))
 
-        dict_key_l_values_et = {}
+            dict_key_l_values_et = {}
 
-        while not self.tp_queue_namedtuple.empty():
-            tp_tuple = self.tp_queue_namedtuple.get()
-            # url: http://stackoverflow.com/questions/20585920/how-to-add-multiple-values-to-a-dictionary-key-in-python
-            dict_key_l_values_et.setdefault(tp_tuple.layer, []).append(self.TP_NAMEDTUPLE_ET(tp_tuple.extent, tp_tuple.w_time))
+            while not self.tp_queue_rt_ntuples_let.empty():
+                tp_tuple = self.tp_queue_rt_ntuples_let.get()
+                # url: http://stackoverflow.com/questions/20585920/how-to-add-multiple-values-to-a-dictionary-key-in-python
+                dict_key_l_values_et.setdefault(tp_tuple.layer, []).append(self.TP_NAMEDTUPLE_ET(tp_tuple.extent, tp_tuple.w_time))
+        # release the mutex
 
-        # url: http://qgis.org/api/classQgsMapCanvas.html#af0ffae7b5e5ec8b29764773fa6a74d58
-        extent_src_crs = mapCanvas.mapSettings().destinationCrs()
+        import time
 
-        for layer in dict_key_l_values_et.keys():
-            layer_to_commit = layer
-            list_fets = []
+        current_time = time.time()
+        delta_time_construct_geom = current_time - self.tp_time_last_construct_geom
+        tp_threshold_construct_geom = 0.250
+        if delta_time_construct_geom >= tp_threshold_construct_geom:
+            # url: http://qgis.org/api/classQgsMapCanvas.html#af0ffae7b5e5ec8b29764773fa6a74d58
+            extent_src_crs = mapCanvas.mapSettings().destinationCrs()
 
-            # url: http://qgis.org/api/classQgsMapLayer.html#a40b79e2d6043f8ec316a28cb17febd6c
-            extent_dst_crs = layer_to_commit.crs()
-            # url: http://docs.qgis.org/testing/en/docs/pyqgis_developer_cookbook/crs.html
-            xform = QgsCoordinateTransform(extent_src_crs, extent_dst_crs)
+            for layer in dict_key_l_values_et.keys():
+                layer_to_commit = layer
+                list_fets = []
 
-            for tp_namedtuple in dict_key_l_values_et[layer]:
-                #qgis_log_tools.logMessage("consume a request track_position in queue ...")
+                # url: http://qgis.org/api/classQgsMapLayer.html#a40b79e2d6043f8ec316a28cb17febd6c
+                extent_dst_crs = layer_to_commit.crs()
+                # url: http://docs.qgis.org/testing/en/docs/pyqgis_developer_cookbook/crs.html
+                xform = QgsCoordinateTransform(extent_src_crs, extent_dst_crs)
 
-                mapcanvas_extent = tp_namedtuple.extent
-                w_time = tp_namedtuple.w_time
+                for tp_namedtuple in dict_key_l_values_et[layer]:
+                    #qgis_log_tools.logMessage("consume a request track_position in queue ...")
 
-                qgis_log_tools.logMessage(
-                    "Request track_position description: \n" +
-                    "\tLayer name: " + layer_to_commit.name() + "\n"
-                    "\tw_time: " + w_time)
+                    mapcanvas_extent = tp_namedtuple.extent
+                    w_time = tp_namedtuple.w_time
 
-                try:
                     #result_commit = layer_to_commit.commitChanges()
 
                     # filter on extent size
@@ -1058,26 +1027,38 @@ class interactive_map_tracking:
                     fet.setGeometry(gPolygon)
 
                     # update the time stamp attribute
-                    self.values[self.tp_id_w_time] = imt_tools.get_timestamp_from_qt_string_format()
+                    # self.values[self.tp_id_w_time] = imt_tools.get_timestamp_from_qt_string_format()
+                    self.values[self.tp_id_w_time] = imt_tools.convert_timestamp_to_qt_string_format(w_time)
+                    qgis_log_tools.logMessageINFO("time from tupple: " + str(w_time))
+                    qgis_log_tools.logMessageINFO("qdatetime string: " + self.values[self.tp_id_w_time])
 
                     fet.setAttributes(self.values)
                     # fet.setAttribute({self.tp_id_w_time: imt_tools.get_timestamp_from_qt_string_format()})
 
                     list_fets.append(fet)
-                except:
-                    qgis_log_tools.logMessageCRITICAL("####################### Error here ! Strange ! ####################### ")
-                    return 0
 
-            qgis_log_tools.logMessage("size of list_fets :" + str(len(list_fets)))
-            #
-            # How can I programatically create and add features to a memory layer in QGIS 1.9?
-            # url: http://gis.stackexchange.com/questions/60473/how-can-i-programatically-create-and-add-features-to-a-memory-layer-in-qgis-1-9
-            # write the layer and send request to DB
-            layer_to_commit.startEditing()
-            layer_to_commit.addFeatures(list_fets, False)  # bool_makeSelected=False
 
-            #
-            try:
-                resultCommit = layer_to_commit.commitChanges()
-            except:
-                pass
+                qgis_log_tools.logMessage("size of list_fets :" + str(len(list_fets)))
+
+                current_time = time.time()
+                delta_time_send_geom_to_layer = current_time - self.tp_time_last_send_geom_to_layer
+                tp_threshold_send_geom_to_layer = 0.500
+                if delta_time_send_geom_to_layer >= tp_threshold_send_geom_to_layer:
+                    qgis_log_tools.logMessageINFO("Send Geometries to layer (start edit)")
+                    #
+                    # How can I programatically create and add features to a memory layer in QGIS 1.9?
+                    # url: http://gis.stackexchange.com/questions/60473/how-can-i-programatically-create-and-add-features-to-a-memory-layer-in-qgis-1-9
+                    # write the layer and send request to DB
+                    layer_to_commit.startEditing()
+                    layer_to_commit.addFeatures(list_fets, False)  # bool_makeSelected=False
+
+                current_time = time.time()
+                delta_time_send_layer_to_dp = current_time - self.tp_time_last_send_layer_to_dp
+                tp_threshold_send_layer_to_dp = 1.000
+                if delta_time_send_layer_to_dp >= tp_threshold_send_layer_to_dp:
+                    qgis_log_tools.logMessageINFO("Send Layers (changed) to DataProvider (commitChanges)")
+                    #
+                    try:
+                        resultCommit = layer_to_commit.commitChanges()
+                    except:
+                        pass
