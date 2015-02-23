@@ -29,6 +29,8 @@ import os
 import socket
 
 
+defaultQtDateFormatString = "yyyy-MM-ddThh:mm:ss.zzz"
+
 #
 if os.name != "nt":
     import fcntl
@@ -92,32 +94,57 @@ def get_os_username():
     return getpass.getuser()
 
 
-def get_timestamp_from_qt_string_format(QtDateFormat=1):
-    """ Retrieve timestamp from the system and convert into a ISO QString/QDateTime format.
-
-    urls:
-    - https://docs.python.org/2/library/datetime.html
-    - http://stackoverflow.com/questions/2935041/how-to-convert-from-timestamp-to-date-in-qt
-    - http://stackoverflow.com/questions/3387655/safest-way-to-convert-float-to-integer-in-python
-    - http://pyqt.sourceforge.net/Docs/PyQt4/qt.html -> Qt.DateFormat
-      Qt.ISODate 	= 1 : ISO 8601 extended format: either YYYY-MM-DD for dates or YYYY-MM-DDTHH:mm:ss, YYYY-MM-DDTHH:mm:ssTZD
-      (e.g., 1997-07-16T19:20:30+01:00) for combined dates and times.
-
-    :param QtDateFormat: enum (value) for ISO conversion (from Qt C++ API) [default=1(=Qt.ISODate)]
-    :type QtDateFormat: int
-
-    :return: TimeStamp in ISO QString from QDateTime format.
-    :rtype: QString
-    """
+def get_timestamp():
     import time
-    from PyQt4.QtCore import QDateTime
     # Python time
-    timestamp = time.time()
+    return time.time()
+
+
+def convert_timestamp_to_qdatetime(timestamp):
+    from PyQt4.QtCore import QDateTime
+    from math import modf
+    timestamp_frac, timestamp_whole = modf(timestamp)
     # Qt time
     qdatetime = QDateTime()
-    qdatetime.setTime_t(int(timestamp))
+    qdatetime.setTime_t(int(timestamp_whole))
+    qdatetime = qdatetime.addMSecs(int(timestamp_frac*1000))
+    #
+    return qdatetime
+
+
+# def convert_timestamp_to_qt_string_format(timestamp, QtDateFormat):
+#     # String Qt time
+#     return convert_timestamp_to_qdatetime(timestamp).toString(QtDateFormat)
+
+
+def convert_timestamp_to_qt_string_format(timestamp, QtDateFormatString=defaultQtDateFormatString):
     # String Qt time
-    return qdatetime.toString(1)
+    return convert_timestamp_to_qdatetime(timestamp).toString(QtDateFormatString)
+
+
+# def get_timestamp_from_qt_string_format(QtDateFormat):
+#     """ Retrieve timestamp from the system and convert into a ISO QString/QDateTime format.
+#
+#     urls:
+#     - https://docs.python.org/2/library/datetime.html
+#     - http://stackoverflow.com/questions/2935041/how-to-convert-from-timestamp-to-date-in-qt
+#     - http://stackoverflow.com/questions/3387655/safest-way-to-convert-float-to-integer-in-python
+#     - http://pyqt.sourceforge.net/Docs/PyQt4/qt.html -> Qt.DateFormat
+#       Qt.ISODate 	= 1 : ISO 8601 extended format: either YYYY-MM-DD for dates or YYYY-MM-DDTHH:mm:ss, YYYY-MM-DDTHH:mm:ssTZD
+#       (e.g., 1997-07-16T19:20:30+01:00) for combined dates and times.
+#
+#     :param QtDateFormat: enum (value) for ISO conversion (from Qt C++ API) [default=1(=Qt.ISODate)]
+#     :type QtDateFormat: int
+#
+#     :return: TimeStamp in ISO QString from QDateTime format.
+#     :rtype: QString
+#     """
+#     return convert_timestamp_to_qt_string_format(get_timestamp(), QtDateFormat)
+
+
+def get_timestamp_from_qt_string_format(QtDateFormatString=defaultQtDateFormatString):
+    return convert_timestamp_to_qt_string_format(get_timestamp(), QtDateFormatString)
+
 
 def construct_listpoints_from_extent(_extent):
     """ Construct a list of QGIS points from QGIS extent.
@@ -142,3 +169,18 @@ def construct_listpoints_from_extent(_extent):
             QgsPoint(x4, y4),
             QgsPoint(x1, y1)]
 
+
+def find_layer_in_qgis_legend_interface(_iface, _layername):
+    """
+
+    :param _iface:
+    :param _layername:
+    :return:
+    """
+    try:
+        layer_searched = [layer_searched
+                          for layer_searched in _iface.legendInterface().layers()
+                          if layer_searched.name() == _layername]
+        return layer_searched[0]
+    except:
+        return None
