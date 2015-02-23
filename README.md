@@ -2,6 +2,8 @@
 ![](https://raw.githubusercontent.com/wiki/Remi-C/interactive_map_tracking/images/plugin/logo_LQ.png) A QGIS 2.6 plugin to track camera of user , AND/OR to autocommit/refresh edit on PostGIS vector layer
 This QGIS 2.6 plug-in has been developed by Lionel Atty from IGN (France).
 
+Go to the [project wiki](https://github.com/Remi-C/interactive_map_tracking/wiki) for more information !
+
 This plug-in was designed to allow __concurrent editing awareness or history of editing__ (tracking), and to enable QGIS to play well with PostGIS database using trigger to __reconstruct geometry on the fly__
 ###feature
 This plug-in add 2 features to QGIS, the user choose what feature he uses
