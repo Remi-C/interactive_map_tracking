@@ -55,7 +55,7 @@ docs/_build/
 target/
 
 #QGIS doc (not used on this project)
-help/build/ 
+help/build/
 #
 .idea/
 
