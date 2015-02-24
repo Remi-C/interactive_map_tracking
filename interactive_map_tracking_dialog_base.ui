@@ -10,6 +10,18 @@
     <height>178</height>
    </rect>
   </property>
+  <property name="minimumSize">
+   <size>
+    <width>420</width>
+    <height>178</height>
+   </size>
+  </property>
+  <property name="maximumSize">
+   <size>
+    <width>420</width>
+    <height>178</height>
+   </size>
+  </property>
   <property name="acceptDrops">
    <bool>true</bool>
   </property>
