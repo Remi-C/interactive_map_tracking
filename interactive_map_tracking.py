@@ -119,6 +119,8 @@ class interactive_map_tracking:
         #
         self.trackposition_user_name = os_username + " (" + user_ip + ")"
 
+        self.threshold = 200
+
     # noinspection PyMethodMayBeStatic
     def tr(self, message):
         """Get the translation for a string using Qt translation API.
@@ -308,6 +310,7 @@ class interactive_map_tracking:
             #
             self.dlg.thresholdLabel.setEnabled(True)
             self.dlg.threshold_extent.setEnabled(True)
+            QObject.connect(self.dlg.threshold_extent, SIGNAL("returnPressed ()"), self.thresholdChanged())
         else:
             #
             self.dlg.enableAutoSave.setDisabled(True)
@@ -320,8 +323,10 @@ class interactive_map_tracking:
             self.dlg.enableUseMutexForTP.setChecked(False)
             #
             self.dlg.thresholdLabel.setDisabled(True)
-            self.dlg.threshold_extent.setText("200")
+            self.dlg.threshold_extent.setText("1:200")
+            self.threshold = 200
             self.dlg.threshold_extent.setDisabled(True)
+            QObject.disconnect(self.dlg.threshold_extent, SIGNAL("returnPressed ()"), self.thresholdChanged)
 
     def update_checkbox(self, _settings, _name_in_setting, _checkbox):
         """ According to values stores in QSetting, update the state of a checkbox
@@ -634,6 +639,7 @@ class interactive_map_tracking:
             self.dlg.enableLogging.setEnabled(True)
             self.dlg.thresholdLabel.setEnabled(True)
             self.dlg.threshold_extent.setEnabled(True)
+            QObject.connect(self.dlg.threshold_extent, SIGNAL("editingFinished ()"), self.thresholdChanged)
             self.dlg.enableUseMutexForTP.setEnabled(True)
             #
             self.connectSignalForLayerChanged()
@@ -651,6 +657,7 @@ class interactive_map_tracking:
             self.dlg.enableLogging.setDisabled(True)
             self.dlg.thresholdLabel.setDisabled(True)
             self.dlg.threshold_extent.setDisabled(True)
+            QObject.disconnect(self.dlg.threshold_extent, SIGNAL("returnPressed ()"), self.thresholdChanged)
             self.dlg.enableUseMutexForTP.setDisabled(True)
             #
             self.disconnectSignalForLayerChanged()
@@ -713,6 +720,29 @@ class interactive_map_tracking:
         #
         return resultCommit
 
+    def thresholdChanged(self):
+        retour = 1
+        # filtre sur la taille de l'extent
+        try:
+            threshold_string = self.dlg.threshold_extent.text()
+            self.threshold = int(threshold_string)
+        except ValueError:
+            try:
+                a, b = threshold_string.split(":")
+                try:
+                    int(a)
+                    self.threshold = int(b)
+                except Exception:
+                    qgis_log_tools.logMessageWARNING("Problem with format ! For scale we want : x:xxxxx or xxxxx (x:number)")
+                    retour = -1
+            except Exception:
+                qgis_log_tools.logMessageWARNING("Problem with format ! For scale we want : x:xxxxx or xxxxx (x:number)")
+                retour = -1
+        #
+        self.dlg.threshold_extent.setText("1:"+str(self.threshold))
+
+        return retour
+
     # TODO: optimize update_track_position because it's a (critical) real-time method !
     def update_track_position(self, bWithProjectionInCRSLayer=True, bUseEmptyFields=False):
         """ Perform the update tracking position (in real-time)
@@ -748,18 +778,12 @@ class interactive_map_tracking:
 
         mapcanvas_extent = mapCanvas.extent()
 
-        # filtre sur la taille de l'extent
-        try:
-            threshold = int(self.dlg.threshold_extent.text())
-        except Exception:
-            qgis_log_tools.logMessageWARNING("Threshold can only be a number")
-            return -1
-
-        if max(mapcanvas_extent.width(), mapcanvas_extent.height()) > threshold:
-            qgis_log_tools.logMessageWARNING("MapCanvas extent size exceed the Threshold size for tracking")
+        # if max(mapcanvas_extent.width(), mapcanvas_extent.height()) > threshold:
+        if mapCanvas.scale() > self.threshold:
+            qgis_log_tools.logMessageWARNING("MapCanvas extent scale exceed the Threshold scale for tracking")
             qgis_log_tools.logMessageWARNING(
-                "-> MapCanvas extent size= " + str(max(mapcanvas_extent.width(), mapcanvas_extent.height())) +
-                "\tThreshold size= " + str(threshold))
+                "-> MapCanvas scale= " + str(mapCanvas.scale()) +
+                "\tThreshold scale= " + str(self.threshold))
             return -2
 
         #

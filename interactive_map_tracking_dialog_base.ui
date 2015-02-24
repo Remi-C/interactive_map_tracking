@@ -27,7 +27,7 @@
    <item row="0" column="0">
     <widget class="QTabWidget" name="IMT_Window_Tabs">
      <property name="currentIndex">
-      <number>0</number>
+      <number>1</number>
      </property>
      <widget class="QWidget" name="tab_general">
       <property name="enabled">
@@ -142,10 +142,10 @@
         <string>200</string>
        </property>
        <property name="maxLength">
-        <number>6</number>
+        <number>9</number>
        </property>
        <property name="alignment">
-        <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+        <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>
        </property>
       </widget>
       <widget class="QLabel" name="thresholdLabel">
@@ -153,12 +153,12 @@
         <rect>
          <x>10</x>
          <y>103</y>
-         <width>221</width>
+         <width>211</width>
          <height>16</height>
         </rect>
        </property>
        <property name="text">
-        <string>Threshold size for tracking (meter)</string>
+        <string>Threshold Scale for tracking </string>
        </property>
       </widget>
       <widget class="QTextEdit" name="textEdit">
