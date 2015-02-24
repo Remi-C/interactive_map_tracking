@@ -94,6 +94,7 @@ class interactive_map_tracking:
         self.bSignalForLayerModifiedConnected = False
         self.bSignalForLayerChangedConnected = False
         self.bSignalForExtentsChangedConnected = False
+        self.bSignalForLayerCrsChangedConnected = False
 
         self.idCameraPositionLayerInBox = 0
 
@@ -342,6 +343,18 @@ class interactive_map_tracking:
             _checkbox.setDisabled(True)
             _checkbox.setChecked(False)
 
+    def disconnectSignaleForLayerCrsChanged(self, layer):
+        """ Disconnect the signal: 'layerCrsChanged' of the layer given
+
+        :param layer:
+        :return:
+        """
+        if None != layer and self.bSignalForLayerModifiedConnected:
+            QObject.disconnect(layer, SIGNAL("layerCrsChanged()"), self.currentLayerCrsChanged)
+            self.bSignalForLayerCrsChangedConnected = False
+            #
+            qgis_log_tools.logMessageINFO("Disconnect SIGNAL on layer: " + layer.name())
+
     def disconnectSignalForLayerModified(self, layer):
         """ Disconnect the signal: 'Layer Modified' of the layer given
 
@@ -373,6 +386,18 @@ class interactive_map_tracking:
             self.bSignalForExtentsChangedConnected = False
             #
             qgis_log_tools.logMessageINFO("Disconnect SIGNAL on QGISMapCanvas")
+
+    def connectSignaleForLayerCrsChanged(self, layer):
+        """ Disconnect the signal: 'layerCrsChanged' of the layer given
+
+        :param layer:
+        :return:
+        """
+        if None != layer and not self.bSignalForLayerCrsChangedConnected:
+            QObject.connect(layer, SIGNAL("layerCrsChanged()"), self.currentLayerCrsChanged)
+            self.bSignalForLayerCrsChangedConnected = False
+            #
+            qgis_log_tools.logMessageINFO("Connect SIGNAL on layer: " + layer.name())
 
     def connectSignalForLayerModified(self, layer):
         """ Connect the signal: "Layer Modified" to the layer given
@@ -414,6 +439,7 @@ class interactive_map_tracking:
         self.disconnectSignalForLayerModified(layer)
         self.disconnectSignalForLayerChanged()
         self.disconnectSignalForExtentsChanged()
+        self.disconnectSignaleForLayerCrsChanged()
 
     def qgisInterfaceCurrentLayerChanged(self, layer):
         """ Action when the signal: 'Current Layer Changed' from QGIS MapCanvas is emitted&captured
@@ -714,7 +740,6 @@ class interactive_map_tracking:
         # retrieve layer name from GUI (IMT)
         layerNameForTrackingPosition = self.dlg.trackingPositionLayerCombo.currentText()
         # search this layer
-        #layerPolygonExtent = qgis_mapcanvas_tools.find_layer_in_mapcanvas(mapCanvas, layerNameForTrackingPosition)
         layerPolygonExtent = qgis_mapcanvas_tools.find_layer_in_qgis_legend_interface(self.iface, layerNameForTrackingPosition)
         if layerPolygonExtent is None:
             qgis_log_tools.logMessageWARNING("No layer found for tracking position")
@@ -749,7 +774,10 @@ class interactive_map_tracking:
             # url: http://docs.qgis.org/testing/en/docs/pyqgis_developer_cookbook/crs.html
             xform = QgsCoordinateTransform(extent_src_crs, extent_dst_crs)
             #
-            list_points = [xform.transform(point) for point in list_points_from_mapcanvas]
+            try:
+                list_points = [xform.transform(point) for point in list_points_from_mapcanvas]
+            except QgsCsException as e:
+                qgis_log_tools.logMessageCRITICAL("QgsCsException => " + str(e))
         else:
             list_points = list_points_from_mapcanvas
         ## NEED TO OPTIMIZE ##
