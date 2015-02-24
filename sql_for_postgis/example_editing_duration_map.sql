@@ -1,7 +1,14 @@
 ﻿---------------------------
 --Rémi Cura, 02/205, IGN THALES 
 ---------------------------
+/** this example shows 2 ways to create a map of edition duration
+the first way is the most classical, and compute intersection of camera geometry then sum the time spent on each
+the second way create an hexagonal grid that covers the camera geometries.
+Then for each tile, we sum the time spent on it .
+Both example could be made to be interactively updated with trigger and few changes.
+This is especially true for the second example
 
+*/
 --LIMIT 100
 CREATE SCHEMA IF NOT EXISTS test ;  
 

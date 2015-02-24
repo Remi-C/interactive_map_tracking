@@ -17,7 +17,7 @@
  ); 
 CREATE INDEX ON tracking.camera_position USING GIST(geom) ; 
 CREATE INDEX ON tracking.camera_position (user_id ) ; 
-CREATE INDEX ON tracking.camera_position (writing_timestamp ) ; 
+CREATE INDEX ON tracking.camera_position (w_time ) ; 
 
 --checking
  SELECT *
