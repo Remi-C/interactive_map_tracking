@@ -310,7 +310,7 @@ class interactive_map_tracking:
             #
             self.dlg.thresholdLabel.setEnabled(True)
             self.dlg.threshold_extent.setEnabled(True)
-            QObject.connect(self.dlg.threshold_extent, SIGNAL("returnPressed ()"), self.thresholdChanged())
+            QObject.connect(self.dlg.threshold_extent, SIGNAL("returnPressed ()"), self.thresholdChanged)
         else:
             #
             self.dlg.enableAutoSave.setDisabled(True)
