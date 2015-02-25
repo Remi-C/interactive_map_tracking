@@ -326,8 +326,8 @@ class interactive_map_tracking:
         icon_path = ':/plugins/interactive_map_tracking/icon.png'
         self.dlg.setWindowIcon(QIcon(icon_path))
 
-        # fix the size of the pluging window
-        self.dlg.setFixedSize(self.dlg.size())
+        # # fix the size of the pluging window
+        # self.dlg.setFixedSize(self.dlg.size())
 
         # set the tab at init
         self.dlg.IMT_Window_Tabs.setCurrentIndex(0)
