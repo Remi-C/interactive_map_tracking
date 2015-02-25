@@ -1,6 +1,7 @@
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
+*.pyc 
 
 # C extensions
 *.so
@@ -52,3 +53,12 @@ docs/_build/
 
 # PyBuilder
 target/
+
+#QGIS doc (not used on this project)
+help/build/
+
+#
+.idea/
+
+interactive_map_tracking_dialog_base.ui_
+interactive_map_tracking_dialog_base.ui.autosave
