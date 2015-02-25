@@ -782,7 +782,7 @@ class interactive_map_tracking:
         mapcanvas_extent = mapCanvas.extent()
 
         # if max(mapcanvas_extent.width(), mapcanvas_extent.height()) > threshold:
-        if mapCanvas.scale() > self.threshold:
+        if mapCanvas.scale() >= self.threshold:
             qgis_log_tools.logMessageWARNING("MapCanvas extent scale exceed the Threshold scale for tracking")
             qgis_log_tools.logMessageWARNING(
                 "-> MapCanvas scale= " + str(mapCanvas.scale()) +
