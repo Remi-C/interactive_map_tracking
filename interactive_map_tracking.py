@@ -721,8 +721,13 @@ class interactive_map_tracking:
         return resultCommit
 
     def thresholdChanged(self):
-        retour = 1
-        # filtre sur la taille de l'extent
+        """
+        QT Line edit changed, we get/interpret the new value (if valid)
+        Format for threshold scale : 'a'[int]:'b'[int]
+        We just used 'b' for scale => threshold_scale = 'b'
+        """
+        validFormat = True
+
         try:
             threshold_string = self.dlg.threshold_extent.text()
             self.threshold = int(threshold_string)
@@ -730,18 +735,18 @@ class interactive_map_tracking:
             try:
                 a, b = threshold_string.split(":")
                 try:
-                    int(a)
-                    self.threshold = int(b)
+                    int(a)  # just to verify the type of 'a'
+                    self.threshold = int(b)     # only use 'b' to change the threshold scale value
                 except Exception:
-                    qgis_log_tools.logMessageWARNING("Problem with format ! For scale we want : x:xxxxx or xxxxx (x:number)")
-                    retour = -1
+                    validFormat = False     # problem with 'a'
             except Exception:
-                qgis_log_tools.logMessageWARNING("Problem with format ! For scale we want : x:xxxxx or xxxxx (x:number)")
-                retour = -1
-        #
-        self.dlg.threshold_extent.setText("1:"+str(self.threshold))
+                validFormat = False     # problem with 'b'
+        # Input format problem!
+        if validFormat == False:
+            qgis_log_tools.logMessageWARNING("Invalid input for scale! Scale format input : [int]:[int] or just [int]")
 
-        return retour
+        # just for visualisation purpose
+        self.dlg.threshold_extent.setText("1:" + str(self.threshold))
 
     # TODO: optimize update_track_position because it's a (critical) real-time method !
     def update_track_position(self, bWithProjectionInCRSLayer=True, bUseEmptyFields=False):
