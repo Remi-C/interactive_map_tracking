@@ -301,7 +301,7 @@ class interactive_map_tracking:
             s.setValue(self.qsettings_prefix_name + "enabledAutoSave", "false")
             s.setValue(self.qsettings_prefix_name + "enabledTrackPosition", "false")
             s.setValue(self.qsettings_prefix_name + "enabledLogging", "false")
-            s.setValue(self.qsettings_prefix_name + "threshold", "200")
+            s.setValue(self.qsettings_prefix_name + "threshold", "300")
 
         if s.value(self.qsettings_prefix_name + "enabledPlugin", "") == "true":
             self.update_checkbox(s, "enableAutoSave", self.dlg.enableAutoSave)
@@ -323,8 +323,6 @@ class interactive_map_tracking:
             self.dlg.enableUseMutexForTP.setChecked(False)
             #
             self.dlg.thresholdLabel.setDisabled(True)
-            self.dlg.threshold_extent.setText("1:200")
-            self.threshold = 200
             self.dlg.threshold_extent.setDisabled(True)
             QObject.disconnect(self.dlg.threshold_extent, SIGNAL("returnPressed ()"), self.thresholdChanged)
 

@@ -139,7 +139,7 @@
         </rect>
        </property>
        <property name="text">
-        <string>200</string>
+        <string>1:300</string>
        </property>
        <property name="maxLength">
         <number>9</number>
