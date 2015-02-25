@@ -33,7 +33,7 @@
    <item row="0" column="0">
     <widget class="QTabWidget" name="IMT_Window_Tabs">
      <property name="currentIndex">
-      <number>0</number>
+      <number>1</number>
      </property>
      <widget class="QWidget" name="tab_general">
       <property name="enabled">
@@ -61,15 +61,11 @@
          <property name="fieldGrowthPolicy">
           <enum>QFormLayout::AllNonFixedFieldsGrow</enum>
          </property>
-         <item row="0" column="0">
-          <widget class="QCheckBox" name="enableAutoSave">
-           <property name="text">
-            <string>Enable Auto-Save and Refresh</string>
-           </property>
-          </widget>
-         </item>
-         <item row="1" column="0">
+         <item row="2" column="0">
           <layout class="QFormLayout" name="formLayout_4">
+           <property name="fieldGrowthPolicy">
+            <enum>QFormLayout::AllNonFixedFieldsGrow</enum>
+           </property>
            <property name="formAlignment">
             <set>Qt::AlignRight|Qt::AlignTop|Qt::AlignTrailing</set>
            </property>
@@ -79,21 +75,28 @@
            <property name="leftMargin">
             <number>15</number>
            </property>
-           <item row="1" column="0">
+           <item row="2" column="0">
             <widget class="QCheckBox" name="enableTrackPosition">
              <property name="text">
               <string>Enable Tracking Position</string>
              </property>
             </widget>
            </item>
-           <item row="0" column="0">
-            <widget class="QCheckBox" name="enablePlugin">
+           <item row="1" column="0">
+            <widget class="QCheckBox" name="enableAutoSave">
              <property name="text">
-              <string>Enable Interactive Map Tracking Plugin</string>
+              <string>Enable Auto-Save and Refresh</string>
              </property>
             </widget>
            </item>
           </layout>
+         </item>
+         <item row="1" column="0">
+          <widget class="QCheckBox" name="enablePlugin">
+           <property name="text">
+            <string>Enable Interactive Map Tracking Plugin</string>
+           </property>
+          </widget>
          </item>
         </layout>
        </item>
@@ -196,7 +199,7 @@ p, li { white-space: pre-wrap; }
        <item row="3" column="1">
         <widget class="QLineEdit" name="threshold_extent">
          <property name="text">
-          <string>200</string>
+          <string>1:300</string>
          </property>
          <property name="maxLength">
           <number>9</number>
