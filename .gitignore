@@ -56,3 +56,8 @@ target/
 
 #QGIS doc (not used on this project)
 help/build/
+
+#
+.idea/
+
+interactive_map_tracking_dialog_base.ui_
