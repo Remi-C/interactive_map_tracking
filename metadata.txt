@@ -10,7 +10,7 @@
 name=Interactive Map Tracking
 qgisMinimumVersion=2.6
 description=A QGIS 2.6 plugin to track camera of user , AND/OR to autocommit/refresh edit on PostGIS vector layer
-version=1.0
+version=1.0.1
 author=Lionel Atty, IGN, SIDT
 email=remi.cura@gmail.com
 
