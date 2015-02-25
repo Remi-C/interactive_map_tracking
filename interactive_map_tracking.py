@@ -175,13 +175,14 @@ class interactive_map_tracking:
         #
         self.tp_user_name = os_username + " (" + user_ip + ")"
 
-        qgis_logger = qgis_log_tools.QGISLogger()
-        qgis_logger.log("test1")
-        qgis_logger.log("test2")
+        # default value for threshold scale
+        self.threshold = 300
 
         self.tp_id_user_id = 0
         self.tp_id_w_time = 0
         self.values = []
+
+        self.bRefreshMapFromAutoSave = False
 
     # noinspection PyMethodMayBeStatic
     def tr(self, message):
@@ -364,7 +365,7 @@ class interactive_map_tracking:
             s.setValue(self.qsettings_prefix_name + "enabledAutoSave", "false")
             s.setValue(self.qsettings_prefix_name + "enabledTrackPosition", "false")
             s.setValue(self.qsettings_prefix_name + "enabledLogging", "false")
-            s.setValue(self.qsettings_prefix_name + "threshold", "200")
+            s.setValue(self.qsettings_prefix_name + "threshold", str(self.threshold))
 
         if s.value(self.qsettings_prefix_name + "enabledPlugin", "") == "true":
             self.update_checkbox(s, "enableAutoSave", self.dlg.enableAutoSave)
@@ -386,8 +387,6 @@ class interactive_map_tracking:
             self.dlg.enableUseMutexForTP.setChecked(False)
             #
             self.dlg.thresholdLabel.setDisabled(True)
-            self.dlg.threshold_extent.setText("1:200")
-            self.threshold = 200
             self.dlg.threshold_extent.setDisabled(True)
             QObject.disconnect(self.dlg.threshold_extent, SIGNAL("returnPressed ()"), self.thresholdChanged)
 
@@ -566,17 +565,11 @@ class interactive_map_tracking:
 
         """
         if self.bUseMutexAndBetaFunctionalities:
-            # url: http://stackoverflow.com/questions/11261663/pyqt-qmutexlocker-not-released-on-exception
-            # with QMutexLocker(self.QMCanvasExtentsChanged):
-            #     try:
-            #         QObject.connect(self.iface.mapCanvas(), SIGNAL("renderComplete(QPainter*)"),
-            #                         self.canvasExtentsChangedAndRenderComplete)
-            #     except:
-            #         qgis_log_tools.logMessageCRITICAL("Exception intercepted !")
-            if self.bUseMutexAndBetaFunctionalities:
-                self.update_track_position_with_qtimers()
+            # filter on our dummy refreshMap using little zoom on mapcanvas (=> canvasExtentChanged was emitted)
+            if self.bRefreshMapFromAutoSave:
+                self.bRefreshMapFromAutoSave = False
             else:
-                self.update_track_position()
+                self.update_track_position_with_qtimers()
         else:
             QObject.connect(self.iface.mapCanvas(), SIGNAL("renderComplete(QPainter*)"),
                             self.canvasExtentsChangedAndRenderComplete)
@@ -870,6 +863,7 @@ class interactive_map_tracking:
         resultCommit = qgis_layer_tools.commitChanges(self.currentLayer, self.iface, QSettings())
         #
         if resultCommit:
+            self.bRefreshMapFromAutoSave = True
             qgis_mapcanvas_tools.refreshMapCanvas(self.iface)
         #
         return resultCommit
@@ -1078,7 +1072,7 @@ class interactive_map_tracking:
                 current_time = time.time()
                 self.tp_time_last_rttp_to_mem = current_time
 
-                qgis_log_tools.logMessageINFO("** Pack " + str(size_tp_queue) + " tupples for 1 call -> mem")
+                qgis_log_tools.logMessageINFO("** Pack " + str(size_tp_queue) + " tuples for 1 call -> mem")
 
     def tracking_position_qtimer_memory_to_geom(self):
         """
