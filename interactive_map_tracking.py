@@ -373,6 +373,7 @@ class interactive_map_tracking:
             #
             self.dlg.thresholdLabel.setEnabled(True)
             self.dlg.threshold_extent.setEnabled(True)
+            QObject.connect(self.dlg.threshold_extent, SIGNAL("returnPressed ()"), self.thresholdChanged())
         else:
             #
             self.dlg.enableAutoSave.setDisabled(True)
@@ -385,8 +386,10 @@ class interactive_map_tracking:
             self.dlg.enableUseMutexForTP.setChecked(False)
             #
             self.dlg.thresholdLabel.setDisabled(True)
-            self.dlg.threshold_extent.setText("200")
+            self.dlg.threshold_extent.setText("1:200")
+            self.threshold = 200
             self.dlg.threshold_extent.setDisabled(True)
+            QObject.disconnect(self.dlg.threshold_extent, SIGNAL("returnPressed ()"), self.thresholdChanged)
 
     def update_checkbox(self, _settings, _name_in_setting, _checkbox):
         """ According to values stores in QSetting, update the state of a checkbox
@@ -407,6 +410,18 @@ class interactive_map_tracking:
         else:
             _checkbox.setDisabled(True)
             _checkbox.setChecked(False)
+
+    def disconnectSignaleForLayerCrsChanged(self, layer):
+        """ Disconnect the signal: 'layerCrsChanged' of the layer given
+
+        :param layer:
+        :return:
+        """
+        if None != layer and self.bSignalForLayerModifiedConnected:
+            QObject.disconnect(layer, SIGNAL("layerCrsChanged()"), self.currentLayerCrsChanged)
+            self.bSignalForLayerCrsChangedConnected = False
+            #
+            qgis_log_tools.logMessageINFO("Disconnect SIGNAL on layer: " + layer.name())
 
     def disconnectSignalForLayerModified(self, layer):
         """ Disconnect the signal: 'Layer Modified' of the layer given
@@ -439,6 +454,18 @@ class interactive_map_tracking:
             self.bSignalForExtentsChangedConnected = False
             #
             qgis_log_tools.logMessageINFO("Disconnect SIGNAL on QGISMapCanvas")
+
+    def connectSignaleForLayerCrsChanged(self, layer):
+        """ Disconnect the signal: 'layerCrsChanged' of the layer given
+
+        :param layer:
+        :return:
+        """
+        if None != layer and not self.bSignalForLayerCrsChangedConnected:
+            QObject.connect(layer, SIGNAL("layerCrsChanged()"), self.currentLayerCrsChanged)
+            self.bSignalForLayerCrsChangedConnected = False
+            #
+            qgis_log_tools.logMessageINFO("Connect SIGNAL on layer: " + layer.name())
 
     def connectSignalForLayerModified(self, layer):
         """ Connect the signal: "Layer Modified" to the layer given
@@ -480,6 +507,7 @@ class interactive_map_tracking:
         self.disconnectSignalForLayerModified(layer)
         self.disconnectSignalForLayerChanged()
         self.disconnectSignalForExtentsChanged()
+        self.disconnectSignaleForLayerCrsChanged()
 
     def qgisInterfaceCurrentLayerChanged(self, layer):
         """ Action when the signal: 'Current Layer Changed' from QGIS MapCanvas is emitted&captured
@@ -766,6 +794,7 @@ class interactive_map_tracking:
             self.dlg.enableLogging.setEnabled(True)
             self.dlg.thresholdLabel.setEnabled(True)
             self.dlg.threshold_extent.setEnabled(True)
+            QObject.connect(self.dlg.threshold_extent, SIGNAL("editingFinished ()"), self.thresholdChanged)
             self.dlg.enableUseMutexForTP.setEnabled(True)
             #
             self.connectSignalForLayerChanged()
@@ -783,6 +812,7 @@ class interactive_map_tracking:
             self.dlg.enableLogging.setDisabled(True)
             self.dlg.thresholdLabel.setDisabled(True)
             self.dlg.threshold_extent.setDisabled(True)
+            QObject.disconnect(self.dlg.threshold_extent, SIGNAL("returnPressed ()"), self.thresholdChanged)
             self.dlg.enableUseMutexForTP.setDisabled(True)
             #
             self.disconnectSignalForLayerChanged()
@@ -844,6 +874,34 @@ class interactive_map_tracking:
         #
         return resultCommit
 
+    def thresholdChanged(self):
+        """
+        QT Line edit changed, we get/interpret the new value (if valid)
+        Format for threshold scale : 'a'[int]:'b'[int]
+        We just used 'b' for scale => threshold_scale = 'b'
+        """
+        validFormat = True
+
+        try:
+            threshold_string = self.dlg.threshold_extent.text()
+            self.threshold = int(threshold_string)
+        except ValueError:
+            try:
+                a, b = threshold_string.split(":")
+                try:
+                    int(a)  # just to verify the type of 'a'
+                    self.threshold = int(b)     # only use 'b' to change the threshold scale value
+                except Exception:
+                    validFormat = False     # problem with 'a'
+            except Exception:
+                validFormat = False     # problem with 'b'
+        # Input format problem!
+        if validFormat == False:
+            qgis_log_tools.logMessageWARNING("Invalid input for scale! Scale format input : [int]:[int] or just [int]")
+
+        # just for visualisation purpose
+        self.dlg.threshold_extent.setText("1:" + str(self.threshold))
+
     # TODO: optimize update_track_position because it's a (critical) real-time method !
     def update_track_position(self, bWithProjectionInCRSLayer=True, bUseEmptyFields=False):
         """ Perform the update tracking position (in real-time)
@@ -871,14 +929,15 @@ class interactive_map_tracking:
 
         layer_for_polygon_extent = self.currentLayerForTrackingPosition
 
-        # filter on extent size
-        try:
-            threshold = int(self.dlg.threshold_extent.text())
-        except Exception:
-            qgis_log_tools.logMessageWARNING("Threshold can only be a number")
-            return -1
+        # # filter on extent size
+        # try:
+        #     threshold = int(self.dlg.threshold_extent.text())
+        # except Exception:
+        #     qgis_log_tools.logMessageWARNING("Threshold can only be a number")
+        #     return -1
 
-        if max(mapcanvas_extent.width(), mapcanvas_extent.height()) > threshold:
+        # if max(mapcanvas_extent.width(), mapcanvas_extent.height()) > threshold:
+        if mapCanvas.scale() > self.threshold:
             qgis_log_tools.logMessageWARNING("MapCanvas extent size exceed the Threshold size for tracking")
             qgis_log_tools.logMessageWARNING(
                 "-> MapCanvas extent size= " + str(max(mapcanvas_extent.width(), mapcanvas_extent.height())) +
@@ -942,33 +1001,38 @@ class interactive_map_tracking:
         return resultCommit
 
     def update_track_position_with_qtimers(self, bWithProjectionInCRSLayer=True, bUseEmptyFields=False):
+        """
+
+        :param bWithProjectionInCRSLayer:
+        :param bUseEmptyFields:
+        :return:
+        """
+
+        # Do we have a current layer activate for tracking position ?
         if self.currentLayerForTrackingPosition is None:
+            # if not, no need to go further
             return -1
 
         mapCanvas = self.iface.mapCanvas()
         mapcanvas_extent = mapCanvas.extent()
 
-        ## NEED TO OPTIMIZE ##
-        try:
-            threshold = int(self.dlg.threshold_extent.text())
-        except Exception:
-            qgis_log_tools.logMessageWARNING("Threshold can only be a number")
-            return -1
-        ## NEED TO OPTIMIZE ##
-
-        # filter on extent size
-        if max(mapcanvas_extent.width(), mapcanvas_extent.height()) > threshold:
-            qgis_log_tools.logMessageWARNING("MapCanvas extent size exceed the Threshold size for tracking")
+        # Filter on extent map scale (size)
+        # We use a threshold scale (user input in the GUI)
+        if mapCanvas.scale() > self.threshold:
+            qgis_log_tools.logMessageWARNING("MapCanvas extent scale exceed the Threshold scale for tracking")
             qgis_log_tools.logMessageWARNING(
-                "MapCanvas extent size= " + str(max(mapcanvas_extent.width(), mapcanvas_extent.height())) +
-                "\tThreshold size= " + str(threshold))
+                "-> MapCanvas scale= " + str(mapCanvas.scale()) +
+                "\tThreshold scale= " + str(self.threshold))
             return -2
 
-        layer_for_polygon_extent = self.currentLayerForTrackingPosition
+        layer_for_itp = self.currentLayerForTrackingPosition
 
-        #
+        # Build the tuple contains:
+        # - layer used for tracking position
+        # - list of points extract from the current extent for QGIS Map Canvas
+        # - acquisition time for this track
         rt_ntuple = self.TP_NAMEDTUPLE_LET(
-            layer_for_polygon_extent,
+            layer_for_itp,
             imt_tools.construct_listpoints_from_extent(mapcanvas_extent),
             imt_tools.get_timestamp()
         )
