@@ -262,7 +262,7 @@ class interactive_map_tracking:
         self.dlg.setWindowIcon(QIcon(icon_path))
 
         # fix the size of the pluging window
-        self.dlg.setFixedSize(self.dlg.size())
+        # self.dlg.setFixedSize(self.dlg.size())
 
         # set the tab at init
         self.dlg.IMT_Window_Tabs.setCurrentIndex(0)
