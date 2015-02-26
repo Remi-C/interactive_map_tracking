@@ -150,15 +150,20 @@ def filter_layer_postgis(layer, list_filters=["PostgreSQL", "database", "PostGIS
     :rtype: bool
     """
     result = False
-    if not(None is layer):
-        storageType = layer.dataProvider().storageType()
-        index = 0
-        len_list_filters = len(list_filters)
-        bContinue = (index < len_list_filters) and (storageType.find(list_filters[index]) != -1)
-        while bContinue:
-            index += 1
-            bContinue = (index < len_list_filters) and (storageType.find(list_filters[index]) != -1)
-        result = (index == len_list_filters)
+    try:
+        if not(None is layer):
+            data_provider = layer.dataProvider()
+            if not(None is data_provider):
+                storageType = data_provider.storageType()
+                index = 0
+                len_list_filters = len(list_filters)
+                bContinue = (index < len_list_filters) and (storageType.find(list_filters[index]) != -1)
+                while bContinue:
+                    index += 1
+                    bContinue = (index < len_list_filters) and (storageType.find(list_filters[index]) != -1)
+                result = (index == len_list_filters)
+    except:
+        qgis_log_tools.logMessageWARNING("Problem with layer: " + layer.name())
     #
     return result
 
