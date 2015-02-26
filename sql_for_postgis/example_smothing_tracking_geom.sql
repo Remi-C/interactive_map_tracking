@@ -57,7 +57,7 @@ It also smooth the inserted geometry
 		FROM (SELECT NEW.geom) AS geom  ;
 
 		_mindim := LEAST(_width , _height) ; 
-		NEW.geom := ST_Buffer(ST_Buffer(NEW.geom, -_mindim*(_radius_percent/2.0)), _mindim*(_radius_percent/2.0)) ; 
+		NEW.geom := ST_Buffer(ST_Buffer(ST_Buffer(NEW.geom, -_mindim*(_radius_percent/2.0)), _mindim*(_radius_percent/2.0)) ,-_mindim*0.10) ; 
 		--RAISE EXCEPTION '%', ST_AsText(NEW.geom) ; 
 		return NEW ; 
 	END ;
