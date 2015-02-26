@@ -662,6 +662,8 @@ class interactive_map_tracking:
         idComboBoxIndex = -1
         idComboBoxForDefaultSearchLayer = -1
 
+        # search a default layer ('camera_position') if no layer was selected before
+        # else we search the same layer (if it present)
         if self.currentLayerForTrackingPosition is None:
             defaultSearchLayer = "camera_position"
         else:
