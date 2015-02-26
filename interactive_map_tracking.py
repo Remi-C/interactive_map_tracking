@@ -935,7 +935,7 @@ class interactive_map_tracking:
             qgis_log_tools.logMessageWARNING("MapCanvas extent size exceed the Threshold size for tracking")
             qgis_log_tools.logMessageWARNING(
                 "-> MapCanvas extent size= " + str(max(mapcanvas_extent.width(), mapcanvas_extent.height())) +
-                "\tThreshold size= " + str(threshold))
+                "\tThreshold size= " + str(self.threshold))
             return -2
 
         # get the list points from the current extent (from QGIS MapCanvas)
