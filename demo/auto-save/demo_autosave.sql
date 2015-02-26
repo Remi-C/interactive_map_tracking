@@ -45,8 +45,8 @@
 CREATE INDEX ON auto_save.line_to_poly_sync USING GIST(line) ; 
 CREATE INDEX ON auto_save.line_to_poly_sync USING GIST(poly) ; 
 
-INSERT INTO auto_save.line_to_poly_sync VALUES (2,ST_GeomFromText('linestring(0 0, 1 1)',4326),NULL::geometry,1,0);
-INSERT INTO auto_save.line_to_poly_sync VALUES (3,ST_GeomFromText('linestring(2 2, 3 3)',4326),NULL::geometry,255,0);
+-- INSERT INTO auto_save.line_to_poly_sync VALUES (2,ST_GeomFromText('linestring(0 0, 1 1)',4326),NULL::geometry,1,0);
+-- INSERT INTO auto_save.line_to_poly_sync VALUES (3,ST_GeomFromText('linestring(2 2, 3 3)',4326),NULL::geometry,255,0);
  
 --checking that the table was correctly created
  SELECT *
