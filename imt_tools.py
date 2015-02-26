@@ -184,3 +184,45 @@ def find_layer_in_qgis_legend_interface(_iface, _layername):
         return layer_searched[0]
     except:
         return None
+
+
+import time
+
+
+class TpTimer:
+
+    def __init__(self):
+        self.currentTime = [time.time(), time.time()]
+        self.dict = {}
+
+    @staticmethod
+    def default():
+        return [time.time(), time.time()]
+
+    def get_current_time(self):
+        self.update_current_time()
+        return self.currentTime[0]
+
+    def __getitem__(self, key):
+        return self.dict.setdefault(key, self.default())
+
+    def update_current_time(self):
+        self.currentTime = [time.time(), self.currentTime[0]]
+
+    def delta(self):
+        return self.currentTime[0] - self.currentTime[1]
+
+    def delta(self, key):
+        list_times = self.__getitem__(key)
+        return list_times[0] - list_times[1]
+
+    def delta_with_current_time(self, key):
+        self.update_current_time()
+        list_times = self.__getitem__(key)
+        return self.currentTime[0] - list_times[0]
+
+    def update(self, key):
+        self.update_current_time()
+        list_times = self.__getitem__(key)
+        self.dict[key] = [self.currentTime[0], list_times[0]]
+        return self.dict[key]

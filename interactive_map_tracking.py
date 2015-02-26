@@ -184,7 +184,7 @@ class interactive_map_tracking:
 
         self.bRefreshMapFromAutoSave = False
 
-        tp_timers = self.TpTimer()
+        self.tp_timers = imt_tools.TpTimer()
 
     # noinspection PyMethodMayBeStatic
     def tr(self, message):
@@ -633,6 +633,7 @@ class interactive_map_tracking:
             return
 
         layer_for_tp = imt_tools.find_layer_in_qgis_legend_interface(self.iface, layer_name)
+        self.currentLayerForTrackingPosition = layer_for_tp     # set the layer for tracking position (plugin)
 
         list_id_fields = qgis_layer_tools.filter_layer_trackingposition_required_fields(layer_for_tp)
 
@@ -659,7 +660,12 @@ class interactive_map_tracking:
         self.dlg.trackingPositionLayerCombo.clear()
 
         idComboBoxIndex = -1
-        idComboBoxIndexForCameraPosition = -1
+        idComboBoxForDefaultSearchLayer = -1
+
+        if self.currentLayerForTrackingPosition is None:
+            defaultSearchLayer = "camera_position"
+        else:
+            defaultSearchLayer = self.currentLayerForTrackingPosition.name()
 
         # dictionnary to link id on combobox and objects QGIS layer
         dict_key_comboboxindex_value_layer = {}
@@ -668,20 +674,24 @@ class interactive_map_tracking:
         for layer in layers:
             # filter on layers to add in combobox
             if qgis_layer_tools.filter_layer_for_trackingposition(layer):
+
                 idComboBoxIndex = self.dlg.trackingPositionLayerCombo.count()
                 dict_key_comboboxindex_value_layer[idComboBoxIndex] = layer
                 self.dlg.trackingPositionLayerCombo.addItem(layer.name(), layer)
+
                 # default search layer
-                if layer.name() == "camera_position":
-                    idComboBoxIndexForCameraPosition = idComboBoxIndex
+                if layer.name() == defaultSearchLayer:
+                    idComboBoxForDefaultSearchLayer = idComboBoxIndex
                     #
-                    qgis_log_tools.logMessageINFO("camera_position layer found - id in combobox: " + str(
-                        idComboBoxIndexForCameraPosition))
+                    qgis_log_tools.logMessageINFO(
+                        defaultSearchLayer + " layer found - id in combobox: " +
+                        str(idComboBoxForDefaultSearchLayer)
+                    )
 
         # update GUI
-        if idComboBoxIndexForCameraPosition != -1:
-            self.dlg.trackingPositionLayerCombo.setCurrentIndex(idComboBoxIndexForCameraPosition)
-            idComboBoxIndex = idComboBoxIndexForCameraPosition
+        if idComboBoxForDefaultSearchLayer != -1:
+            self.dlg.trackingPositionLayerCombo.setCurrentIndex(idComboBoxForDefaultSearchLayer)
+            idComboBoxIndex = idComboBoxForDefaultSearchLayer
 
         if idComboBoxIndex != -1:
             try:
@@ -996,24 +1006,6 @@ class interactive_map_tracking:
         #
         return resultCommit
 
-    class TpTimer:
-        def __init__(self):
-            self.currentTime = [time.time(), time.time()]
-            self.dict = {}
-
-        def __getitem__(self, item):
-            return self.dict[item]
-
-        def update(self):
-            self.currentTime = time.time()
-
-        def update(self, key):
-            self.update()
-            # self.tp_dict_key_l_values_et.setdefault(tp_tuple.layer, []).append(
-            # self.dict.setdefault(key, [] = time.time()
-            return self.dict[key]
-
-
     def update_track_position_with_qtimers(self, bWithProjectionInCRSLayer=True, bUseEmptyFields=False):
         """
 
@@ -1068,11 +1060,13 @@ class interactive_map_tracking:
 
         """
 
-        current_time = time.time()
-        delta_time_mem = current_time - self.tp_time_last_rttp_to_mem
-
-        if delta_time_mem >= self.tp_threshold_time_for_tp_to_mem:
-            size_tp_queue = self.tp_queue_rt_ntuples_let._qsize()
+        # current_time = time.time()
+        # delta_time_mem = current_time - self.tp_time_last_rttp_to_mem
+        #
+        # if delta_time_mem >= self.tp_threshold_time_for_tp_to_mem:
+        # qgis_log_tools.logMessage("self.tp_timers.delta_with_current_time(''tracking_position_qtimer_rttp_to_memory''): " + str(self.tp_timers.delta_with_current_time("tracking_position_qtimer_rttp_to_memory")))
+        if self.tp_timers.delta_with_current_time("tp_time_last_rttp_to_mem") >= self.tp_threshold_time_for_tp_to_mem:
+            size_tp_queue = self.tp_queue_rt_ntuples_let.qsize()
 
             # this queue is not protect (multi-threads context)
             # but it's oki in your case
@@ -1089,8 +1083,10 @@ class interactive_map_tracking:
 
             if size_tp_queue != 0:
                 # update timer
-                current_time = time.time()
-                self.tp_time_last_rttp_to_mem = current_time
+                # current_time = time.time()
+                # self.tp_time_last_rttp_to_mem = current_time
+                self.tp_timers.update("tp_time_last_rttp_to_mem")
+
 
                 qgis_log_tools.logMessageINFO("** Pack " + str(size_tp_queue) + " tuples for 1 call -> mem")
 
@@ -1100,10 +1096,11 @@ class interactive_map_tracking:
         :return:
 
         """
-        current_time = time.time()
-        delta_time_construct_geom = (current_time - self.tp_time_last_rttp_to_mem)
-
-        if delta_time_construct_geom >= self.tp_threshold_time_for_construct_geom:
+        # current_time = time.time()
+        # delta_time_construct_geom = (current_time - self.tp_time_last_rttp_to_mem)
+        #
+        # if delta_time_construct_geom >= self.tp_threshold_time_for_construct_geom:
+        if self.tp_timers.delta_with_current_time("tp_time_last_rttp_to_mem") >= self.tp_threshold_time_for_construct_geom:
             mapCanvas = self.iface.mapCanvas()
 
             # url: http://qgis.org/api/classQgsMapCanvas.html#af0ffae7b5e5ec8b29764773fa6a74d58
@@ -1161,8 +1158,10 @@ class interactive_map_tracking:
 
             if append_in_dic:
                 # update timer
-                current_time = time.time()
-                self.tp_time_last_construct_geom = current_time
+                # current_time = time.time()
+                # self.tp_time_last_construct_geom = current_time
+                self.tp_timers.update("tp_time_last_construct_geom")
+                self.tp_timers.update("still moving")
 
     def tracking_position_qtimer_geom_to_layer(self):
         """
@@ -1170,14 +1169,18 @@ class interactive_map_tracking:
         :return:
 
         """
-        current_time = time.time()
-        delta_time_send_geom_to_layer = (current_time - self.tp_time_last_construct_geom)
+
+        # current_time = time.time()
+        # delta_time_send_geom_to_layer = (current_time - self.tp_time_last_construct_geom)
 
         # TODO: clean this with a state machine on tracking position
-        b_still_moving = (current_time - self.tp_time_last_construct_geom) <= self.delta_time_still_moving
+        # b_still_moving = (self.tp_timers.get_current_time() - self.tp_time_last_construct_geom) <= self.delta_time_still_moving
 
-        if delta_time_send_geom_to_layer >= self.tp_threshold_time_for_sending_geom_to_layer \
-                and not b_still_moving:
+        #qgis_log_tools.logMessage("self.tp_timers.delta_with_current_time('still moving''):"+str(self.tp_timers.delta_with_current_time("still moving")))
+        # if delta_time_send_geom_to_layer >= self.tp_threshold_time_for_sending_geom_to_layer \
+        if self.tp_timers.delta_with_current_time("tp_time_last_construct_geom") >= self.tp_threshold_time_for_sending_geom_to_layer \
+            and self.tp_timers.delta_with_current_time("still moving") > self.delta_time_still_moving:
+                # and not b_still_moving:
 
             append_in_dict_one_time = False
 
@@ -1200,8 +1203,9 @@ class interactive_map_tracking:
 
             if append_in_dict_one_time:
                 # update timer
-                current_time = time.time()
-                self.tp_time_last_send_geom_to_layer = current_time
+                # current_time = time.time()
+                # self.tp_time_last_send_geom_to_layer = current_time
+                self.tp_timers.update("tp_time_last_send_geom_to_layer")
 
 
     def tracking_position_qtimer_layers_to_commit(self):
@@ -1210,12 +1214,15 @@ class interactive_map_tracking:
         :return:
 
         """
-        current_time = time.time()
-        delta_time_send_layer_to_dp = (current_time - self.tp_time_last_send_geom_to_layer)
-        b_still_moving = (current_time - self.tp_time_last_construct_geom) <= self.delta_time_still_moving
+        # current_time = time.time()
+        # delta_time_send_layer_to_dp = (current_time - self.tp_time_last_send_geom_to_layer)
+        # b_still_moving = (current_time - self.tp_time_last_construct_geom) <= self.delta_time_still_moving
 
-        if delta_time_send_layer_to_dp >= self.tp_threshold_time_for_sending_layer_to_dp \
-                and not b_still_moving:
+        #if delta_time_send_layer_to_dp >= self.tp_threshold_time_for_sending_layer_to_dp \
+        # qgis_log_tools.logMessage("self.tp_timers.delta_with_current_time(''tp_time_last_send_geom_to_layer''):"+str(self.tp_timers.delta_with_current_time("tp_time_last_send_geom_to_layer")))
+        # qgis_log_tools.logMessage("still moving: " + str(self.tp_timers.delta_with_current_time("still moving") > self.delta_time_still_moving))
+        if self.tp_timers.delta_with_current_time("tp_time_last_send_geom_to_layer") >= self.tp_threshold_time_for_sending_layer_to_dp \
+                and self.tp_timers.delta_with_current_time("still moving") > self.delta_time_still_moving:
 
             layers = self.tp_dict_layers_to_commit.keys()
             # clear dict
@@ -1225,6 +1232,9 @@ class interactive_map_tracking:
                 #
                 try:
                     resultCommit = layer_to_commit.commitChanges()
+                    # update timer
+                    self.tp_timers.update("tracking_position_qtimer_layers_to_commit")
+                    #
                     qgis_log_tools.logMessageINFO("* Commit change layer:" + layer_to_commit.name + " [OK]")
                 except:
                     pass
@@ -1233,7 +1243,7 @@ class interactive_map_tracking:
         """
         """
         qgis_log_tools.logMessageINFO(
-            "self.tp_queue_rt_ntuples_let._qsize(): " + str(self.tp_queue_rt_ntuples_let._qsize()))
+            "self.tp_queue_rt_ntuples_let.qsize(): " + str(self.tp_queue_rt_ntuples_let.qsize()))
         qgis_log_tools.logMessageINFO(
             "- self.tp_dict_key_l_values_et.qsize(): " + str(len(self.tp_dict_key_l_values_et)))
         qgis_log_tools.logMessageINFO("- - self.tp_list_fets: " + str(len(self.tp_list_fets)))
