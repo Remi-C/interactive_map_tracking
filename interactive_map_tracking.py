@@ -184,6 +184,8 @@ class interactive_map_tracking:
 
         self.bRefreshMapFromAutoSave = False
 
+        tp_timers = self.TpTimer()
+
     # noinspection PyMethodMayBeStatic
     def tr(self, message):
         """Get the translation for a string using Qt translation API.
@@ -374,7 +376,7 @@ class interactive_map_tracking:
             #
             self.dlg.thresholdLabel.setEnabled(True)
             self.dlg.threshold_extent.setEnabled(True)
-            QObject.connect(self.dlg.threshold_extent, SIGNAL("returnPressed ()"), self.thresholdChanged())
+            QObject.connect(self.dlg.threshold_extent, SIGNAL("returnPressed ()"), self.thresholdChanged)
         else:
             #
             self.dlg.enableAutoSave.setDisabled(True)
@@ -993,6 +995,24 @@ class interactive_map_tracking:
                                                 QgsMessageBar.CRITICAL, 0)
         #
         return resultCommit
+
+    class TpTimer:
+        def __init__(self):
+            self.currentTime = [time.time(), time.time()]
+            self.dict = {}
+
+        def __getitem__(self, item):
+            return self.dict[item]
+
+        def update(self):
+            self.currentTime = time.time()
+
+        def update(self, key):
+            self.update()
+            # self.tp_dict_key_l_values_et.setdefault(tp_tuple.layer, []).append(
+            # self.dict.setdefault(key, [] = time.time()
+            return self.dict[key]
+
 
     def update_track_position_with_qtimers(self, bWithProjectionInCRSLayer=True, bUseEmptyFields=False):
         """
