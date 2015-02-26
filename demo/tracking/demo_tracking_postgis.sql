@@ -42,13 +42,16 @@ CREATE INDEX ON tracking.camera_position (user_id ) ;
 CREATE INDEX ON tracking.camera_position (w_time ) ; 
 
 
+--creating a view that will warn the users when there is a conflict
 DROP VIEW IF EXISTS  tracking.camera_position_multi_user_conflict ;
 CREATE VIEW tracking.camera_position_multi_user_conflict AS
 	SELECT row_number() over(order by c1.gid, c2.gid) as ngid
 		, c1.gid as gid_user1
 		, c2.gid as gid_user2
-		, ST_Multi(ST_Union(c1.geom,c2.geom))::geometry(multipolygon) AS geom
-		, format('User %s and user %s are in conflict here, same edition separated by %s sec',c1.user_id, c2.user_id, abs(extract(EPOCH FROM c1.w_time-c2.w_time)))::text as warn
+		, ST_Multi(ST_Union(c1.geom,c2.geom))::geometry(multipolygon,4326) AS geom
+		, format('WARNING :User %s and user %s are in conflict here, 
+		same edition separated by %s sec 
+		(only allowed if edits are separated by > 5min)',c1.user_id, c2.user_id, abs(extract(EPOCH FROM c1.w_time-c2.w_time)))::text as warn
 	FROM tracking.camera_position AS c1
 		,tracking.camera_position AS c2
 	WHERE c1.user_id<> c2.user_id --we want conflict between different users
@@ -56,7 +59,27 @@ CREATE VIEW tracking.camera_position_multi_user_conflict AS
 		AND ST_Intersects(c1.geom, c2.geom) --conflict is when tracking at the same place (place sharing space)
 		AND abs(extract(EPOCH FROM c1.w_time-c2.w_time))< 5*60 --conflict is when it is recent. Old editing canbe reviewed without error
 		;
-		
+
+DROP VIEW IF EXISTS  tracking.camera_position_single_user_conflict ;
+CREATE VIEW tracking.camera_position_single_user_conflict AS
+	SELECT row_number() over(order by c1.gid, c2.gid) as ngid
+		, c1.gid as gid_user1
+		, c2.gid as gid_user2
+		, ST_Multi(ST_Union(c1.geom,c2.geom))::geometry(multipolygon,4326) AS geom
+		, format('WARNING : You, %s ,
+		 just edited something that you already edited %s ago
+		 You can re-edit area if you edited it less than 5 minutes ago 
+		)',c1.user_id , abs(extract(EPOCH FROM c1.w_time-c2.w_time)))::text as warn
+	FROM tracking.camera_position AS c1
+		,tracking.camera_position AS c2
+	WHERE c1.user_id = c2.user_id --we want conflict between different users
+		AND c1.gid < c2.gid -- (gid2,gid2) is identical for us here too (gid2,gid1)
+		AND ST_Intersects(c1.geom, c2.geom) --conflict is when tracking at the same place (place sharing space)
+		AND abs(extract(EPOCH FROM c1.w_time-c2.w_time))> 5*60 --conflict is when it is recent. Old editing canbe reviewed without error
+		;
+
+ SELECT *
+ FROM tracking.camera_position_single_user_conflict ;
 --checking that the table was correctly created
  SELECT *
  FROM tracking.camera_position;  
