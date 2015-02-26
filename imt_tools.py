@@ -192,19 +192,24 @@ import time
 class TpTimer:
 
     def __init__(self):
-        self.currentTime = [time.time(), time.time()]
-        self.dict = {}
+        self.currentTime = self.default_timers()
+        self.dict_process_timeupdate = {}
+        self.dict_process_delay = {}
 
     @staticmethod
-    def default():
+    def default_timers():
         return [time.time(), time.time()]
+
+    @staticmethod
+    def default_delay():
+        return 0.0
 
     def get_current_time(self):
         self.update_current_time()
         return self.currentTime[0]
 
     def __getitem__(self, key):
-        return self.dict.setdefault(key, self.default())
+        return self.dict_process_timeupdate.setdefault(key, self.default_timers())
 
     def update_current_time(self):
         self.currentTime = [time.time(), self.currentTime[0]]
@@ -224,5 +229,15 @@ class TpTimer:
     def update(self, key):
         self.update_current_time()
         list_times = self.__getitem__(key)
-        self.dict[key] = [self.currentTime[0], list_times[0]]
-        return self.dict[key]
+        self.dict_process_timeupdate[key] = [self.currentTime[0], list_times[0]]
+        return self.dict_process_timeupdate[key]
+
+    def get_delay(self, process_name):
+        return self.dict_process_delay.setdefault(process_name, self.default_delay())
+
+    def set_delay(self, process_name, time_delay):
+        self.dict_process_timeupdate[process_name] = time_delay
+
+    def is_time_to_update(self, process_name, delay_name):
+        return self.delta_with_current_time(process_name) >= self.get_delay(delay_name)
+
