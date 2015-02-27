@@ -235,8 +235,8 @@ class TpTimer:
     def get_delay(self, process_name):
         return self.dict_process_delay.setdefault(process_name, self.default_delay())
 
-    def set_delay(self, process_name, time_delay):
-        self.dict_process_timeupdate[process_name] = time_delay
+    def set_delay(self, delay_name, time_delay):
+        self.dict_process_delay[delay_name] = time_delay
 
     def is_time_to_update(self, process_name, delay_name):
         return self.delta_with_current_time(process_name) >= self.get_delay(delay_name)

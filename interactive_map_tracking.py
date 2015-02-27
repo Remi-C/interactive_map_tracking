@@ -145,22 +145,23 @@ class interactive_map_tracking:
         self.qtimer_tracking_position_layers_to_commit = QTimer()
         self.qtimer_tracking_position_layers_to_commit.timeout.connect(self.tracking_position_qtimer_layers_to_commit)
         # OPTIONS: timing reactions
-        # TODO : think about time and chaining condition
+        #
         self.tp_timers = imt_tools.TpTimer()
+        # TODO : add this options timing on GUI
+        tp_threshold_time_for_realtime_tracking_position = 0.125  # i.e. 8hz => (max) 8 tracking positions record per second
+        tp_threshold_time_for_tp_to_mem = 0.500  # add to reference timing: realtime_tracking_position
+        tp_threshold_time_for_construct_geom = 0.050  # add to reference timing: tp_to_mem
+        tp_threshold_time_for_sending_geom_to_layer = 0.100  # add to reference timing: construct_geom
+        tp_threshold_time_for_sending_layer_to_dp = 0.150  # add to reference timing: sending_geom_to_layer
         #
-        self.tp_threshold_time_for_realtime_tracking_position = 0.125  # i.e. 8hz => (max) 8 tracking positions record per second
-        self.tp_threshold_time_for_tp_to_mem = 0.500  # add to reference timing: realtime_tracking_position
-        self.tp_threshold_time_for_construct_geom = 0.050  # add to reference timing: tp_to_mem
-        self.tp_threshold_time_for_sending_geom_to_layer = 0.100  # add to reference timing: construct_geom
-        self.tp_threshold_time_for_sending_layer_to_dp = 0.150  # add to reference timing: sending_geom_to_layer
+        self.tp_timers.set_delay("tp_threshold_time_for_realtime_tracking_position", tp_threshold_time_for_realtime_tracking_position)
+        self.tp_timers.set_delay("tp_threshold_time_for_tp_to_mem", tp_threshold_time_for_tp_to_mem)
+        self.tp_timers.set_delay("tp_threshold_time_for_construct_geom", tp_threshold_time_for_construct_geom)
+        self.tp_timers.set_delay("tp_threshold_time_for_sending_geom_to_layer", tp_threshold_time_for_sending_geom_to_layer)
+        self.tp_timers.set_delay("tp_threshold_time_for_sending_layer_to_dp", tp_threshold_time_for_sending_layer_to_dp)
         #
-        self.tp_timers.set_delay("tp_threshold_time_for_realtime_tracking_position", self.tp_threshold_time_for_realtime_tracking_position)
-        self.tp_timers.set_delay("tp_threshold_time_for_tp_to_mem", self.tp_threshold_time_for_tp_to_mem)
-        self.tp_timers.set_delay("tp_threshold_time_for_construct_geom", self.tp_threshold_time_for_construct_geom)
-        self.tp_timers.set_delay("tp_threshold_time_for_sending_geom_to_layer", self.tp_threshold_time_for_sending_geom_to_layer)
-        self.tp_timers.set_delay("tp_threshold_time_for_sending_layer_to_dp", self.tp_threshold_time_for_sending_layer_to_dp)
-        #
-        self.delta_time_still_moving = 0.750  # delta time used to decide if the user still moving on the map
+        delta_time_still_moving = 0.750  # delta time used to decide if the user still moving on the map
+        self.tp_timers.set_delay("delta_time_still_moving", delta_time_still_moving)
         # for timing
         self.tp_time_last_rttp_to_mem = current_time
         self.tp_time_last_construct_geom = current_time
@@ -1173,10 +1174,13 @@ class interactive_map_tracking:
         :return:
 
         """
-        #qgis_log_tools.logMessage("self.tp_timers.delta_with_current_time('still moving''):"+str(self.tp_timers.delta_with_current_time("still moving")))
-
         bIsTimeToUpdate = self.tp_timers.is_time_to_update("tp_time_last_construct_geom", "tp_threshold_time_for_sending_geom_to_layer")
-        bNotMovingOnQGISMap = self.tp_timers.delta_with_current_time("still moving") > self.delta_time_still_moving
+        bNotMovingOnQGISMap = self.tp_timers.is_time_to_update("still moving", "delta_time_still_moving")
+
+        # qgis_log_tools.logMessage("self.tp_timers.delta_with_current_time('still moving''):"+str(self.tp_timers.delta_with_current_time("still moving")))
+        # qgis_log_tools.logMessage("self.tp_timers.delta_with_current_time('still moving'): " + str(self.tp_timers.delta_with_current_time("still moving")))
+        # qgis_log_tools.logMessage("bNotMovingOnQGISMap: " + str(bNotMovingOnQGISMap))
+        # qgis_log_tools.logMessage("delta_time_still_moving: " + str(self.tp_timers.get_delay("delta_time_still_moving")))
 
         if bIsTimeToUpdate and bNotMovingOnQGISMap:
             append_in_dict_one_time = False
@@ -1209,11 +1213,11 @@ class interactive_map_tracking:
         :return:
 
         """
-        # qgis_log_tools.logMessage("self.tp_timers.delta_with_current_time(''tp_time_last_send_geom_to_layer''):"+str(self.tp_timers.delta_with_current_time("tp_time_last_send_geom_to_layer")))
-        # qgis_log_tools.logMessage("still moving: " + str(self.tp_timers.delta_with_current_time("still moving") > self.delta_time_still_moving))
-
         bIsTimeToUpdate = self.tp_timers.is_time_to_update("tp_time_last_send_geom_to_layer", "tp_threshold_time_for_sending_layer_to_dp")
-        bNotMovingOnQGISMap = self.tp_timers.delta_with_current_time("still moving") > self.delta_time_still_moving
+        bNotMovingOnQGISMap = self.tp_timers.is_time_to_update("still moving", "delta_time_still_moving")
+
+        # qgis_log_tools.logMessage("self.tp_timers.delta_with_current_time(''tp_time_last_send_geom_to_layer''):"+str(self.tp_timers.delta_with_current_time("tp_time_last_send_geom_to_layer")))
+        # qgis_log_tools.logMessage("bNotMovingOnQGISMap: " + str(bNotMovingOnQGISMap))
 
         if bIsTimeToUpdate and bNotMovingOnQGISMap:
 
