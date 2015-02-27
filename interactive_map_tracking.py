@@ -566,7 +566,7 @@ class interactive_map_tracking:
         QObject.disconnect(self.iface.mapCanvas(), SIGNAL("renderComplete(QPainter*)"),
                            self.currentLayerModifiedAndRenderComplete)
         #
-        self.commitChangesAndRefresh()
+        qgis_layer_tools.commitChangesAndRefresh(self.currentLayer, self.iface, QSettings())
 
     def canvasExtentsChanged(self):
         """ Action when the signal: 'Extent Changed' from QGIS MapCanvas is emitted&captured
@@ -877,17 +877,6 @@ class interactive_map_tracking:
         """
         self.update_settings(QSettings())
         self.dlg.hide()
-
-    def commitChangesAndRefresh(self):
-        """ Perform a commitChanges on current layer and perform a refresh on QGIS MapCanvas """
-        #
-        resultCommit = qgis_layer_tools.commitChanges(self.currentLayer, self.iface, QSettings())
-        #
-        if resultCommit:
-            self.bRefreshMapFromAutoSave = True
-            qgis_mapcanvas_tools.refreshMapCanvas(self.iface)
-        #
-        return resultCommit
 
     def thresholdChanged(self):
         """

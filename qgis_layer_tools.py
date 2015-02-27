@@ -123,7 +123,8 @@ def commitChangesAndRefresh(layer, iface, s):
     """
     bResultCommit = commitChanges(layer, iface, s)
     if bResultCommit:
-        qgis_mapcanvas_tools.refreshMapCanvas(iface)
+        qgis_mapcanvas_tools.refreshMapCanvas(iface)    # use a trick here
+        # qgis_mapcanvas_tools.refreshLayer(layer, iface)   # don't work ... but we don't know why :'(
     return bResultCommit
 
 
