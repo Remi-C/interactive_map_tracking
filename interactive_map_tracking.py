@@ -56,6 +56,9 @@ import time
 import threading
 
 
+def CONVERT_S_TO_MS(s):
+    return s*1000
+
 class interactive_map_tracking:
     """QGIS Plugin Implementation."""
 
@@ -122,16 +125,10 @@ class interactive_map_tracking:
         self.TP_NAMEDTUPLE_ET = namedtuple('TP_NAMEDTUPLE_ET', ['extent', 'w_time'])
         # LIFO Queue to save (in real time) requests for tracking position
         self.tp_queue_rt_ntuples_let = Queue.LifoQueue()
-        # self.tp_queue_mutex = QMutex()
-        self.tp_rt_ntuples_let = self.TP_NAMEDTUPLE_LET(None, None, current_time)
-        # self.tp_dict_mutex_let = QMutex()
+        # self.tp_rt_ntuples_let = self.TP_NAMEDTUPLE_LET(None, None, current_time)
         self.tp_dict_key_l_values_et = {}
-        # self.tp_list_fets_mutex = QMutex()
         self.tp_list_fets = []
-        # self.tp_dict_mutex_llf = QMutex()
         self.tp_dict_key_l_values_listfeatures = {}
-        # self.tp_list_mutex_ltc = QMutex()
-        # self.tp_dict_layers_to_commit = []
         self.tp_dict_layers_to_commit = {}
         #
         self.qtimer_tracking_position_rtt_to_memory = QTimer()
@@ -142,9 +139,6 @@ class interactive_map_tracking:
         self.qtimer_tracking_position_geom_to_layer.timeout.connect(self.tracking_position_qtimer_geom_to_layer)
         self.qtimer_tracking_position_layers_to_commit = QTimer()
         self.qtimer_tracking_position_layers_to_commit.timeout.connect(self.tracking_position_qtimer_layers_to_commit)
-
-        # self.waitcondition_tp_still_moving = QWaitCondition()
-        # self.waitcondition_mutex_tp_still_moving = QMutex()     # note sure it's necessary
 
         # OPTIONS: timing reactions
         #
@@ -296,11 +290,19 @@ class interactive_map_tracking:
         """Create the menu entries and toolbar icons inside the QGIS GUI."""
 
         icon_path = ':/plugins/interactive_map_tracking/icon.png'
+        # icon_path = ':/plugins/interactive_map_tracking/icon_svg.png'
         self.add_action(
             icon_path,
             text=self.tr(u'Tools for Interactive Map Tracking'),
             callback=self.run,
             parent=self.iface.mainWindow())
+
+        #  # create action that will start plugin configuration
+        # self.action = QAction(QIcon(":/plugins/interactive_map_tracking/icon_svg.svg"), "Interactive Map Tracking", self.iface.mainWindow())
+        # self.action.setWhatsThis("Interactive Map Tracking")
+        # QObject.connect(self.action, SIGNAL("triggered()"), self.run)
+        # add toolbar button and menu item
+        # self.iface.addToolBarIcon(self.action)
 
         self.init_plugin()
 
@@ -1006,60 +1008,51 @@ class interactive_map_tracking:
         :return:
         """
 
-        # Do we have a current layer activate for tracking position ?
-        if self.currentLayerForTrackingPosition is None:
-            # if not, no need to go further
-            return -1
-
-        mapCanvas = self.iface.mapCanvas()
-        mapcanvas_extent = mapCanvas.extent()
-
-        # Filter on extent map scale (size)
-        # We use a threshold scale (user input in the GUI)
-        if mapCanvas.scale() > self.threshold:
-            qgis_log_tools.logMessageWARNING("MapCanvas extent scale exceed the Threshold scale for tracking")
-            qgis_log_tools.logMessageWARNING(
-                "-> MapCanvas scale= " + str(mapCanvas.scale()) +
-                "\tThreshold scale= " + str(self.threshold))
-            return -2
-
-        layer_for_itp = self.currentLayerForTrackingPosition
-
-        # Build the tuple contains:
-        # - layer used for tracking position
-        # - list of points extract from the current extent for QGIS Map Canvas
-        # - acquisition time for this track
-        rt_ntuple = self.TP_NAMEDTUPLE_LET(
-            layer_for_itp,
-            imt_tools.construct_listpoints_from_extent(mapcanvas_extent),
-            imt_tools.get_timestamp()
-        )
-        # update delta time
-        tp_delta_time_rt = rt_ntuple.w_time - self.tp_rt_ntuples_let.w_time
-        # filter
-        bIsTimeToUpdate = tp_delta_time_rt >= self.tp_timers.get_delay(
-            "tp_threshold_time_for_realtime_tracking_position")
+        bIsTimeToUpdate = self.tp_timers.is_time_to_update("update_track_position_with_qtimers", "tp_threshold_time_for_realtime_tracking_position")
         if bIsTimeToUpdate:
-            self.tp_rt_ntuples_let = rt_ntuple
-            # this queue is not protect (multi-threads context)
+            # Do we have a current layer activate for tracking position ?
+            if self.currentLayerForTrackingPosition is None:
+            # if not, no need to go further
+                return -1
+
+            mapCanvas = self.iface.mapCanvas()
+            mapcanvas_extent = mapCanvas.extent()
+
+            # Filter on extent map scale (size)
+            # We use a threshold scale (user input in the GUI)
+            if mapCanvas.scale() > self.threshold:
+                qgis_log_tools.logMessageWARNING("MapCanvas extent scale exceed the Threshold scale for tracking")
+                qgis_log_tools.logMessageWARNING(
+                    "-> MapCanvas scale= " + str(mapCanvas.scale()) +
+                    "\tThreshold scale= " + str(self.threshold))
+                return -2
+
+            layer_for_itp = self.currentLayerForTrackingPosition
+
+            # Build the tuple contains:
+            # - layer used for tracking position
+            # - list of points extract from the current extent for QGIS Map Canvas
+            # - acquisition time for this track
+            rt_ntuple = self.TP_NAMEDTUPLE_LET(
+                layer_for_itp,
+                imt_tools.construct_listpoints_from_extent(mapcanvas_extent),
+                imt_tools.get_timestamp()
+            )
+
+            self.tp_timers.update("update_track_position_with_qtimers")
+
+            # This queue is not protect (multi-threads context)
             # but it's oki in your case
             # queue in write-append only here !
             self.tp_queue_rt_ntuples_let.put(rt_ntuple)
 
-            self.qtimer_tracking_position_rtt_to_memory.start(
-                self.tp_timers.get_delay("tp_threshold_time_for_tp_to_mem")
-            )
+            interval = self.tp_timers.get_delay("tp_threshold_time_for_tp_to_mem")
+            self.qtimer_tracking_position_rtt_to_memory.start(interval)
 
-        # update timer for still moving here ! TODO: clean/explain that !
+        # update timer for still moving here !
         self.tp_timers.update("still moving")
 
-        return True
-
-    @ staticmethod
-    def set_qtimer_in_wait_mode(qtimer):
-        # from sys import maxint
-        # qtimer.setInterval(maxint)
-        qtimer.stop()
+        return 1
 
     def tracking_position_qtimer_rttp_to_memory(self):
         """ Action perform when the QTimer for Tracking Position is time out
@@ -1072,8 +1065,8 @@ class interactive_map_tracking:
         # qgis_log_tools.logMessage("self.tp_timers.delta_with_current_time('tp_time_last_rttp_to_mem'): "
         #                           + str(self.tp_timers.delta_with_current_time("tp_time_last_rttp_to_mem")))
 
-        bIsTimeToUpdate = self.tp_timers.is_time_to_update("tp_time_last_rttp_to_mem",
-                                                           "tp_threshold_time_for_tp_to_mem")
+        # bIsTimeToUpdate = self.tp_timers.is_time_to_update("tp_time_last_rttp_to_mem",
+        #                                                    "tp_threshold_time_for_tp_to_mem")
 
         size_tp_queue = self.tp_queue_rt_ntuples_let.qsize()
 
@@ -1091,15 +1084,18 @@ class interactive_map_tracking:
 
         if size_tp_queue != 0:
             # update timer
-            self.tp_timers.update("tp_time_last_rttp_to_mem")
+            # self.tp_timers.update("tp_time_last_rttp_to_mem")
             #
             qgis_log_tools.logMessageINFO("** Pack " + str(size_tp_queue) + " tuples for 1 call -> mem")
 
+        #####################
+        # Process Management
+        #####################
         self.qtimer_tracking_position_rtt_to_memory.stop()
         #
-        self.qtimer_tracking_position_memory_to_geom.start(
-            self.tp_timers.get_delay("tp_threshold_time_for_construct_geom")
-        )
+        interval = self.tp_timers.get_delay("tp_threshold_time_for_construct_geom")
+        self.qtimer_tracking_position_memory_to_geom.start(interval)
+        #####################
 
     def tracking_position_qtimer_memory_to_geom(self):
         """ Action perform when the QTimer for Tracking Position is time out
@@ -1173,14 +1169,21 @@ class interactive_map_tracking:
                     "-- Pack " + str(len(tp_list_fets)) + " features in layer: " + layer.name())
 
         if append_in_dic:
+
             # update timer
-            self.tp_timers.update("tp_time_last_construct_geom")
+            # self.tp_timers.update("tp_time_last_construct_geom")
+
+            #####################
+            # Process Management
+            #####################
             #
             self.qtimer_tracking_position_memory_to_geom.stop()
             #
-            interval = self.tp_timers.get_delay("tp_threshold_time_for_sending_geom_to_layer") + \
-                    max(0.0, (self.tp_timers.get_delay("delay_time_still_moving")-self.tp_timers.delta_with_current_time("still moving")))*1000
+            interval = self.tp_timers.get_delay("tp_threshold_time_for_sending_geom_to_layer")
+            interval += CONVERT_S_TO_MS(max(0.0, (self.tp_timers.get_delay("delay_time_still_moving")-self.tp_timers.delta_with_current_time("still moving"))))
             self.qtimer_tracking_position_geom_to_layer.start(interval)
+            #####################
+
             # qgis_log_tools.logMessage("=> still moving = " + str(self.tp_timers.get_delay("delay_time_still_moving")-self.tp_timers.delta_with_current_time("still moving")))
             # qgis_log_tools.logMessage("=> still moving = " + str(max(0.0, self.tp_timers.get_delay("delay_time_still_moving")-self.tp_timers.delta_with_current_time("still moving"))))
             # qgis_log_tools.logMessage("delay= " + str(delay))
@@ -1224,13 +1227,18 @@ class interactive_map_tracking:
 
             if append_in_dict_one_time:
                 # update timer
-                self.tp_timers.update("tp_time_last_send_geom_to_layer")
-                #
+                # self.tp_timers.update("tp_time_last_send_geom_to_layer")
+
+                #####################
+                # Process Management
+                #####################
                 self.qtimer_tracking_position_geom_to_layer.stop()
                 #
-                interval = self.tp_timers.get_delay("tp_threshold_time_for_sending_layer_to_dp") + \
-                           max(0.0, self.tp_timers.get_delay("delay_time_still_moving")-self.tp_timers.delta_with_current_time("still moving"))*1000
+                interval = self.tp_timers.get_delay("tp_threshold_time_for_sending_layer_to_dp")
+                interval += CONVERT_S_TO_MS(max(0.0, self.tp_timers.get_delay("delay_time_still_moving")-self.tp_timers.delta_with_current_time("still moving")))
                 self.qtimer_tracking_position_layers_to_commit.start(interval)
+                #####################
+
                 # qgis_log_tools.logMessageINFO("tp_threshold_time_for_sending_layer_to_dp= " + str(self.tp_timers.get_delay("tp_threshold_time_for_sending_layer_to_dp")))
         else:
             self.qtimer_tracking_position_geom_to_layer.setInterval(self.tp_timers.get_delay("delay_time_still_moving")*1000)
@@ -1258,7 +1266,7 @@ class interactive_map_tracking:
                 #
                 try:
                     # update timer
-                    self.tp_timers.update("tracking_position_qtimer_layers_to_commit")
+                    # self.tp_timers.update("tracking_position_qtimer_layers_to_commit")
 
                     resultCommit = layer_to_commit.commitChanges()
 
@@ -1268,9 +1276,19 @@ class interactive_map_tracking:
                     # TODO : deal with errors/exceptions
                     pass
 
+            #####################
+            # Process Management
+            #####################
+            # last link of processes chain
             self.qtimer_tracking_position_layers_to_commit.stop()
+            #####################
         else:
-            self.qtimer_tracking_position_layers_to_commit.setInterval(self.tp_timers.get_delay("delay_time_still_moving")*1000)
+            #####################
+            # Process Management
+            #####################
+            interval = CONVERT_S_TO_MS(self.tp_timers.get_delay("delay_time_still_moving"))
+            self.qtimer_tracking_position_layers_to_commit.setInterval(interval)
+            #####################
 
 
 def tracking_position_log_threads_infos(self):
