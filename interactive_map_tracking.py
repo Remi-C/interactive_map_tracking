@@ -64,7 +64,7 @@ def CONVERT_S_TO_MS(s):
 # gui_doc_user_doc = ":/plugins/interactive_map_tracking/gui_doc/Simplified_User_Guide.htm"
 
 # with absolute (os) path
-qgis_plugins_directory = QgsApplication.qgisSettingsDirPath() + "python/plugins/" + "interactive_map_tracking/"
+qgis_plugins_directory = QgsApplication.qgisSettingsDirPath()[:-1] + "python/plugins/" + "interactive_map_tracking/"
 gui_doc_about = qgis_plugins_directory + "gui_doc/About.htm"
 gui_doc_user_doc = qgis_plugins_directory + "gui_doc/Simplified_User_Guide.htm"
 
@@ -979,7 +979,7 @@ class interactive_map_tracking:
         new_width += margin
         new_height += margin
         #
-        new_height = max(new_height, 4/3*new_width)
+        new_height = min(768, max(new_height, 4/3*new_width))
         #
         self.dlg.resize(new_width, new_height)
 
