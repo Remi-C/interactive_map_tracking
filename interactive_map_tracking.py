@@ -30,7 +30,7 @@ from interactive_map_tracking_dialog import interactive_map_trackingDialog
 import os.path
 
 from PyQt4.QtCore import QSettings, QTranslator, qVersion, QCoreApplication
-from PyQt4.QtCore import QObject, SIGNAL, QFile
+from PyQt4.QtCore import QObject, SIGNAL, QUrl
 # from PyQt4.QtCore import QMutex, QWaitCondition
 from PyQt4.QtGui import QAction, QIcon
 
@@ -65,8 +65,8 @@ def CONVERT_S_TO_MS(s):
 
 # with absolute (os) path
 qgis_plugins_directory = QgsApplication.qgisSettingsDirPath()[:-1] + "python/plugins/" + "interactive_map_tracking/"
-gui_doc_about = qgis_plugins_directory + "gui_doc/About.htm"
-gui_doc_user_doc = qgis_plugins_directory + "gui_doc/Simplified_User_Guide.htm"
+gui_doc_about = qgis_plugins_directory + "gui_doc/" + "About.htm"
+gui_doc_user_doc = qgis_plugins_directory + "gui_doc/" + "Simplified_User_Guide.htm"
 
 class interactive_map_tracking:
     """QGIS Plugin Implementation."""
@@ -165,7 +165,8 @@ class interactive_map_tracking:
                                  tp_threshold_time_for_realtime_tracking_position)
         self.tp_timers.set_delay("tp_threshold_time_for_tp_to_mem", tp_threshold_time_for_tp_to_mem)
         self.tp_timers.set_delay("tp_threshold_time_for_construct_geom", tp_threshold_time_for_construct_geom)
-        self.tp_timers.set_delay("tp_threshold_time_for_sending_geom_to_layer", tp_threshold_time_for_sending_geom_to_layer)
+        self.tp_timers.set_delay("tp_threshold_time_for_sending_geom_to_layer",
+                                 tp_threshold_time_for_sending_geom_to_layer)
         self.tp_timers.set_delay("tp_threshold_time_for_sending_layer_to_dp", tp_threshold_time_for_sending_layer_to_dp)
         # in S
         delay_time_still_moving = 0.750  # delta time used to decide if the user still moving on the map
@@ -220,7 +221,6 @@ class interactive_map_tracking:
         """
         # noinspection PyTypeChecker,PyArgumentList,PyCallByClass
         return QCoreApplication.translate('interactive_map_tracking', message)
-
 
     def add_action(
             self,
@@ -358,28 +358,8 @@ class interactive_map_tracking:
         icon_path = ':/plugins/interactive_map_tracking/icon.png'
         self.dlg.setWindowIcon(QIcon(icon_path))
 
-        # # fix the size of the pluging window
-        # self.dlg.setFixedSize(self.dlg.size())
-
         # set the tab at init
         self.dlg.IMT_Window_Tabs.setCurrentIndex(0)
-
-        ################
-        # Don't work
-        ################
-        # webview = self.dlg.webView_userdoc
-        # url = webview.url()
-        # # check_internet = imt_tools.isConnected(url)
-        # check_internet = imt_tools.is_network_alive(url.toString())
-        # if check_internet == 1:
-        #     QgsMessageLog.logMessage("Internet [OK]")
-        # else:
-        #     QgsMessageLog.logMessage("Not connected (url tested: " + str(url.toString()))
-        #     #
-
-        # # Work with ressources files (without 'qrc:/' prefix)
-        # file = QFile(gui_doc_about)
-        # QgsMessageLog.logMessage("file.open(0x0001 | 0x0010): " + str(file.open(QFile.ReadOnly)))
 
         # show the dialog
         self.dlg.show()
@@ -388,13 +368,14 @@ class interactive_map_tracking:
         self.enabled_plugin()
 
         # Run the dialog event loop
-        result = self.dlg.exec_()
+        self.dlg.exec_()
 
-        # See if OK was pressed
-        if result:
-            # Do something useful here - delete the line containing pass and
-            # substitute with your code.
-            pass
+        # result = self.dlg.exec_()
+        # # See if OK was pressed
+        # if result:
+        #     # Do something useful here - delete the line containing pass and
+        #     # substitute with your code.
+        #     pass
 
     def init_plugin(self):
         """ Init the plugin
@@ -412,13 +393,18 @@ class interactive_map_tracking:
             s.setValue(self.qsettings_prefix_name + "enabledPlugin", "false")
             s.setValue(self.qsettings_prefix_name + "enabledAutoSave", "false")
             s.setValue(self.qsettings_prefix_name + "enabledTrackPosition", "false")
-            s.setValue(self.qsettings_prefix_name + "enabledLogging", "false")
+            #
             s.setValue(self.qsettings_prefix_name + "threshold", str(self.threshold))
+            #
+            s.setValue(self.qsettings_prefix_name + "enabledLogging", "true")
+            s.setValue(self.qsettings_prefix_name + "enableV2", "true")
 
         if s.value(self.qsettings_prefix_name + "enabledPlugin", "") == "true":
             self.update_checkbox(s, "enableAutoSave", self.dlg.enableAutoSave)
             self.update_checkbox(s, "enableTrackPosition", self.dlg.enableTrackPosition)
+            #
             self.update_checkbox(s, "enableLogging", self.dlg.enableLogging)
+            self.update_checkbox(s, "enableV2", self.dlg.enableUseMutexForTP)
             #
             self.dlg.thresholdLabel.setEnabled(True)
             self.dlg.threshold_extent.setEnabled(True)
@@ -429,10 +415,11 @@ class interactive_map_tracking:
             self.dlg.enableAutoSave.setChecked(False)
             self.dlg.enableTrackPosition.setDisabled(True)
             self.dlg.enableTrackPosition.setChecked(False)
+            #
             self.dlg.enableLogging.setDisabled(True)
-            self.dlg.enableLogging.setChecked(False)
+            self.dlg.enableLogging.setChecked(True)
             self.dlg.enableUseMutexForTP.setDisabled(True)
-            self.dlg.enableUseMutexForTP.setChecked(False)
+            self.dlg.enableUseMutexForTP.setChecked(True)
             #
             self.dlg.thresholdLabel.setDisabled(True)
             self.dlg.threshold_extent.setDisabled(True)
