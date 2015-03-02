@@ -30,7 +30,7 @@ from interactive_map_tracking_dialog import interactive_map_trackingDialog
 import os.path
 
 from PyQt4.QtCore import QSettings, QTranslator, qVersion, QCoreApplication
-from PyQt4.QtCore import QObject, SIGNAL
+from PyQt4.QtCore import QObject, SIGNAL, QFile
 # from PyQt4.QtCore import QMutex, QWaitCondition
 from PyQt4.QtGui import QAction, QIcon
 
@@ -58,6 +58,15 @@ import threading
 
 def CONVERT_S_TO_MS(s):
     return s*1000
+
+# with Qt resources files
+# gui_doc_about = ":/plugins/interactive_map_tracking/gui_doc/About.htm"
+# gui_doc_user_doc = ":/plugins/interactive_map_tracking/gui_doc/Simplified_User_Guide.htm"
+
+# with absolute (os) path
+qgis_plugins_directory = QgsApplication.qgisSettingsDirPath() + "python/plugins/" + "interactive_map_tracking/"
+gui_doc_about = qgis_plugins_directory + "gui_doc/About.htm"
+gui_doc_user_doc = qgis_plugins_directory + "gui_doc/Simplified_User_Guide.htm"
 
 class interactive_map_tracking:
     """QGIS Plugin Implementation."""
@@ -193,6 +202,10 @@ class interactive_map_tracking:
 
         self.bRefreshMapFromAutoSave = False
 
+        self.TP_NAMEDTUPLE_WEBVIEW = namedtuple('TP_NAMEDTUPLE_WEBVIEW', ['bFirstTimeReSize', 'width', 'height', 'url'])
+        self.webview_dict = {}
+        self.webview_default_tuple = self.TP_NAMEDTUPLE_WEBVIEW(True, 0, 0, None)
+
     # noinspection PyMethodMayBeStatic
     def tr(self, message):
         """Get the translation for a string using Qt translation API.
@@ -317,6 +330,7 @@ class interactive_map_tracking:
         self.dlg.refreshLayersListForTrackPosition.clicked.connect(self.refreshComboBoxLayers)
         QObject.connect(self.dlg.trackingPositionLayerCombo, SIGNAL("currentIndexChanged ( const QString & )"),
                         self.currentIndexChangedTPLCB)
+        QObject.connect(self.dlg.IMT_Window_Tabs, SIGNAL("currentChanged (int)"), self.QTabWidget_CurrentChanged)
 
         # Dev Debug
         self.dlg.enableLogging.clicked.connect(self.enableLogging)
@@ -349,6 +363,23 @@ class interactive_map_tracking:
 
         # set the tab at init
         self.dlg.IMT_Window_Tabs.setCurrentIndex(0)
+
+        ################
+        # Don't work
+        ################
+        # webview = self.dlg.webView_userdoc
+        # url = webview.url()
+        # # check_internet = imt_tools.isConnected(url)
+        # check_internet = imt_tools.is_network_alive(url.toString())
+        # if check_internet == 1:
+        #     QgsMessageLog.logMessage("Internet [OK]")
+        # else:
+        #     QgsMessageLog.logMessage("Not connected (url tested: " + str(url.toString()))
+        #     #
+
+        # # Work with ressources files (without 'qrc:/' prefix)
+        # file = QFile(gui_doc_about)
+        # QgsMessageLog.logMessage("file.open(0x0001 | 0x0010): " + str(file.open(QFile.ReadOnly)))
 
         # show the dialog
         self.dlg.show()
@@ -900,6 +931,68 @@ class interactive_map_tracking:
 
         # just for visualisation purpose
         self.dlg.threshold_extent.setText("1:" + str(self.threshold))
+
+    def adapt_qdialog_size_to_webview(self, webview, margin=60, localURL=""):
+        """
+
+        :param webview:
+        :param margin:
+        :return:
+        """
+
+        page = webview.page()
+        frame = page.currentFrame()
+        #
+        url = webview.url()
+        QgsMessageLog.logMessage("url: " + str(url.toString()))
+
+        #isConnected = page.findText(searchText)
+        isConnected = page.totalBytes() != 0
+
+        if isConnected:
+            QgsMessageLog.logMessage("Connected ! We are in HTML page")
+        else:
+            QgsMessageLog.logMessage("Not Connected ! switch to localURL: " + str(localURL))
+            # url : http://qt-project.org/forums/viewthread/1517
+            # url.setUrl("qrc" + localURL)
+            # with absolute path
+            url.setUrl(localURL)
+
+        tuple_webview = self.webview_dict.setdefault(webview, self.webview_default_tuple)
+        if tuple_webview.bFirstTimeReSize:
+            #
+            width = frame.contentsSize().width()
+            height = frame.contentsSize().height()
+            #
+            tuple_webview = self.TP_NAMEDTUPLE_WEBVIEW(False or not(isConnected), width, height, url)
+            #
+            self.webview_dict[webview] = tuple_webview
+
+        new_width = tuple_webview.width
+        new_height = tuple_webview.height
+        #
+        webview.setUrl(tuple_webview.url)
+        #
+        # QgsMessageLog.logMessage("frame.scrollBarMaximum: " + str(frame.scrollBarMaximum(0x1)))
+        # QgsMessageLog.logMessage("frame.contentsSize().width(): " + str(frame.contentsSize().width()))
+        #
+        new_width += margin
+        new_height += margin
+        #
+        new_height = max(new_height, 4/3*new_width)
+        #
+        self.dlg.resize(new_width, new_height)
+
+    def set_qdialog_size_to_default(self):
+        self.dlg.resize(self.dlg.minimumSize())
+
+    def QTabWidget_CurrentChanged(self, index):
+        if index == 3:
+            self.adapt_qdialog_size_to_webview(self.dlg.webView_userdoc, 60, gui_doc_user_doc)
+        elif index == 4:
+            self.adapt_qdialog_size_to_webview(self.dlg.webView_about, 60, gui_doc_about)
+        else:
+            self.set_qdialog_size_to_default()
 
     # TODO: optimize update_track_position because it's a (critical) real-time method !
     def update_track_position(self, bWithProjectionInCRSLayer=True, bUseEmptyFields=False):

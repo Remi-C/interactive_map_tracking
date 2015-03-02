@@ -241,3 +241,25 @@ class TpTimer:
     def is_time_to_update(self, process_name, delay_name):
         return self.delta_with_current_time(process_name) >= self.get_delay(delay_name)
 
+
+import shlex
+from subprocess import call, PIPE, STDOUT
+
+
+def get_return_code_of_simple_cmd(cmd, stderr=STDOUT):
+    """Execute a simple external command and return its exit status."""
+    args = shlex.split(cmd)
+    return call(args, stdout=PIPE, stderr=stderr)
+
+
+def is_network_alive(url="www.google.com"):
+    #cmd = "ping -c 1 " + url
+    cmd = "curl --output /dev/null --silent --head --fail" + url
+    return get_return_code_of_simple_cmd(cmd) == 0
+
+from PyQt4.QtNetwork import QTcpSocket
+
+def isConnected(url):
+    socket = QTcpSocket()
+    socket.connectToHost(url, 80)
+    return socket.waitForConnected(1000)
