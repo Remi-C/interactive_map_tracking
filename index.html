@@ -28,153 +28,37 @@
     <div id="content-wrapper">
       <div class="inner clearfix">
         <section id="main-content">
-          <p>This plug-in was designed to </p>
+          <p>Interactive Map Tracking is a QGIS &gt;=2.6 plug-in.</p>
+
+<p>Plugin : </p>
 
 <ul>
-<li>allow <strong>concurrent editing awareness or history of editing</strong> (tracking)</li>
-<li>enable QGIS to play well with PostGIS database that use trigger to <strong>reconstruct geometry on the fly</strong>
-</li>
+<li><a href="http://remi-c.github.io/interactive_map_tracking/">Website</a></li>
+<li><a href="https://github.com/Remi-C/interactive_map_tracking/wiki">Wiki</a></li>
+<li><a href="https://github.com/Remi-C/interactive_map_tracking">Bug tracker</a></li>
 </ul>
 
-<h3>
-<a id="feature" class="anchor" href="#feature" aria-hidden="true"><span class="octicon octicon-link"></span></a>feature</h3>
+<p>It was created by Lionel Atty (IGN) and Rémi Cura (IGN/Thales)</p>
 
-<p>This plug-in adds 2 features to QGIS, the user choose what feature he uses</p>
-
-<h4>
-<a id="tracking-the-position" class="anchor" href="#tracking-the-position" aria-hidden="true"><span class="octicon octicon-link"></span></a>tracking the position</h4>
+<p>Lionel worked on the technical aspects :</p>
 
 <ul>
-<li>each time the user change its position on QGIS map canvas (aka camera position), the screen rectangle is saved along with a user id and a timestamp. That is, if the user zoom level is sufficient (it is a parameter)</li>
-<li>with correct QGIS styling, this enable to see : 
+<li>architecture/design</li>
+<li>all the code !</li>
+<li>debug/low level doc</li>
+</ul>
+
+<p>Rémi worked on usability </p>
 
 <ul>
-<li>where the other users <strong>are editing</strong> so two people won't hopefully edit the same area</li>
-<li>where the other users (and self) <strong>were editing</strong>, so an user won't come and edit the same area twice</li>
-</ul>
-</li>
-<li>Moreover, this tracking data can be analysed to produce : 
-
-<ul>
-<li>a map of editing time (gives the place where editing was short/long)</li>
-<li>Reliable stats on editing time and area edited per user, which is essential in a benchmark</li>
-</ul>
-</li>
+<li>concept</li>
+<li>test</li>
+<li>high level doc (wiki,site)</li>
 </ul>
 
-<h4>
-<a id="autosave-and-refresh-after-an-edit" class="anchor" href="#autosave-and-refresh-after-an-edit" aria-hidden="true"><span class="octicon octicon-link"></span></a>autosave and refresh after an edit</h4>
+<p>Any contribution to the project is very welcome (GPL)</p>
 
-<ul>
-<li>QGIS uses a sophisticated Do/Undo mechanism with a delayed writing system. However, when working with a data base that generates geometry on the fly (trigger), it is essential to commit each change immediately.</li>
-<li>The plug-in does exactly that : each modification (geometry or attribute) is saved immediately to the layer, and the canvas is re-rendered.</li>
-<li>this instantaneous commit allow to <strong>create new user interaction</strong> that are within the database, as opposed to be within QGIS. Thus, this interactions can be used in other GIS software, and can be much more complex.</li>
-</ul>
-
-<h2>
-<a id="configure-the-plug-in" class="anchor" href="#configure-the-plug-in" aria-hidden="true"><span class="octicon octicon-link"></span></a>Configure the plug-in</h2>
-
-<p>There are very little parameters to this plugin.</p>
-
-<p><strong>By default the plug-in does nothing</strong> ! </p>
-
-<p>Notice that for the tracking you have to select a compatible layer to write the tracking information.
-The layer can be any qgis vector layer type,<br>
-but it must has <strong>at least</strong> (other attributes will be filed with null) :   </p>
-
-<ul>
-<li>A column <code>user_id</code> of type text</li>
-<li>A column <code>w_time</code> of type text (but following the iso format for time, for usage)</li>
-</ul>
-
-<p>To control the plugin, click on the plug-in icon that has been added to QGIS icons when installing the plug-in.
-[[/images/plugin/logo_LQ.png]]</p>
-
-<p>Then configure the parameters : 
-[[/images/plugin/GUI_of_plugin_explained.png]]</p>
-
-<p>As a regular user, you shouldn't use the last tab (dev).</p>
-
-<h2>
-<a id="using-the-plug-in" class="anchor" href="#using-the-plug-in" aria-hidden="true"><span class="octicon octicon-link"></span></a>Using the plug-in</h2>
-
-<h3>
-<a id="tracking" class="anchor" href="#tracking" aria-hidden="true"><span class="octicon octicon-link"></span></a>Tracking</h3>
-
-<p>When the tracking is activated, the position of the screen will be saved automatically every time you change you screen position in QGIS, if you are close enough (depending on the parameter).
-Each screen geometry saved also has a user-id given by your computer, as well as a time of saving.</p>
-
-<p>[[/images/plugin/principle_of_tracking.png]]</p>
-
-<p>Both of this attributes can be used to display who did what and when within QGIS, or even create a map of editing time</p>
-
-<h3>
-<a id="coloring-camera-tracking-layer" class="anchor" href="#coloring-camera-tracking-layer" aria-hidden="true"><span class="octicon octicon-link"></span></a>Coloring camera tracking layer</h3>
-
-<h4>
-<a id="coloring-camera-tracking-with-time" class="anchor" href="#coloring-camera-tracking-with-time" aria-hidden="true"><span class="octicon octicon-link"></span></a>coloring camera tracking with time</h4>
-
-<ul>
-<li>edit style of layer</li>
-<li>choose graduated</li>
-<li>paste <code>todatetime("w_time")</code> in column field</li>
-<li>click button class
-<img src="https://github.com/Remi-C/street_gen/blob/master/gui/doc/doc_github/coloring_camera_position.png" alt="coloring camera position">
-</li>
-</ul>
-
-<h4>
-<a id="coloring-camera-tracking-with-user_id" class="anchor" href="#coloring-camera-tracking-with-user_id" aria-hidden="true"><span class="octicon octicon-link"></span></a>coloring camera tracking with user_id</h4>
-
-<ul>
-<li>edit style of layer</li>
-<li>choose graduated or classified</li>
-<li>paste <code>tostring("user_id")</code> in column field</li>
-<li>click button class
-<img src="https://github.com/Remi-C/street_gen/blob/master/gui/doc/doc_github/coloring_camera_position_by_user_id.png" alt="coloring camera position">
-</li>
-</ul>
-
-<h3>
-<a id="auto-save-and-refresh-feature" class="anchor" href="#auto-save-and-refresh-feature" aria-hidden="true"><span class="octicon octicon-link"></span></a>Auto save and refresh feature</h3>
-
-<p>This feature can only be used on PostGIS vector layers, because it wouldn't make much sense elsewhere.</p>
-
-<p>When activated, each edition (geometry or attribute) that you perform on a PostGIS vector layer is instantaneously saved, and QGIS display is refreshed afterward.<br>
-This behaviour skip the whole Do/Undo QGIS feature, but allow to use on-the-fly generation of geometry in database.</p>
-
-<p>[[/images/plugin/auto_save_combined.png]]</p>
-
-<h3>
-<a id="creating-an-edition-duration-map" class="anchor" href="#creating-an-edition-duration-map" aria-hidden="true"><span class="octicon octicon-link"></span></a>Creating an edition-duration map</h3>
-
-<p>You can create an edition-duration map, see [[Using a PostGIS layer for tracking|[User]-Advanced-Tracking-with-a-PostGIS-layer]]</p>
-
-<h2>
-<a id="using-the-plug-in--limitations" class="anchor" href="#using-the-plug-in--limitations" aria-hidden="true"><span class="octicon octicon-link"></span></a>Using the plug-in : Limitations</h2>
-
-<ul>
-<li>tracking
-
-<ul>
-<li>when the tracking layer is not diplayed, no tracking</li>
-<li>because the plug-in writes each camera position, it may slow navigation when using a lot of scroll/unscroll</li>
-<li>In certain condition, non metric coordinates could cause weird behavior</li>
-</ul>
-</li>
-<li>Autosave/refresh
-
-<ul>
-<li>The Do/Undo feature can't be used</li>
-<li> when using the node tool, auto saving will loose the selection of nodes </li>
-</ul>
-</li>
-</ul>
-
-<h2>
-<a id="improving-the-plug-in" class="anchor" href="#improving-the-plug-in" aria-hidden="true"><span class="octicon octicon-link"></span></a>Improving the plug-in</h2>
-
-<p>This is an open source project, any test/idea/contribution is welcome.</p>
+<p>03/2015</p>
         </section>
 
         <aside id="sidebar">
