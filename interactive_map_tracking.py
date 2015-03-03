@@ -32,7 +32,8 @@ import os.path
 from PyQt4.QtCore import QSettings, QTranslator, qVersion, QCoreApplication
 from PyQt4.QtCore import QObject, SIGNAL, QUrl
 # from PyQt4.QtCore import QMutex, QWaitCondition
-from PyQt4.QtGui import QAction, QIcon
+from PyQt4.QtGui import QAction, QIcon, QTabWidget
+from PyQt4.QtWebKit import QWebSettings, QWebView
 
 from qgis.gui import QgsMessageBar
 
@@ -65,8 +66,10 @@ def CONVERT_S_TO_MS(s):
 
 # with absolute (os) path
 qgis_plugins_directory = QgsApplication.qgisSettingsDirPath()[:-1] + "python/plugins/" + "interactive_map_tracking/"
-gui_doc_about = qgis_plugins_directory + "gui_doc/" + "About.htm"
-gui_doc_user_doc = qgis_plugins_directory + "gui_doc/" + "Simplified_User_Guide.htm"
+webview_offline_about = qgis_plugins_directory + "gui_doc/" + "About.htm"
+webview_offline_user_doc = qgis_plugins_directory + "gui_doc/" + "Simplified_User_Guide.htm"
+webview_online_about = "https://github.com/Remi-C/interactive_map_tracking/wiki/[User]-About"
+webview_online_user_doc = "https://github.com/Remi-C/interactive_map_tracking/wiki/[User]-User-Guide"
 
 class interactive_map_tracking:
     """QGIS Plugin Implementation."""
@@ -203,9 +206,15 @@ class interactive_map_tracking:
 
         self.bRefreshMapFromAutoSave = False
 
-        self.TP_NAMEDTUPLE_WEBVIEW = namedtuple('TP_NAMEDTUPLE_WEBVIEW', ['bFirstTimeReSize', 'width', 'height', 'url'])
+        self.TP_NAMEDTUPLE_WEBVIEW = namedtuple('TP_NAMEDTUPLE_WEBVIEW', ['state', 'width', 'height', 'online_url', 'offline_url'])
         self.webview_dict = {}
-        self.webview_default_tuple = self.TP_NAMEDTUPLE_WEBVIEW(True, 0, 0, None)
+        self.webview_default_tuple = self.TP_NAMEDTUPLE_WEBVIEW(0, 0, 0, None, None)
+        self.webview_dict[self.dlg.webView_userdoc] = self.TP_NAMEDTUPLE_WEBVIEW(0, 0, 0, webview_online_user_doc, webview_offline_user_doc)
+        self.webview_dict[self.dlg.webView_about] = self.TP_NAMEDTUPLE_WEBVIEW(0, 0, 0, webview_online_about, webview_offline_about)
+        self.current_webview = None
+        self.webview_margin = 60
+
+        self.dict_tabs_size = {}
 
     # noinspection PyMethodMayBeStatic
     def tr(self, message):
@@ -350,6 +359,11 @@ class interactive_map_tracking:
                 action)
             self.iface.removeToolBarIcon(action)
 
+    def onResizeEvent(self, event):
+        # url: http://openclassrooms.com/forum/sujet/dimensionnement-automatique-d-une-qtabwidget
+        QTabWidget.resizeEvent(self.dlg.IMT_Window_Tabs, event)
+        # url: http://qt-project.org/doc/qt-4.8/qresizeevent.html
+        self.dict_tabs_size[self.dlg.IMT_Window_Tabs.currentIndex()] = event.size()
 
     def run(self):
         """Run method that performs all the real work"""
@@ -360,6 +374,8 @@ class interactive_map_tracking:
 
         # set the tab at init
         self.dlg.IMT_Window_Tabs.setCurrentIndex(0)
+        # url: http://qt-project.org/doc/qt-4.8/qtabwidget.html#resizeEvent
+        self.dlg.IMT_Window_Tabs.resizeEvent = self.onResizeEvent
 
         # show the dialog
         self.dlg.show()
@@ -424,6 +440,9 @@ class interactive_map_tracking:
             self.dlg.thresholdLabel.setDisabled(True)
             self.dlg.threshold_extent.setDisabled(True)
             QObject.disconnect(self.dlg.threshold_extent, SIGNAL("returnPressed ()"), self.thresholdChanged)
+            #
+            QObject.disconnect(self.dlg.webView_about, SIGNAL("loadFinished (bool)"), self.webview_loadFinished)
+            QObject.disconnect(self.dlg.webView_userdoc, SIGNAL("loadFinished (bool)"), self.webview_loadFinished)
 
     def update_checkbox(self, _settings, _name_in_setting, _checkbox):
         """ According to values stores in QSetting, update the state of a checkbox
@@ -542,6 +561,9 @@ class interactive_map_tracking:
         self.disconnectSignalForLayerChanged()
         self.disconnectSignalForExtentsChanged()
         self.disconnectSignaleForLayerCrsChanged()
+        #
+        QObject.disconnect(self.dlg.webView_about, SIGNAL("loadFinished (bool)"), self.webview_loadFinished)
+        QObject.disconnect(self.dlg.webView_userdoc, SIGNAL("loadFinished (bool)"), self.webview_loadFinished)
 
     def qgisInterfaceCurrentLayerChanged(self, layer):
         """ Action when the signal: 'Current Layer Changed' from QGIS MapCanvas is emitted&captured
@@ -919,67 +941,99 @@ class interactive_map_tracking:
         # just for visualisation purpose
         self.dlg.threshold_extent.setText("1:" + str(self.threshold))
 
-    def adapt_qdialog_size_to_webview(self, webview, margin=60, localURL=""):
+    def update_size_dlg_from_frame(self, dlg, frame, margin_width=60):
+        width = frame.contentsSize().width()
+        height = frame.contentsSize().height()
+        #
+        width += margin_width
+        #
+        width = max(1024, width)
+        height = min(768, max(height, width*4/3))
+        #
+        dlg.resize(width, height)
+        #
+        return width, height
+
+    def update_size_dlg_from_tuple(self, dlg, tuple):
+        dlg.resize(tuple.width, tuple.height)
+        return tuple.width, tuple.height
+
+    def webview_loadFinished(self, ok):
+        webview = self.current_webview
+
+        tuple_webview = self.webview_dict.setdefault(webview, self.webview_default_tuple)
+        last_state = tuple_webview.state
+        QgsMessageLog.logMessage("#last_state : " + str(last_state))
+
+        if ok:
+            # we have loaded a HTML page (offline or online)
+            QgsMessageLog.logMessage("## WebView : OK")
+
+            # update the QDiaglog sizes
+            width, height = self.update_size_dlg_from_frame(
+                self.dlg,
+                webview.page().currentFrame(),
+                self.webview_margin
+            )
+            # update the tuple for this webview
+            self.webview_dict[webview] = self.TP_NAMEDTUPLE_WEBVIEW(
+                1,
+                width, height,
+                tuple_webview.online_url,
+                tuple_webview.offline_url
+            )
+            #
+            QgsMessageLog.logMessage("### width : " + str(width) + " - height : " + str(height))
+        else:
+            QgsMessageLog.logMessage("## WebView : FAILED TO LOAD")
+            #
+            self.webview_dict[webview] = self.TP_NAMEDTUPLE_WEBVIEW(
+                2,
+                tuple_webview.width, tuple_webview.height,
+                tuple_webview.online_url,
+                tuple_webview.offline_url
+            )
+            # try to load the offline version (still in initial state)
+            webview.load(QUrl(tuple_webview.offline_url))
+
+    def adapt_qdialog_size_to_webview(self, webview, margin=60):
         """
 
         :param webview:
         :param margin:
         :return:
         """
-
-        page = webview.page()
-        frame = page.currentFrame()
         #
-        url = webview.url()
-        QgsMessageLog.logMessage("url: " + str(url.toString()))
-
-        #isConnected = page.findText(searchText)
-        isConnected = page.totalBytes() != 0
-
-        if isConnected:
-            QgsMessageLog.logMessage("Connected ! We are in HTML page")
-        else:
-            QgsMessageLog.logMessage("Not Connected ! switch to localURL: " + str(localURL))
-            # url : http://qt-project.org/forums/viewthread/1517
-            # url.setUrl("qrc" + localURL)
-            # with absolute path
-            url.setUrl(localURL)
-
         tuple_webview = self.webview_dict.setdefault(webview, self.webview_default_tuple)
-        if tuple_webview.bFirstTimeReSize:
-            #
-            width = frame.contentsSize().width()
-            height = frame.contentsSize().height()
-            #
-            tuple_webview = self.TP_NAMEDTUPLE_WEBVIEW(False or not(isConnected), width, height, url)
-            #
-            self.webview_dict[webview] = tuple_webview
 
-        new_width = tuple_webview.width
-        new_height = tuple_webview.height
-        #
-        webview.setUrl(tuple_webview.url)
-        #
-        # QgsMessageLog.logMessage("frame.scrollBarMaximum: " + str(frame.scrollBarMaximum(0x1)))
-        # QgsMessageLog.logMessage("frame.contentsSize().width(): " + str(frame.contentsSize().width()))
-        #
-        new_width += margin
-        new_height += margin
-        #
-        new_height = min(768, max(new_height, 4/3*new_width))
-        #
-        self.dlg.resize(new_width, new_height)
+        self.webview_margin = margin
+        self.current_webview = webview
 
-    def set_qdialog_size_to_default(self):
-        self.dlg.resize(self.dlg.minimumSize())
+        # signal : 'loadFinished(bool)'
+        QObject.connect(webview, SIGNAL("loadFinished (bool)"), self.webview_loadFinished)
+
+        if tuple_webview.state == 2:    # offline
+            webview.load(QUrl(tuple_webview.offline_url))
+        else:   # 0 or 1 (init, online)
+            webview.load(QUrl(tuple_webview.online_url))
+
+    def restore_dlg_size(self):
+        self.dlg.resize(self.dlg_size)
 
     def QTabWidget_CurrentChanged(self, index):
+
+        QObject.disconnect(self.dlg.webView_about, SIGNAL("loadFinished (bool)"), self.webview_loadFinished)
+        QObject.disconnect(self.dlg.webView_userdoc, SIGNAL("loadFinished (bool)"), self.webview_loadFinished)
+
         if index == 3:
-            self.adapt_qdialog_size_to_webview(self.dlg.webView_userdoc, 60, gui_doc_user_doc)
+            QgsMessageLog.logMessage("## Tab : User Doc")
+            self.adapt_qdialog_size_to_webview(self.dlg.webView_userdoc, 60)
         elif index == 4:
-            self.adapt_qdialog_size_to_webview(self.dlg.webView_about, 60, gui_doc_about)
+            QgsMessageLog.logMessage("## Tab : About")
+            self.adapt_qdialog_size_to_webview(self.dlg.webView_about, 60)
         else:
-            self.set_qdialog_size_to_default()
+            self.dict_tabs_size[index] = self.dict_tabs_size.setdefault(index, self.dlg.minimumSize())
+            self.dlg.resize(self.dict_tabs_size[index])
 
     # TODO: optimize update_track_position because it's a (critical) real-time method !
     def update_track_position(self, bWithProjectionInCRSLayer=True, bUseEmptyFields=False):
