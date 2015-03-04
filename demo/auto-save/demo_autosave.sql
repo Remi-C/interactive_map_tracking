@@ -38,11 +38,16 @@
 	gid SERIAL PRIMARY KEY --mandatory
 	, line geometry(linestring, 4326) -- use your custom SRID here
 	, poly geometry(polygon,4326)  --use your custom SRID here 
+	, color int
+	, was_modified_x_time int
  ); 
 --creating index is not mandatory but will speed up all usual operations on those columns
 CREATE INDEX ON auto_save.line_to_poly_sync USING GIST(line) ; 
 CREATE INDEX ON auto_save.line_to_poly_sync USING GIST(poly) ; 
 
+-- INSERT INTO auto_save.line_to_poly_sync VALUES (2,ST_GeomFromText('linestring(0 0, 1 1)',4326),NULL::geometry,1,0);
+-- INSERT INTO auto_save.line_to_poly_sync VALUES (3,ST_GeomFromText('linestring(2 2, 3 3)',4326),NULL::geometry,255,0);
+ 
 --checking that the table was correctly created
  SELECT *
  FROM auto_save.line_to_poly_sync;  
@@ -51,11 +56,19 @@ CREATE INDEX ON auto_save.line_to_poly_sync USING GIST(poly) ;
  CREATE OR REPLACE FUNCTION rc_buffer_line_on_insert_or_update(  )
   RETURNS  trigger  AS
 $BODY$ 
-/** @brief : this trigger compute the buffer of line (random()/10) and save it at each change (insert/update)
+/** @brief : this trigger update the row bi computing the poly associated to the line, random color, and couting how much time the object was edited.
 */ 
 	DECLARE 
 	BEGIN   
-		NEW.poly = ST_Buffer(NEW.line,random()/10.0);
+		NEW.poly = ST_Buffer(NEW.line,ST_Length(NEW.line)/100.0);
+		NEW.color = (random()*255)::int ; 
+		 
+		IF NEW.was_modified_x_time IS NULL OR TG_OP = 'INSERT' THEN 
+			NEW.was_modified_x_time:=0 ;
+		ELSE 
+			NEW.was_modified_x_time = OLD.was_modified_x_time +1 ; 
+		END IF ;
+		
 		RETURN NEW ;
 	END ;
 	$BODY$

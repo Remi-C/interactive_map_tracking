@@ -45,6 +45,17 @@ def refreshMapCanvas(iface):
     iface.mapCanvas().zoomByFactor(1.0 + DEFAULT_SEGMENT_EPSILON, mapRect.center())
 
 
+def refreshLayer(layer, iface):
+    """Force QGIS to refresh/repaint the layer
+
+    :param layer: Layer to refresh/repaint/rerender
+    :type iface: QgsMapLayer
+
+    """
+    qgis_log_tools.logMessageINFO("Try to refresh: " + str(layer.name()))
+    layer.triggerRepaint()
+    iface.mapCanvas().refresh()
+
 def find_layer_in_mapcanvas(_mapCanvas, _layername):
     """ Finding the index of an item given a list containing it in Python
     url : http://stackoverflow.com/questions/176918/finding-the-index-of-an-item-given-a-list-containing-it-in-python
@@ -81,18 +92,3 @@ def find_layer_in_mapcanvas(_mapCanvas, _layername):
         return None
     else:
         return _mapCanvas.layer(index_layer_searched[0])
-
-def find_layer_in_qgis_legend_interface(_iface, _layername):
-    """
-
-    :param _iface:
-    :param _layername:
-    :return:
-    """
-    try:
-        layer_searched = [layer_searched
-                          for layer_searched in _iface.legendInterface().layers()
-                          if layer_searched.name() == _layername]
-        return layer_searched[0]
-    except:
-        return None

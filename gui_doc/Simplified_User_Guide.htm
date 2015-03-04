@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html><head>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="chrome=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+    <link href="Simplified_User_Guide_fichiers/css.css" rel="stylesheet" type="text/css">
+    <link rel="stylesheet" type="text/css" href="Simplified_User_Guide_fichiers/stylesheet.css" media="screen">
+    <link rel="stylesheet" type="text/css" href="Simplified_User_Guide_fichiers/pygment_trac.css" media="screen">
+    <link rel="stylesheet" type="text/css" href="Simplified_User_Guide_fichiers/print.css" media="print">
+
+    <!--[if lt IE 9]>
+    <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+
+    <title>Interactive map tracking by Remi-C</title>
+  <style type="text/css"> #fi #fic {margin-right:100px !important}  #fi #rh {margin-left:-115px !important;width:95px !important}  #fi .rh {display:none !important}  body:not(.xE) div[role='main'] .Bu:not(:first-child) {display: none !important} </style></head>
+
+  <body>
+    <header>
+      <div class="inner">
+        <h1>Interactive map tracking</h1>
+        <h2>A QGIS 2.6 plugin to track camera of user , AND/OR to autocommit/refresh edit on PostGIS vector layer</h2>
+       
+      </div>
+    </header>
+
+    <div id="content-wrapper">
+      <div class="inner clearfix">
+        <section id="main-content">
+          <h2>
+<a id="interactive_map_tracking" class="anchor" href="#interactive_map_tracking" aria-hidden="true"><span class="octicon octicon-link"></span></a>interactive_map_tracking</h2>
+
+<p><img src="Simplified_User_Guide_fichiers/logo_LQ.png" alt=""> A QGIS 2.6 plugin to track camera of user , AND/OR to autocommit/refresh edit on PostGIS vector layer
+This QGIS 2.6 plug-in has been developed by Lionel Atty from IGN (France).</p>
+
+<p>Go to the <a href="https://github.com/Remi-C/interactive_map_tracking/wiki">project wiki</a> for more information !</p>
+
+<p>This plug-in was designed to allow <strong>concurrent editing awareness or history of editing</strong> (tracking), and to enable QGIS to play well with PostGIS database using trigger to <strong>reconstruct geometry on the fly</strong></p>
+
+<h3>
+<a id="feature" class="anchor" href="#feature" aria-hidden="true"><span class="octicon octicon-link"></span></a>feature</h3>
+
+<p>This plug-in add 2 features to QGIS, the user choose what feature he uses</p>
+
+<p><img src="Simplified_User_Guide_fichiers/multi_user_tracking_edited_LQ.png" alt=""></p>
+
+<p><img src="Simplified_User_Guide_fichiers/edition_time_with_hexagonal_grid_LQ.png" alt=""></p>
+
+<p><img src="Simplified_User_Guide_fichiers/auto_save_combined.png" alt=""></p>
+
+<h4>
+<a id="tracking-the-position" class="anchor" href="#tracking-the-position" aria-hidden="true"><span class="octicon octicon-link"></span></a>tracking the position</h4>
+
+<ul>
+<li>each time the user change its position on QGIS map canvas, the 
+screen rectangle is saved along with a user id and a timestamp. That is,
+ if the user zoom level is compatible with edition (parameter)</li>
+<li>with correct QGIS styling, this enable to see : 
+
+<ul>
+<li>where the other users <strong>are editing</strong> so two people won't hopefully edit the same area</li>
+<li>where the other users (and self) <strong>were editing</strong>, so an user won't come and edit the same area twice</li>
+</ul>
+</li>
+<li>Moreover, this tracking data can be analysed to produce : 
+
+<ul>
+<li>a map of editing time (gives the place where editing was short/long)</li>
+<li>Reliable stats on editing time and area edited per user, which is essential in a benchmark</li>
+</ul>
+</li>
+</ul>
+
+<h4>
+<a id="autosave-and-refresh-after-an-edit" class="anchor" href="#autosave-and-refresh-after-an-edit" aria-hidden="true"><span class="octicon octicon-link"></span></a>autosave and refresh after an edit</h4>
+
+<ul>
+<li>QGIS uses a sophisticated Do/Undo mechanism with a delayed writing 
+system. However, when working with a data base that generates geometry 
+on the fly (trigger), it is essential to commit each change immediately.</li>
+<li>The plug-in does exactly that : each modification (geometry or 
+attribute) is saved immediately to the layer, and the canvas is 
+re-rendered.</li>
+<li>this instantaneous commit allow to <strong>create new user interaction</strong>
+ that are within the database, as opposed to be within QGIS. Thus, this 
+interactions can be used in other GIS software, and can be much more 
+complex.</li>
+</ul>
+        </section>
+
+         
+      </div>
+    </div>
+
+            <script type="text/javascript">
+            var gaJsHost = (("https:" == document.location.protocol) ? "https://ssl." : "http://www.");
+            document.write(unescape("%3Cscript src='" + gaJsHost + "google-analytics.com/ga.js' type='text/javascript'%3E%3C/script%3E"));
+          </script><script src="Simplified_User_Guide_fichiers/ga.js" type="text/javascript"></script>
+          <script type="text/javascript">
+            try {
+              var pageTracker = _gat._getTracker("UA-60271234-1");
+            pageTracker._trackPageview();
+            } catch(err) {}
+          </script>
+
+  
+
+</body></html>

@@ -123,7 +123,8 @@ def commitChangesAndRefresh(layer, iface, s):
     """
     bResultCommit = commitChanges(layer, iface, s)
     if bResultCommit:
-        qgis_mapcanvas_tools.refreshMapCanvas(iface)
+        qgis_mapcanvas_tools.refreshMapCanvas(iface)    # use a trick here
+        # qgis_mapcanvas_tools.refreshLayer(layer, iface)   # don't work ... but we don't know why :'(
     return bResultCommit
 
 
@@ -150,15 +151,20 @@ def filter_layer_postgis(layer, list_filters=["PostgreSQL", "database", "PostGIS
     :rtype: bool
     """
     result = False
-    if not(None is layer):
-        storageType = layer.dataProvider().storageType()
-        index = 0
-        len_list_filters = len(list_filters)
-        bContinue = (index < len_list_filters) and (storageType.find(list_filters[index]) != -1)
-        while bContinue:
-            index += 1
-            bContinue = (index < len_list_filters) and (storageType.find(list_filters[index]) != -1)
-        result = (index == len_list_filters)
+    try:
+        if not(None is layer):
+            data_provider = layer.dataProvider()
+            if not(None is data_provider):
+                storageType = data_provider.storageType()
+                index = 0
+                len_list_filters = len(list_filters)
+                bContinue = (index < len_list_filters) and (storageType.find(list_filters[index]) != -1)
+                while bContinue:
+                    index += 1
+                    bContinue = (index < len_list_filters) and (storageType.find(list_filters[index]) != -1)
+                result = (index == len_list_filters)
+    except:
+        qgis_log_tools.logMessageWARNING("Problem with layer: " + layer.name())
     #
     return result
 
@@ -207,18 +213,19 @@ def filter_layer_trackingposition_required_fields(layer, list_fields=["user_id",
     :param layer: QGIS layer to commit
     :type layer: QgsMapLayer
 
-    :return: Result of the filter
-    :rtype: bool
+    :return: Result list of indices for fields given (in list fields)
+    or return empty list if problem (don't found fields)
+    :rtype: list[int]
     """
     try:
         fields = layer.dataProvider().fields()
         # get fields name from the layer
         field_names = [field.name() for field in fields]
         #
-        [field_names.index(name_field) for name_field in list_fields]
+        list_id_fields = [field_names.index(name_field) for name_field in list_fields]
     except:
-            return False
-    return True
+            return []
+    return list_id_fields
 
 def filter_layer_for_trackingposition(layer):
     """ Helper to decided if 'layer' is compatible for Tracking Position

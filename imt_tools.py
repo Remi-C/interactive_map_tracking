@@ -184,3 +184,82 @@ def find_layer_in_qgis_legend_interface(_iface, _layername):
         return layer_searched[0]
     except:
         return None
+
+
+import time
+
+
+class TpTimer:
+
+    def __init__(self):
+        self.currentTime = self.default_timers()
+        self.dict_process_timeupdate = {}
+        self.dict_process_delay = {}
+
+    @staticmethod
+    def default_timers():
+        return [time.time(), time.time()]
+
+    @staticmethod
+    def default_delay():
+        return 0.0
+
+    def get_current_time(self):
+        self.update_current_time()
+        return self.currentTime[0]
+
+    def __getitem__(self, key):
+        return self.dict_process_timeupdate.setdefault(key, self.default_timers())
+
+    def update_current_time(self):
+        self.currentTime = [time.time(), self.currentTime[0]]
+
+    def delta(self):
+        return self.currentTime[0] - self.currentTime[1]
+
+    def delta(self, key):
+        list_times = self.__getitem__(key)
+        return list_times[0] - list_times[1]
+
+    def delta_with_current_time(self, key):
+        self.update_current_time()
+        list_times = self.__getitem__(key)
+        return self.currentTime[0] - list_times[0]
+
+    def update(self, key):
+        self.update_current_time()
+        list_times = self.__getitem__(key)
+        self.dict_process_timeupdate[key] = [self.currentTime[0], list_times[0]]
+        return self.dict_process_timeupdate[key]
+
+    def get_delay(self, process_name):
+        return self.dict_process_delay.setdefault(process_name, self.default_delay())
+
+    def set_delay(self, delay_name, time_delay):
+        self.dict_process_delay[delay_name] = time_delay
+
+    def is_time_to_update(self, process_name, delay_name):
+        return self.delta_with_current_time(process_name) >= self.get_delay(delay_name)
+
+
+import shlex
+from subprocess import call, PIPE, STDOUT
+
+
+def get_return_code_of_simple_cmd(cmd, stderr=STDOUT):
+    """Execute a simple external command and return its exit status."""
+    args = shlex.split(cmd)
+    return call(args, stdout=PIPE, stderr=stderr)
+
+
+def is_network_alive(url="www.google.com"):
+    #cmd = "ping -c 1 " + url
+    cmd = "curl --output /dev/null --silent --head --fail" + url
+    return get_return_code_of_simple_cmd(cmd) == 0
+
+from PyQt4.QtNetwork import QTcpSocket
+
+def isConnected(url):
+    socket = QTcpSocket()
+    socket.connectToHost(url, 80)
+    return socket.waitForConnected(1000)

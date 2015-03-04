@@ -1,5 +1,5 @@
 <RCC>
-    <qresource prefix="/plugins/interactive_map_tracking" >
+    <qresource prefix="/plugins/interactive_map_tracking">
         <file>icon.png</file>
     </qresource>
 </RCC>
