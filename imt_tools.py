@@ -257,9 +257,20 @@ def is_network_alive(url="www.google.com"):
     cmd = "curl --output /dev/null --silent --head --fail" + url
     return get_return_code_of_simple_cmd(cmd) == 0
 
+
 from PyQt4.QtNetwork import QTcpSocket
+
 
 def isConnected(url):
     socket = QTcpSocket()
     socket.connectToHost(url, 80)
     return socket.waitForConnected(1000)
+
+DEFAULT_SEGMENT_EPSILON = 1e-08
+
+
+def extent_equal(r1, r2, epsilon=DEFAULT_SEGMENT_EPSILON):
+    return abs(r1.xMaximum() - r2.xMaximum()) <= epsilon and \
+           abs(r1.yMaximum() - r2.yMaximum()) <= epsilon and \
+           abs(r1.xMinimum() - r2.xMinimum()) <= epsilon and \
+           abs(r1.yMinimum() - r2.yMinimum()) <= epsilon

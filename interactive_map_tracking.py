@@ -1171,12 +1171,6 @@ class interactive_map_tracking:
         #
         return resultCommit
 
-    def same_extent(self, r1, r2, epsilon):
-        return abs(r1.xMaximum() - r2.xMaximum()) <= epsilon and \
-               abs(r1.yMaximum() - r2.yMaximum()) <= epsilon and \
-               abs(r1.xMinimum() - r2.xMinimum()) <= epsilon and \
-               abs(r1.yMinimum() - r2.yMinimum()) <= epsilon
-
     def update_track_position_with_qtimers(self, bWithProjectionInCRSLayer=True, bUseEmptyFields=False):
         """
         Note: it's not a Thread/QTimer
@@ -1197,7 +1191,7 @@ class interactive_map_tracking:
             mapcanvas_extent = mapCanvas.extent()
 
             # Add a filter to prevent to save the same extent (useful in regards to our 'dummy' approach to refresh map)
-            if self.same_extent(self.tp_last_extent_saved, mapcanvas_extent, 0.1):
+            if imt_tools.extent_equal(self.tp_last_extent_saved, mapcanvas_extent, 0.01):   # 10 mm
                 return -3
 
             # Filter on extent map scale (size)
