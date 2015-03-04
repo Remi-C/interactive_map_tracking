@@ -33,7 +33,7 @@
    <item row="0" column="0">
     <widget class="QTabWidget" name="IMT_Window_Tabs">
      <property name="currentIndex">
-      <number>2</number>
+      <number>1</number>
      </property>
      <widget class="QWidget" name="tab_general">
       <property name="enabled">

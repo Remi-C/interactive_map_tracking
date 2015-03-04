@@ -30,7 +30,6 @@ import os.path
 
 from PyQt4.QtCore import QSettings, QTranslator, qVersion, QCoreApplication
 from PyQt4.QtCore import QObject, SIGNAL, QUrl
-# from PyQt4.QtCore import QMutex, QWaitCondition
 from PyQt4.QtGui import QAction, QIcon, QTabWidget
 from PyQt4.QtWebKit import QWebSettings, QWebView
 
@@ -197,7 +196,7 @@ class interactive_map_tracking:
         self.tp_user_name = os_username + " (" + user_ip + ")"
 
         # default value for threshold scale
-        self.threshold = 300
+        self.threshold = 0
 
         self.tp_id_user_id = 0
         self.tp_id_w_time = 0
@@ -205,15 +204,31 @@ class interactive_map_tracking:
 
         self.bRefreshMapFromAutoSave = False
 
-        self.TP_NAMEDTUPLE_WEBVIEW = namedtuple('TP_NAMEDTUPLE_WEBVIEW', ['state', 'width', 'height', 'online_url', 'offline_url'])
+        self.TP_NAMEDTUPLE_WEBVIEW = namedtuple(
+            'TP_NAMEDTUPLE_WEBVIEW',
+            ['state', 'width', 'height', 'online_url', 'offline_url']
+        )
         self.webview_dict = {}
-        self.webview_default_tuple = self.TP_NAMEDTUPLE_WEBVIEW(0, 0, 0, None, None)
-        self.webview_dict[self.dlg.webView_userdoc] = self.TP_NAMEDTUPLE_WEBVIEW(0, 0, 0, webview_online_user_doc, webview_offline_user_doc)
-        self.webview_dict[self.dlg.webView_about] = self.TP_NAMEDTUPLE_WEBVIEW(0, 0, 0, webview_online_about, webview_offline_about)
-        self.current_webview = None
+        # url : http://qt-project.org/doc/qt-4.8/qurl.html
+        self.webview_default_tuple = self.TP_NAMEDTUPLE_WEBVIEW('init', 0, 0, QUrl(""), QUrl(""))
+        self.webview_dict[self.dlg.webView_userdoc] = self.TP_NAMEDTUPLE_WEBVIEW(
+            'init',
+            0, 0,
+            QUrl(webview_online_user_doc),
+            QUrl(webview_offline_user_doc)
+        )
+        self.webview_dict[self.dlg.webView_about] = self.TP_NAMEDTUPLE_WEBVIEW(
+            'init',
+            0, 0,
+            QUrl(webview_online_about),
+            QUrl(webview_offline_about)
+        )
+        self.webview_current = None
         self.webview_margin = 60
 
         self.dict_tabs_size = {}
+
+        self.tp_last_extent_saved = QgsRectangle()
 
     # noinspection PyMethodMayBeStatic
     def tr(self, message):
@@ -318,13 +333,7 @@ class interactive_map_tracking:
             callback=self.run,
             parent=self.iface.mainWindow())
 
-        #  # create action that will start plugin configuration
-        # self.action = QAction(QIcon(":/plugins/interactive_map_tracking/icon_svg.svg"), "Interactive Map Tracking", self.iface.mainWindow())
-        # self.action.setWhatsThis("Interactive Map Tracking")
-        # QObject.connect(self.action, SIGNAL("triggered()"), self.run)
-        # add toolbar button and menu item
-        # self.iface.addToolBarIcon(self.action)
-
+        #
         self.init_plugin()
 
         # Connections
@@ -349,6 +358,8 @@ class interactive_map_tracking:
         self.dlg.buttonHide.clicked.connect(self.hide_plugin)
         #
         self.refreshComboBoxLayers()
+
+        self.thresholdChanged()
 
         #
         QgsMessageLog.logMessage("enableLogging()")
@@ -390,13 +401,6 @@ class interactive_map_tracking:
         # Run the dialog event loop
         self.dlg.exec_()
 
-        # result = self.dlg.exec_()
-        # # See if OK was pressed
-        # if result:
-        #     # Do something useful here - delete the line containing pass and
-        #     # substitute with your code.
-        #     pass
-
     def init_plugin(self):
         """ Init the plugin
         - Set defaults values in QSetting
@@ -410,45 +414,36 @@ class interactive_map_tracking:
         pluginEnable = s.value(self.qsettings_prefix_name + "enabledPlugin", defaultValue="undef")
 
         if pluginEnable == "undef":
+            # retrieve default states from Qt Creator GUI design
             self.update_setting(s, "enabledPlugin", self.dlg.enablePlugin)
             self.update_setting(s, "enabledAutoSave", self.dlg.enableAutoSave)
             self.update_setting(s, "enabledTrackPosition", self.dlg.enableTrackPosition)
             self.update_setting(s, "enabledLogging", self.dlg.enableLogging)
             self.update_setting(s, "enableV2", self.dlg.enableUseMutexForTP)
             #
-            # s.setValue(self.qsettings_prefix_name + "enabledPlugin", "false")
-            # s.setValue(self.qsettings_prefix_name + "enabledAutoSave", "false")
-            # s.setValue(self.qsettings_prefix_name + "enabledTrackPosition", "false")
+            self.thresholdChanged()
             s.setValue(self.qsettings_prefix_name + "threshold", str(self.threshold))
-            # s.setValue(self.qsettings_prefix_name + "enabledLogging", "true")
-            # s.setValue(self.qsettings_prefix_name + "enableV2", "true")
 
         if s.value(self.qsettings_prefix_name + "enabledPlugin", "") == "true":
             self.update_checkbox(s, "enableAutoSave", self.dlg.enableAutoSave)
             self.update_checkbox(s, "enableTrackPosition", self.dlg.enableTrackPosition)
-            #
             self.update_checkbox(s, "enableLogging", self.dlg.enableLogging)
             self.update_checkbox(s, "enableV2", self.dlg.enableUseMutexForTP)
             #
             self.dlg.thresholdLabel.setEnabled(True)
             self.dlg.threshold_extent.setEnabled(True)
             QObject.connect(self.dlg.threshold_extent, SIGNAL("returnPressed ()"), self.thresholdChanged)
+            self.thresholdChanged()
         else:
             #
             self.dlg.enableAutoSave.setDisabled(True)
-            # self.dlg.enableAutoSave.setChecked(False)
             self.dlg.enableTrackPosition.setDisabled(True)
-            # self.dlg.enableTrackPosition.setChecked(False)
-            #
             self.dlg.enableLogging.setDisabled(True)
-            # self.dlg.enableLogging.setChecked(True)
             self.dlg.enableUseMutexForTP.setDisabled(True)
-            # self.dlg.enableUseMutexForTP.setChecked(True)
-            #
             self.dlg.thresholdLabel.setDisabled(True)
             self.dlg.threshold_extent.setDisabled(True)
-            QObject.disconnect(self.dlg.threshold_extent, SIGNAL("returnPressed ()"), self.thresholdChanged)
             #
+            QObject.disconnect(self.dlg.threshold_extent, SIGNAL("returnPressed ()"), self.thresholdChanged)
             QObject.disconnect(self.dlg.webView_about, SIGNAL("loadFinished (bool)"), self.webview_loadFinished)
             QObject.disconnect(self.dlg.webView_userdoc, SIGNAL("loadFinished (bool)"), self.webview_loadFinished)
 
@@ -634,6 +629,7 @@ class interactive_map_tracking:
         QObject.disconnect(self.iface.mapCanvas(), SIGNAL("renderComplete(QPainter*)"),
                            self.currentLayerModifiedAndRenderComplete)
         #
+        # qgis_layer_tools.bRefreshMapFromAutoSave = True
         qgis_layer_tools.commitChangesAndRefresh(self.currentLayer, self.iface, QSettings())
 
     def canvasExtentsChanged(self):
@@ -643,10 +639,10 @@ class interactive_map_tracking:
         """
         if self.bUseV2Functionnalities:
             # filter on our dummy refreshMap using little zoom on mapcanvas (=> canvasExtentChanged was emitted)
-            if self.bRefreshMapFromAutoSave:
-                self.bRefreshMapFromAutoSave = False
-            else:
-                self.update_track_position_with_qtimers()
+            # if self.bRefreshMapFromAutoSave:
+            #     self.bRefreshMapFromAutoSave = False
+            # else:
+            self.update_track_position_with_qtimers()
         else:
             QObject.connect(self.iface.mapCanvas(), SIGNAL("renderComplete(QPainter*)"),
                             self.canvasExtentsChangedAndRenderComplete)
@@ -962,6 +958,13 @@ class interactive_map_tracking:
         self.dlg.threshold_extent.setText("1:" + str(self.threshold))
 
     def update_size_dlg_from_frame(self, dlg, frame, margin_width=60):
+        """
+
+        :param dlg:
+        :param frame:
+        :param margin_width:
+        :return:
+        """
         width = frame.contentsSize().width()
         height = frame.contentsSize().height()
         #
@@ -979,7 +982,13 @@ class interactive_map_tracking:
         return tuple.width, tuple.height
 
     def webview_loadFinished(self, ok):
-        webview = self.current_webview
+        """
+
+        :param ok:
+        """
+
+        # safe because we stop the listener of this event when we changed the tab
+        webview = self.webview_current
 
         tuple_webview = self.webview_dict.setdefault(webview, self.webview_default_tuple)
         last_state = tuple_webview.state
@@ -997,7 +1006,7 @@ class interactive_map_tracking:
             )
             # update the tuple for this webview
             self.webview_dict[webview] = self.TP_NAMEDTUPLE_WEBVIEW(
-                1,
+                'online',
                 width, height,
                 tuple_webview.online_url,
                 tuple_webview.offline_url
@@ -1008,15 +1017,16 @@ class interactive_map_tracking:
             qgis_log_tools.logMessageINFO("## WebView : FAILED TO LOAD")
             #
             self.webview_dict[webview] = self.TP_NAMEDTUPLE_WEBVIEW(
-                2,
+                'offline',
                 tuple_webview.width, tuple_webview.height,
                 tuple_webview.online_url,
                 tuple_webview.offline_url
             )
+
             # try to load the offline version (still in initial state)
             webview.load(QUrl(tuple_webview.offline_url))
 
-    def adapt_qdialog_size_to_webview(self, webview, margin=60):
+    def webview_load_page(self, webview, margin=60):
         """
 
         :param webview:
@@ -1027,30 +1037,38 @@ class interactive_map_tracking:
         tuple_webview = self.webview_dict.setdefault(webview, self.webview_default_tuple)
 
         self.webview_margin = margin
-        self.current_webview = webview
+        self.webview_current = webview
 
         # signal : 'loadFinished(bool)'
         QObject.connect(webview, SIGNAL("loadFinished (bool)"), self.webview_loadFinished)
 
-        if tuple_webview.state == 2:    # offline
-            webview.load(QUrl(tuple_webview.offline_url))
-        else:   # 0 or 1 (init, online)
-            webview.load(QUrl(tuple_webview.online_url))
+        # reset/clear the web widget
+        # url : http://qt-project.org/doc/qt-4.8/qwebview.html#settings
+        websetting = webview.settings()
+        websetting.clearMemoryCaches()
+        globalsettings = websetting.globalSettings()
+        globalsettings.clearMemoryCaches()
 
-    def restore_dlg_size(self):
-        self.dlg.resize(self.dlg_size)
+        if tuple_webview.state == 'offline':    # offline
+            webview.load(tuple_webview.offline_url)
+        else:   # 'init' or 'online'
+            webview.load(tuple_webview.online_url)
 
     def QTabWidget_CurrentChanged(self, index):
+        """
 
+        :param index:
+        :return:
+        """
         QObject.disconnect(self.dlg.webView_about, SIGNAL("loadFinished (bool)"), self.webview_loadFinished)
         QObject.disconnect(self.dlg.webView_userdoc, SIGNAL("loadFinished (bool)"), self.webview_loadFinished)
 
         if index == 3:
             qgis_log_tools.logMessageINFO("## Tab : User Doc")
-            self.adapt_qdialog_size_to_webview(self.dlg.webView_userdoc, 60)
+            self.webview_load_page(self.dlg.webView_userdoc, self.webview_margin)
         elif index == 4:
             qgis_log_tools.logMessageINFO("## Tab : About")
-            self.adapt_qdialog_size_to_webview(self.dlg.webView_about, 60)
+            self.webview_load_page(self.dlg.webView_about, self.webview_margin)
         else:
             self.dict_tabs_size[index] = self.dict_tabs_size.setdefault(index, self.dlg.minimumSize())
             self.dlg.resize(self.dict_tabs_size[index])
@@ -1153,6 +1171,12 @@ class interactive_map_tracking:
         #
         return resultCommit
 
+    def same_extent(self, r1, r2, epsilon):
+        return abs(r1.xMaximum() - r2.xMaximum()) <= epsilon and \
+               abs(r1.yMaximum() - r2.yMaximum()) <= epsilon and \
+               abs(r1.xMinimum() - r2.xMinimum()) <= epsilon and \
+               abs(r1.yMinimum() - r2.yMinimum()) <= epsilon
+
     def update_track_position_with_qtimers(self, bWithProjectionInCRSLayer=True, bUseEmptyFields=False):
         """
         Note: it's not a Thread/QTimer
@@ -1171,6 +1195,10 @@ class interactive_map_tracking:
 
             mapCanvas = self.iface.mapCanvas()
             mapcanvas_extent = mapCanvas.extent()
+
+            # Add a filter to prevent to save the same extent (useful in regards to our 'dummy' approach to refresh map)
+            if self.same_extent(self.tp_last_extent_saved, mapcanvas_extent, 0.1):
+                return -3
 
             # Filter on extent map scale (size)
             # We use a threshold scale (user input in the GUI)
@@ -1192,6 +1220,7 @@ class interactive_map_tracking:
                 imt_tools.construct_listpoints_from_extent(mapcanvas_extent),
                 imt_tools.get_timestamp()
             )
+            self.tp_last_extent_saved = mapcanvas_extent
 
             self.tp_timers.update("update_track_position_with_qtimers")
 
