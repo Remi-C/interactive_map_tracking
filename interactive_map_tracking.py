@@ -350,6 +350,11 @@ class interactive_map_tracking:
         #
         self.refreshComboBoxLayers()
 
+        #
+        QgsMessageLog.logMessage("enableLogging()")
+        self.enableLogging()
+        self.enableUseMutexForTP()
+
     def unload(self):
         """Removes the plugin menu item and icon from QGIS GUI."""
         for action in self.actions:
@@ -405,14 +410,18 @@ class interactive_map_tracking:
         pluginEnable = s.value(self.qsettings_prefix_name + "enabledPlugin", defaultValue="undef")
 
         if pluginEnable == "undef":
-            s.setValue(self.qsettings_prefix_name + "enabledPlugin", "false")
-            s.setValue(self.qsettings_prefix_name + "enabledAutoSave", "false")
-            s.setValue(self.qsettings_prefix_name + "enabledTrackPosition", "false")
+            self.update_setting(s, "enabledPlugin", self.dlg.enablePlugin)
+            self.update_setting(s, "enabledAutoSave", self.dlg.enableAutoSave)
+            self.update_setting(s, "enabledTrackPosition", self.dlg.enableTrackPosition)
+            self.update_setting(s, "enabledLogging", self.dlg.enableLogging)
+            self.update_setting(s, "enableV2", self.dlg.enableUseMutexForTP)
             #
+            # s.setValue(self.qsettings_prefix_name + "enabledPlugin", "false")
+            # s.setValue(self.qsettings_prefix_name + "enabledAutoSave", "false")
+            # s.setValue(self.qsettings_prefix_name + "enabledTrackPosition", "false")
             s.setValue(self.qsettings_prefix_name + "threshold", str(self.threshold))
-            #
-            s.setValue(self.qsettings_prefix_name + "enabledLogging", "true")
-            s.setValue(self.qsettings_prefix_name + "enableV2", "true")
+            # s.setValue(self.qsettings_prefix_name + "enabledLogging", "true")
+            # s.setValue(self.qsettings_prefix_name + "enableV2", "true")
 
         if s.value(self.qsettings_prefix_name + "enabledPlugin", "") == "true":
             self.update_checkbox(s, "enableAutoSave", self.dlg.enableAutoSave)
@@ -427,14 +436,14 @@ class interactive_map_tracking:
         else:
             #
             self.dlg.enableAutoSave.setDisabled(True)
-            self.dlg.enableAutoSave.setChecked(False)
+            # self.dlg.enableAutoSave.setChecked(False)
             self.dlg.enableTrackPosition.setDisabled(True)
-            self.dlg.enableTrackPosition.setChecked(False)
+            # self.dlg.enableTrackPosition.setChecked(False)
             #
             self.dlg.enableLogging.setDisabled(True)
-            self.dlg.enableLogging.setChecked(True)
+            # self.dlg.enableLogging.setChecked(True)
             self.dlg.enableUseMutexForTP.setDisabled(True)
-            self.dlg.enableUseMutexForTP.setChecked(True)
+            # self.dlg.enableUseMutexForTP.setChecked(True)
             #
             self.dlg.thresholdLabel.setDisabled(True)
             self.dlg.threshold_extent.setDisabled(True)
@@ -442,6 +451,18 @@ class interactive_map_tracking:
             #
             QObject.disconnect(self.dlg.webView_about, SIGNAL("loadFinished (bool)"), self.webview_loadFinished)
             QObject.disconnect(self.dlg.webView_userdoc, SIGNAL("loadFinished (bool)"), self.webview_loadFinished)
+
+    def update_setting(self, _settings, _name_in_setting, _checkbox):
+        """
+
+        :param _settings:
+        :param _name_in_setting:
+        :param _checkbox:
+        """
+        if _checkbox.isChecked():
+            _settings.setValue(self.qsettings_prefix_name + _name_in_setting, "true")
+        else:
+            _settings.setValue(self.qsettings_prefix_name + _name_in_setting, "false")
 
     def update_checkbox(self, _settings, _name_in_setting, _checkbox):
         """ According to values stores in QSetting, update the state of a checkbox
@@ -962,11 +983,11 @@ class interactive_map_tracking:
 
         tuple_webview = self.webview_dict.setdefault(webview, self.webview_default_tuple)
         last_state = tuple_webview.state
-        QgsMessageLog.logMessage("#last_state : " + str(last_state))
+        qgis_log_tools.logMessageINFO("#last_state : " + str(last_state))
 
         if ok:
             # we have loaded a HTML page (offline or online)
-            QgsMessageLog.logMessage("## WebView : OK")
+            qgis_log_tools.logMessageINFO("## WebView : OK")
 
             # update the QDiaglog sizes
             width, height = self.update_size_dlg_from_frame(
@@ -982,9 +1003,9 @@ class interactive_map_tracking:
                 tuple_webview.offline_url
             )
             #
-            QgsMessageLog.logMessage("### width : " + str(width) + " - height : " + str(height))
+            qgis_log_tools.logMessageINFO("### width : " + str(width) + " - height : " + str(height))
         else:
-            QgsMessageLog.logMessage("## WebView : FAILED TO LOAD")
+            qgis_log_tools.logMessageINFO("## WebView : FAILED TO LOAD")
             #
             self.webview_dict[webview] = self.TP_NAMEDTUPLE_WEBVIEW(
                 2,
@@ -1025,10 +1046,10 @@ class interactive_map_tracking:
         QObject.disconnect(self.dlg.webView_userdoc, SIGNAL("loadFinished (bool)"), self.webview_loadFinished)
 
         if index == 3:
-            QgsMessageLog.logMessage("## Tab : User Doc")
+            qgis_log_tools.logMessageINFO("## Tab : User Doc")
             self.adapt_qdialog_size_to_webview(self.dlg.webView_userdoc, 60)
         elif index == 4:
-            QgsMessageLog.logMessage("## Tab : About")
+            qgis_log_tools.logMessageINFO("## Tab : About")
             self.adapt_qdialog_size_to_webview(self.dlg.webView_about, 60)
         else:
             self.dict_tabs_size[index] = self.dict_tabs_size.setdefault(index, self.dlg.minimumSize())

@@ -33,7 +33,7 @@
    <item row="0" column="0">
     <widget class="QTabWidget" name="IMT_Window_Tabs">
      <property name="currentIndex">
-      <number>4</number>
+      <number>2</number>
      </property>
      <widget class="QWidget" name="tab_general">
       <property name="enabled">
@@ -237,7 +237,7 @@ p, li { white-space: pre-wrap; }
             <string>Enable LOGging</string>
            </property>
            <property name="checked">
-            <bool>true</bool>
+            <bool>false</bool>
            </property>
           </widget>
          </item>
