@@ -392,7 +392,7 @@ class interactive_map_tracking:
         self.thresholdChanged()
 
         #
-        QgsMessageLog.logMessage("enableLogging()")
+        #QgsMessageLog.logMessage("enableLogging()")
         self.enableLogging()
         self.enableUseMutexForTP()
 
@@ -1056,6 +1056,7 @@ class interactive_map_tracking:
                 )
 
                 # try to load the offline version (still in initial state)
+                # @FIXME : doesn't load the images in offline mode on XP...
                 webview.load(QUrl(tuple_webview.offline_url))
                 
             else: # we already failed last, time, stopping to try
