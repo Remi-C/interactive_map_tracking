@@ -845,7 +845,8 @@ class interactive_map_tracking:
 
         """
         qgis_log_tools.logMessageINFO("Launch 'enabled_plugin(...)' ...")
-
+        #force the plugin to be in front
+        self.dlg.raise_()
         resultCommit = False
 
         # filtre sur les layers a prendre en compte
