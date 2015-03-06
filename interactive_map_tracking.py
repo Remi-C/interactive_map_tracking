@@ -78,7 +78,7 @@ class interactive_map_tracking:
         """
 
         import time
-
+        from PyQt4.QtNetwork import QNetworkProxy
         current_time = time.time()
 
         # Save reference to the QGIS interface
@@ -229,6 +229,32 @@ class interactive_map_tracking:
         )
         self.webview_current = None
         self.webview_margin = 60
+        
+        #getting proxy 
+        s = QSettings() #getting proxy from qgis options settings
+        proxyEnabled = s.value("proxy/proxyEnabled", "")
+        proxyType = s.value("proxy/proxyType", "" )
+        proxyHost = s.value("proxy/proxyHost", "" )
+        proxyPort = s.value("proxy/proxyPort", "" )
+        proxyUser = s.value("proxy/proxyUser", "" )
+        proxyPassword = s.value("proxy/proxyPassword", "" )
+        if proxyEnabled == "true": # test if there are proxy settings
+            proxy = QNetworkProxy()
+        if proxyType == "DefaultProxy":
+            proxy.setType(QNetworkProxy.DefaultProxy)
+        elif proxyType == "Socks5Proxy":
+            proxy.setType(QNetworkProxy.Socks5Proxy)
+        elif proxyType == "HttpProxy":
+            proxy.setType(QNetworkProxy.HttpProxy)
+        elif proxyType == "HttpCachingProxy":
+            proxy.setType(QNetworkProxy.HttpCachingProxy)
+        elif proxyType == "FtpCachingProxy":
+            proxy.setType(QNetworkProxy.FtpCachingProxy)
+        proxy.setHostName(proxyHost)
+        proxy.setPort(int(proxyPort))
+        proxy.setUser(proxyUser)
+        proxy.setPassword(proxyPassword)
+        QNetworkProxy.setApplicationProxy(proxy)
 
         self.dict_tabs_size = {}
 
