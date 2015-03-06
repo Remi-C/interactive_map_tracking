@@ -1015,18 +1015,24 @@ class interactive_map_tracking:
             #
             qgis_log_tools.logMessageINFO("### width : " + str(width) + " - height : " + str(height))
         else:
-            qgis_log_tools.logMessageINFO("## WebView : FAILED TO LOAD")
+            if self.webview_dict[webview].state == 'online':
+                qgis_log_tools.logMessageINFO("## WebView : FAILED TO LOAD from " + str(self.webview_dict[webview].online_url))#online_url
+            else :
+                qgis_log_tools.logMessageINFO("## WebView : FAILED TO LOAD from " + str(self.webview_dict[webview].offline_url))
             #
-            self.webview_dict[webview] = self.TP_NAMEDTUPLE_WEBVIEW(
-                'offline',
-                tuple_webview.width, tuple_webview.height,
-                tuple_webview.online_url,
-                tuple_webview.offline_url
-            )
+            if  self.webview_dict[webview].state != 'offline': #regular case we failed, but we are going to try again
+                self.webview_dict[webview] = self.TP_NAMEDTUPLE_WEBVIEW(
+                    'offline',
+                    tuple_webview.width, tuple_webview.height,
+                    tuple_webview.online_url,
+                    tuple_webview.offline_url
+                )
 
-            # try to load the offline version (still in initial state)
-            webview.load(QUrl(tuple_webview.offline_url))
-
+                # try to load the offline version (still in initial state)
+                webview.load(QUrl(tuple_webview.offline_url))
+                
+            else: # we already failed last, time, stopping to try
+                qgis_log_tools.logMessageINFO("## WebView : stopping to try to retrieve html")
     def webview_load_page(self, webview, margin=60):
         """
 
