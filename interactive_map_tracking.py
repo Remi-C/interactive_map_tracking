@@ -63,11 +63,7 @@ def CONVERT_S_TO_MS(s):
 # gui_doc_user_doc = ":/plugins/interactive_map_tracking/gui_doc/Simplified_User_Guide.htm"
 
 # with absolute (os) path
-qgis_plugins_directory = QgsApplication.qgisSettingsDirPath()[:-1] + "python/plugins/" + "interactive_map_tracking/"
-webview_offline_about = qgis_plugins_directory + "gui_doc/" + "About.htm"
-webview_offline_user_doc = qgis_plugins_directory + "gui_doc/" + "Simplified_User_Guide.htm"
-webview_online_about = "https://github.com/Remi-C/interactive_map_tracking/wiki/[User]-About"
-webview_online_user_doc = "https://github.com/Remi-C/interactive_map_tracking/wiki/[User]-User-Guide"
+
 
 class interactive_map_tracking:
     """QGIS Plugin Implementation."""
@@ -208,20 +204,28 @@ class interactive_map_tracking:
             'TP_NAMEDTUPLE_WEBVIEW',
             ['state', 'width', 'height', 'online_url', 'offline_url']
         )
+        # very dirty @FIXME @TODO : here is the proper way to do it (from within the class `self.plugin_dir`)
+        self.qgis_plugins_directory = self.plugin_dir
+        self.webview_offline_about = os.path.join(self.qgis_plugins_directory , "gui_doc","About.htm" )
+        self.webview_offline_user_doc = os.path.join(self.qgis_plugins_directory , "gui_doc", "Simplified_User_Guide.htm" ) 
+        self.webview_online_about = "https://github.com/Remi-C/interactive_map_tracking/wiki/[User]-About"
+        self.webview_online_user_doc = "https://github.com/Remi-C/interactive_map_tracking/wiki/[User]-User-Guide"
+
+
         self.webview_dict = {}
         # url : http://qt-project.org/doc/qt-4.8/qurl.html
         self.webview_default_tuple = self.TP_NAMEDTUPLE_WEBVIEW('init', 0, 0, QUrl(""), QUrl(""))
         self.webview_dict[self.dlg.webView_userdoc] = self.TP_NAMEDTUPLE_WEBVIEW(
             'init',
             0, 0,
-            QUrl(webview_online_user_doc),
-            QUrl(webview_offline_user_doc)
+            QUrl(self.webview_online_user_doc),
+            QUrl(self.webview_offline_user_doc)
         )
         self.webview_dict[self.dlg.webView_about] = self.TP_NAMEDTUPLE_WEBVIEW(
             'init',
             0, 0,
-            QUrl(webview_online_about),
-            QUrl(webview_offline_about)
+            QUrl(self.webview_online_about),
+            QUrl(self.webview_offline_about)
         )
         self.webview_current = None
         self.webview_margin = 60
