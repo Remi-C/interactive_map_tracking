@@ -407,26 +407,21 @@ class interactive_map_tracking:
 
     def init_plugin(self):
         """ Init the plugin
-        - Set defaults values in QSetting
+        - Set defaults values in QSetting # note : some value are already setted ! 
         - Setup the GUI
         """
 
         qgis_log_tools.logMessageINFO("Launch 'init_plugin(...)' ...")
-
         s = QSettings()
-
-        pluginEnable = s.value(self.qsettings_prefix_name + "enabledPlugin", defaultValue="undef")
-
-        if pluginEnable == "undef":
-            # retrieve default states from Qt Creator GUI design
-            self.update_setting(s, "enabledPlugin", self.dlg.enablePlugin)
-            self.update_setting(s, "enabledAutoSave", self.dlg.enableAutoSave)
-            self.update_setting(s, "enabledTrackPosition", self.dlg.enableTrackPosition)
-            self.update_setting(s, "enabledLogging", self.dlg.enableLogging)
-            self.update_setting(s, "enableV2", self.dlg.enableUseMutexForTP)
-            #
-            self.thresholdChanged()
-            s.setValue(self.qsettings_prefix_name + "threshold", str(self.threshold))
+          
+        # retrieve default states from Qt Creator GUI design
+        self.update_setting(s, "enabledPlugin", self.dlg.enablePlugin)
+        self.update_setting(s, "enabledAutoSave", self.dlg.enableAutoSave)
+        self.update_setting(s, "enabledTrackPosition", self.dlg.enableTrackPosition)
+        self.update_setting(s, "enabledLogging", self.dlg.enableLogging)
+        self.update_setting(s, "enableV2", self.dlg.enableUseMutexForTP) 
+        self.thresholdChanged()
+        s.setValue(self.qsettings_prefix_name + "threshold", str(self.threshold))
 
         if s.value(self.qsettings_prefix_name + "enabledPlugin", "") == "true":
             self.update_checkbox(s, "enableAutoSave", self.dlg.enableAutoSave)
@@ -480,8 +475,9 @@ class interactive_map_tracking:
             _checkbox.setDisabled(False)
             _checkbox.setChecked(True)
         else:
-            _checkbox.setDisabled(True)
             _checkbox.setChecked(False)
+            _checkbox.setDisabled(True)
+
 
     def disconnectSignaleForLayerCrsChanged(self, layer):
         """ Disconnect the signal: 'layerCrsChanged' of the layer given
@@ -931,6 +927,7 @@ class interactive_map_tracking:
         Don't change the state of the plugin
 
         """
+        # @FIXME there is a mistake here, this function is also called before init. Because QSettings is a singleton, variable are inited before end of init !
         self.update_settings(QSettings())
         self.dlg.hide()
 
