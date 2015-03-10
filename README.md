@@ -9,6 +9,8 @@ This plug-in was designed to allow __concurrent editing awareness or history of 
 This plug-in add 2 features to QGIS, the user choose what feature he uses
 
 
+You can see a short video of demos : 
+[![Demo on video](https://raw.githubusercontent.com/wiki/Remi-C/interactive_map_tracking/videos/icon_video_LQ.png)](http://www.youtube.com/watch?v=grlkUvvSf3w&hd=1)
 
 ![](https://raw.githubusercontent.com/wiki/Remi-C/interactive_map_tracking/images/plugin/multi_user_tracking_edited_LQ.png)
 
