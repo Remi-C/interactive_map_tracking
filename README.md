@@ -9,6 +9,8 @@ This plug-in was designed to allow __concurrent editing awareness or history of 
 This plug-in add 2 features to QGIS, the user choose what feature he uses
 
 
+You can see a short video of demos : 
+[![Demo on video](https://raw.githubusercontent.com/wiki/Remi-C/interactive_map_tracking/videos/icon_video_LQ.png)](http://www.youtube.com/watch?v=grlkUvvSf3w&hd=1)
 
 ![](https://raw.githubusercontent.com/wiki/Remi-C/interactive_map_tracking/images/plugin/multi_user_tracking_edited_LQ.png)
 
@@ -32,4 +34,6 @@ This plug-in add 2 features to QGIS, the user choose what feature he uses
 * QGIS uses a sophisticated Do/Undo mechanism with a delayed writing system. However, when working with a data base that generates geometry on the fly (trigger), it is essential to commit each change immediately.
 * The plug-in does exactly that : each modification (geometry or attribute) is saved immediately to the layer, and the canvas is re-rendered.
 * this instantaneous commit allow to __create new user interaction__ that are within the database, as opposed to be within QGIS. Thus, this interactions can be used in other GIS software, and can be much more complex.
- 
+
+This work was partly supported by Agence Nationale de
+la Recherche Grant ANR-12-VBDU-0002-09 (TrafiPollu project), and by Thales Training & Simulation SAS within FUI project TerraMobilita. The result of this works is under the co-property of IGN and Thales Training & Simulation SAS
