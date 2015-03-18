@@ -29,16 +29,16 @@ from interactive_map_tracking_dialog import interactive_map_trackingDialog
 import os.path
 
 from PyQt4.QtCore import QSettings, QTranslator, qVersion, QCoreApplication
-from PyQt4.QtCore import QObject, SIGNAL, QUrl
+from PyQt4.QtCore import QObject, SIGNAL, QUrl, QReadWriteLock, QReadLocker, QWriteLocker, pyqtSlot
 from PyQt4.QtGui import QAction, QIcon, QTabWidget
-from PyQt4.QtWebKit import QWebSettings, QWebView
+#from PyQt4.QtWebKit import QWebSettings, QWebView
 
 from qgis.gui import QgsMessageBar
 
 from qgis.core import *
 
 import qgis_layer_tools
-import qgis_mapcanvas_tools
+#import qgis_mapcanvas_tools
 import qgis_log_tools
 import imt_tools
 
@@ -50,9 +50,8 @@ import Queue
 
 from collections import namedtuple
 
-import time
-
-import threading
+#import time
+#import threading
 
 
 def CONVERT_S_TO_MS(s):
@@ -63,11 +62,7 @@ def CONVERT_S_TO_MS(s):
 # gui_doc_user_doc = ":/plugins/interactive_map_tracking/gui_doc/Simplified_User_Guide.htm"
 
 # with absolute (os) path
-qgis_plugins_directory = QgsApplication.qgisSettingsDirPath()[:-1] + "python/plugins/" + "interactive_map_tracking/"
-webview_offline_about = qgis_plugins_directory + "gui_doc/" + "About.htm"
-webview_offline_user_doc = qgis_plugins_directory + "gui_doc/" + "Simplified_User_Guide.htm"
-webview_online_about = "https://github.com/Remi-C/interactive_map_tracking/wiki/[User]-About"
-webview_online_user_doc = "https://github.com/Remi-C/interactive_map_tracking/wiki/[User]-User-Guide"
+
 
 class interactive_map_tracking:
     """QGIS Plugin Implementation."""
@@ -82,13 +77,13 @@ class interactive_map_tracking:
         """
 
         import time
-
+        from PyQt4.QtNetwork import QNetworkProxy
         current_time = time.time()
 
         # Save reference to the QGIS interface
         self.iface = iface
         # initialize plugin directory
-        self.plugin_dir = os.path.dirname(__file__)
+        self.plugin_dir = os.path.normcase(os.path.dirname(__file__))
         # initialize locale
         locale = QSettings().value('locale/userLocale')[0:2]
         locale_path = os.path.join(
@@ -121,21 +116,20 @@ class interactive_map_tracking:
         self.bSignalForExtentsChangedConnected = False
 
         # self.idCameraPositionLayerInBox = 0
-        self.currentLayerForTrackingPosition = None
+        self.tp_layer = None
 
-        self.bSignalForProjectReadConnected = True
-        QObject.connect(self.iface, SIGNAL("projectRead()"), self.qgisInterfaceProjectRead)
+        # self.bSignalForProjectReadConnected = True
+        # QObject.connect(self.iface, SIGNAL("projectRead()"), self.qgisInterfaceProjectRead)
 
         # MUTEX
         self.bUseV2Functionnalities = self.dlg.enableUseMutexForTP.isChecked()
 
         # url: https://docs.python.org/2/library/collections.html#collections.namedtuple
         # Definition : namedtuples 'type'
-        self.TP_NAMEDTUPLE_LET = namedtuple('TP_NAMEDTUPLE_LET', ['layer', 'extent', 'w_time'])
+        self.TP_NAMEDTUPLE_LET = namedtuple('TP_NAMEDTUPLE_LET', ['id_layer', 'extent', 'w_time'])
         self.TP_NAMEDTUPLE_ET = namedtuple('TP_NAMEDTUPLE_ET', ['extent', 'w_time'])
         # LIFO Queue to save (in real time) requests for tracking position
         self.tp_queue_rt_ntuples_let = Queue.LifoQueue()
-        # self.tp_rt_ntuples_let = self.TP_NAMEDTUPLE_LET(None, None, current_time)
         self.tp_dict_key_l_values_et = {}
         self.tp_list_fets = []
         self.tp_dict_key_l_values_listfeatures = {}
@@ -208,27 +202,74 @@ class interactive_map_tracking:
             'TP_NAMEDTUPLE_WEBVIEW',
             ['state', 'width', 'height', 'online_url', 'offline_url']
         )
+        # very dirty @FIXME @TODO : here is the proper way to do it (from within the class `self.plugin_dir`)
+        self.qgis_plugins_directory = self.plugin_dir
+        self.webview_offline_about = os.path.join(self.qgis_plugins_directory , "gui_doc","About.htm" )
+        self.webview_offline_user_doc = os.path.join(self.qgis_plugins_directory , "gui_doc", "Simplified_User_Guide.htm" ) 
+        self.webview_online_about = "https://github.com/Remi-C/interactive_map_tracking/wiki/[User]-About"
+        self.webview_online_user_doc = "https://github.com/Remi-C/interactive_map_tracking/wiki/[User]-User-Guide"
+        #
+        self.webview_online_itown = "http://www.itowns.fr/api/testAPI.html"
+        # self.webview_online_about = self.webview_online_itown
+
         self.webview_dict = {}
         # url : http://qt-project.org/doc/qt-4.8/qurl.html
         self.webview_default_tuple = self.TP_NAMEDTUPLE_WEBVIEW('init', 0, 0, QUrl(""), QUrl(""))
         self.webview_dict[self.dlg.webView_userdoc] = self.TP_NAMEDTUPLE_WEBVIEW(
             'init',
             0, 0,
-            QUrl(webview_online_user_doc),
-            QUrl(webview_offline_user_doc)
+            QUrl(self.webview_online_user_doc),
+            QUrl(self.webview_offline_user_doc)
         )
         self.webview_dict[self.dlg.webView_about] = self.TP_NAMEDTUPLE_WEBVIEW(
             'init',
             0, 0,
-            QUrl(webview_online_about),
-            QUrl(webview_offline_about)
+            QUrl(self.webview_online_about),
+            QUrl(self.webview_offline_about)
         )
         self.webview_current = None
         self.webview_margin = 60
+        
+        #getting proxy 
+        s = QSettings() #getting proxy from qgis options settings
+        proxyEnabled = s.value("proxy/proxyEnabled", "")
+        proxyType = s.value("proxy/proxyType", "" )
+        proxyHost = s.value("proxy/proxyHost", "" )
+        proxyPort = s.value("proxy/proxyPort", "" )
+        proxyUser = s.value("proxy/proxyUser", "" )
+        proxyPassword = s.value("proxy/proxyPassword", "" )
+        if proxyEnabled == "true": # test if there are proxy settings
+            proxy = QNetworkProxy()
+        if proxyType == "DefaultProxy":
+            proxy.setType(QNetworkProxy.DefaultProxy)
+        elif proxyType == "Socks5Proxy":
+            proxy.setType(QNetworkProxy.Socks5Proxy)
+        elif proxyType == "HttpProxy":
+            proxy.setType(QNetworkProxy.HttpProxy)
+        elif proxyType == "HttpCachingProxy":
+            proxy.setType(QNetworkProxy.HttpCachingProxy)
+        elif proxyType == "FtpCachingProxy":
+            proxy.setType(QNetworkProxy.FtpCachingProxy)
+        proxy.setHostName(proxyHost)
+        proxy.setPort(int(proxyPort))
+        proxy.setUser(proxyUser)
+        proxy.setPassword(proxyPassword)
+        QNetworkProxy.setApplicationProxy(proxy)
 
         self.dict_tabs_size = {}
 
         self.tp_last_extent_saved = QgsRectangle()
+
+        # LOCKER for protecting layers (ptr) from QGIS
+        # used by our asynchronous tracking method
+        # -> to ensure protection when/if user want to delete the tracking layer
+        self.tp_mutex_on_layers = QReadWriteLock()
+
+        self.qgsmaplayerregistry = QgsMapLayerRegistry.instance()
+        #
+        self.bSignalForLayerDeleted = True
+        QObject.connect(self.qgsmaplayerregistry, SIGNAL("layersWillBeRemoved( QStringList )"), self.slot_LayersWillBeRemoved)
+        # self.qgsmaplayerregistry.layersWillBeRemoved.connect(self.slot_LayersWillBeRemoved)
 
     # noinspection PyMethodMayBeStatic
     def tr(self, message):
@@ -362,7 +403,7 @@ class interactive_map_tracking:
         self.thresholdChanged()
 
         #
-        QgsMessageLog.logMessage("enableLogging()")
+        #QgsMessageLog.logMessage("enableLogging()")
         self.enableLogging()
         self.enableUseMutexForTP()
 
@@ -401,28 +442,28 @@ class interactive_map_tracking:
         # Run the dialog event loop
         self.dlg.exec_()
 
+        # release signals on QGIS
+        if self.bSignalForLayerDeleted:
+            self.qgsmaplayerregistry.layersWillBeRemoved.disconnect(self.slot_LayersWillBeRemoved)
+            self.bSignalForLayerDeleted = False
+
     def init_plugin(self):
         """ Init the plugin
-        - Set defaults values in QSetting
+        - Set defaults values in QSetting # note : some value are already setted ! 
         - Setup the GUI
         """
 
         qgis_log_tools.logMessageINFO("Launch 'init_plugin(...)' ...")
-
         s = QSettings()
-
-        pluginEnable = s.value(self.qsettings_prefix_name + "enabledPlugin", defaultValue="undef")
-
-        if pluginEnable == "undef":
-            # retrieve default states from Qt Creator GUI design
-            self.update_setting(s, "enabledPlugin", self.dlg.enablePlugin)
-            self.update_setting(s, "enabledAutoSave", self.dlg.enableAutoSave)
-            self.update_setting(s, "enabledTrackPosition", self.dlg.enableTrackPosition)
-            self.update_setting(s, "enabledLogging", self.dlg.enableLogging)
-            self.update_setting(s, "enableV2", self.dlg.enableUseMutexForTP)
-            #
-            self.thresholdChanged()
-            s.setValue(self.qsettings_prefix_name + "threshold", str(self.threshold))
+          
+        # retrieve default states from Qt Creator GUI design
+        self.update_setting(s, "enabledPlugin", self.dlg.enablePlugin)
+        self.update_setting(s, "enabledAutoSave", self.dlg.enableAutoSave)
+        self.update_setting(s, "enabledTrackPosition", self.dlg.enableTrackPosition)
+        self.update_setting(s, "enabledLogging", self.dlg.enableLogging)
+        self.update_setting(s, "enableV2", self.dlg.enableUseMutexForTP) 
+        self.thresholdChanged()
+        s.setValue(self.qsettings_prefix_name + "threshold", str(self.threshold))
 
         if s.value(self.qsettings_prefix_name + "enabledPlugin", "") == "true":
             self.update_checkbox(s, "enableAutoSave", self.dlg.enableAutoSave)
@@ -446,6 +487,8 @@ class interactive_map_tracking:
             QObject.disconnect(self.dlg.threshold_extent, SIGNAL("returnPressed ()"), self.thresholdChanged)
             QObject.disconnect(self.dlg.webView_about, SIGNAL("loadFinished (bool)"), self.webview_loadFinished)
             QObject.disconnect(self.dlg.webView_userdoc, SIGNAL("loadFinished (bool)"), self.webview_loadFinished)
+            #
+            # QObject.disconnect(self.qgsmaplayerregistry, SIGNAL("layersWillBeRemoved (QStringList)"), self.slot_LayersWillBeRemoved)
 
     def update_setting(self, _settings, _name_in_setting, _checkbox):
         """
@@ -476,8 +519,9 @@ class interactive_map_tracking:
             _checkbox.setDisabled(False)
             _checkbox.setChecked(True)
         else:
-            _checkbox.setDisabled(True)
             _checkbox.setChecked(False)
+            _checkbox.setDisabled(True)
+
 
     def disconnectSignaleForLayerCrsChanged(self, layer):
         """ Disconnect the signal: 'layerCrsChanged' of the layer given
@@ -579,6 +623,8 @@ class interactive_map_tracking:
         #
         QObject.disconnect(self.dlg.webView_about, SIGNAL("loadFinished (bool)"), self.webview_loadFinished)
         QObject.disconnect(self.dlg.webView_userdoc, SIGNAL("loadFinished (bool)"), self.webview_loadFinished)
+        #
+        # QObject.disconnect(self.qgsmaplayerregistry, SIGNAL("layersWillBeRemoved(QStringList)"), self.slot_LayersWillBeRemoved)
 
     def qgisInterfaceCurrentLayerChanged(self, layer):
         """ Action when the signal: 'Current Layer Changed' from QGIS MapCanvas is emitted&captured
@@ -700,50 +746,49 @@ class interactive_map_tracking:
         """
         qgis_log_tools.logMessageINFO("Launch 'currentIndexChangedTPLCB(self, layer_name=" + layer_name + ")' ...")
         # layer_name == "" when when we clear the combobox (for example)
-        if layer_name == "":
-            return
+        # if layer_name == "":
+        #     return
 
-        layer_for_tp = imt_tools.find_layer_in_qgis_legend_interface(self.iface, layer_name)
-        self.currentLayerForTrackingPosition = layer_for_tp  # set the layer for tracking position (plugin)
+        try:
+            layer_for_tp = imt_tools.find_layer_in_qgis_legend_interface(self.iface, layer_name)
+            self.tp_layer = layer_for_tp  # set the layer for tracking position (plugin)
 
-        list_id_fields = qgis_layer_tools.filter_layer_trackingposition_required_fields(layer_for_tp)
+            list_id_fields = qgis_layer_tools.filter_layer_trackingposition_required_fields(layer_for_tp)
 
-        self.tp_id_user_id = list_id_fields[0]
-        self.tp_id_w_time = list_id_fields[1]
+            self.tp_id_user_id = list_id_fields[0]
+            self.tp_id_w_time = list_id_fields[1]
 
-        dataProvider = layer_for_tp.dataProvider()
+            dataProvider = layer_for_tp.dataProvider()
 
-        # Return a map of indexes with field names for this layer.
-        # url: http://qgis.org/api/classQgsVectorDataProvider.html#a53f4e62cb05889ecf9897fc6a015c296
-        fields = dataProvider.fields()
+            # Return a map of indexes with field names for this layer.
+            # url: http://qgis.org/api/classQgsVectorDataProvider.html#a53f4e62cb05889ecf9897fc6a015c296
+            fields = dataProvider.fields()
 
-        # set the fields
-        # reset all fields in None
-        self.values = [None for i in range(fields.count())]
-        # set user_id field (suppose constant for a layer (in QGIS session))
-        self.values[self.tp_id_user_id] = self.tp_user_name
+            # set the fields
+            # reset all fields in None
+            self.values = [None for i in range(fields.count())]
+            # set user_id field (suppose constant for a layer (in QGIS session))
+            self.values[self.tp_id_user_id] = self.tp_user_name
+        except:
+            pass
 
     def refreshComboBoxLayers(self):
         """ Action when the Combo Box attached to refreshing layers for tracking position is clicked """
         #
         qgis_log_tools.logMessageINFO("Launch 'refreshComboBoxLayers(...)' ...")
 
+        defaultSearchLayer = self.dlg.trackingPositionLayerCombo.currentText()
+        # qgis_log_tools.logMessageINFO("++++ defaultSearchLayer: " + defaultSearchLayer)
+
         self.dlg.trackingPositionLayerCombo.clear()
 
         idComboBoxIndex = -1
         idComboBoxForDefaultSearchLayer = -1
 
-        # search a default layer ('camera_position') if no layer was selected before
-        # else we search the same layer (if it present)
-        if self.currentLayerForTrackingPosition is None:
-            defaultSearchLayer = "camera_position"
-        else:
-            defaultSearchLayer = self.currentLayerForTrackingPosition.name()
-
         # dictionnary to link id on combobox and objects QGIS layer
         dict_key_comboboxindex_value_layer = {}
         #
-        layers = QgsMapLayerRegistry.instance().mapLayers().values()
+        layers = self.qgsmaplayerregistry.mapLayers().values()
         for layer in layers:
             # filter on layers to add in combobox
             if qgis_layer_tools.filter_layer_for_trackingposition(layer):
@@ -752,7 +797,7 @@ class interactive_map_tracking:
                 dict_key_comboboxindex_value_layer[idComboBoxIndex] = layer
                 self.dlg.trackingPositionLayerCombo.addItem(layer.name(), layer)
 
-                # default search layer
+                # # default search layer
                 if layer.name() == defaultSearchLayer:
                     idComboBoxForDefaultSearchLayer = idComboBoxIndex
                     #
@@ -767,11 +812,11 @@ class interactive_map_tracking:
             idComboBoxIndex = idComboBoxForDefaultSearchLayer
 
         if idComboBoxIndex != -1:
-            try:
-                self.currentLayerForTrackingPosition = dict_key_comboboxindex_value_layer[idComboBoxIndex]
-                qgis_log_tools.logMessageINFO("Set the layer to: " + self.currentLayerForTrackingPosition.name())
-            except:
-                qgis_log_tools.logMessageINFO("!!! ERROR for selecting layer !!!")
+            self.tp_layer = dict_key_comboboxindex_value_layer[idComboBoxIndex]
+            qgis_log_tools.logMessageINFO("Set the layer to: " + self.tp_layer.name())
+        else:
+            self.tp_layer = None
+            qgis_log_tools.logMessageWARNING("WARNING: No layer selected for Tracking Position !")
 
     def enabled_autosave(self):
         """ Action when the checkbox 'Enable Auto-Save and Refresh' is clicked """
@@ -829,8 +874,8 @@ class interactive_map_tracking:
 
     def enableUseMutexForTP(self):
         """ Action when the checkbox 'Use Mutex (for TrackingPosition) [BETA]' is clicked
-        Beta test for:
         - using Mutex to protect commitChange operation in multi-threads context (signals strategy)
+        Beta test for:
         - using queuing requests from TrackPosition (we try to amortize the cost and effects on QGIS GUI)
 
         """
@@ -845,7 +890,8 @@ class interactive_map_tracking:
 
         """
         qgis_log_tools.logMessageINFO("Launch 'enabled_plugin(...)' ...")
-
+        #force the plugin to be in front
+        self.dlg.raise_()
         resultCommit = False
 
         # filtre sur les layers a prendre en compte
@@ -926,6 +972,7 @@ class interactive_map_tracking:
         Don't change the state of the plugin
 
         """
+        # @FIXME there is a mistake here, this function is also called before init. Because QSettings is a singleton, variable are inited before end of init !
         self.update_settings(QSettings())
         self.dlg.hide()
 
@@ -1014,17 +1061,25 @@ class interactive_map_tracking:
             #
             qgis_log_tools.logMessageINFO("### width : " + str(width) + " - height : " + str(height))
         else:
-            qgis_log_tools.logMessageINFO("## WebView : FAILED TO LOAD")
+            if self.webview_dict[webview].state == 'online':
+                qgis_log_tools.logMessageINFO("## WebView : FAILED TO LOAD from " + str(self.webview_dict[webview].online_url))#online_url
+            else :
+                qgis_log_tools.logMessageINFO("## WebView : FAILED TO LOAD from " + str(self.webview_dict[webview].offline_url))
             #
-            self.webview_dict[webview] = self.TP_NAMEDTUPLE_WEBVIEW(
-                'offline',
-                tuple_webview.width, tuple_webview.height,
-                tuple_webview.online_url,
-                tuple_webview.offline_url
-            )
+            if  self.webview_dict[webview].state != 'offline': #regular case we failed, but we are going to try again
+                self.webview_dict[webview] = self.TP_NAMEDTUPLE_WEBVIEW(
+                    'offline',
+                    tuple_webview.width, tuple_webview.height,
+                    tuple_webview.online_url,
+                    tuple_webview.offline_url
+                )
 
-            # try to load the offline version (still in initial state)
-            webview.load(QUrl(tuple_webview.offline_url))
+                # try to load the offline version (still in initial state)
+                # @FIXME : doesn't load the images in offline mode on XP...
+                webview.load(QUrl(tuple_webview.offline_url))
+                
+            else: # we already failed last, time, stopping to try
+                qgis_log_tools.logMessageINFO("## WebView : stopping to try to retrieve html")
 
     def webview_load_page(self, webview, margin=60):
         """
@@ -1073,6 +1128,96 @@ class interactive_map_tracking:
             self.dict_tabs_size[index] = self.dict_tabs_size.setdefault(index, self.dlg.minimumSize())
             self.dlg.resize(self.dict_tabs_size[index])
 
+    @pyqtSlot('QStringList')
+    def slot_LayersWillBeRemoved(self, theLayerIds):
+        """
+
+        :param theLayerIds:
+        """
+
+        qgis_log_tools.logMessageINFO("# slot_LayersWillBeRemoved")
+
+        len_theLayerIds = len(theLayerIds)
+        if len_theLayerIds is 0:
+            return
+        for id_layer in theLayerIds:
+            qgis_log_tools.logMessageINFO("id_layer: " + str(id_layer))
+
+        # with QWriteLocker(self.tp_mutex_on_layers):
+        self.tp_mutex_on_layers.lockForWrite()
+        if True:
+            # clean lists, dicts
+
+            qgis_log_tools.logMessageINFO("# self.tp_queue_rt_ntuples_let.qsize() : " + str(self.tp_queue_rt_ntuples_let.qsize()))
+
+            nb_tuples_let_removed = 0
+            tp_queue_fifo_rt_ntuples_let = Queue.Queue()
+            #
+            while not self.tp_queue_rt_ntuples_let.empty():
+                # queue in read-write-delete/pop here
+                tp_tuple = self.tp_queue_rt_ntuples_let.get()
+                #
+                for layer_id in theLayerIds:
+                    qgis_log_tools.logMessageINFO("layer_id: " + str(id_layer) + " - tp_tuple.id_layer: " + str(tp_tuple.id_layer))
+                    if layer_id != tp_tuple.id_layer:
+                        tp_queue_fifo_rt_ntuples_let.put(tp_tuple)
+                    else:
+                        nb_tuples_let_removed = nb_tuples_let_removed + 1
+                        qgis_log_tools.logMessageINFO("## tuple removed !")
+            #
+            # qgis_log_tools.logMessageINFO("## nb_tuples_let_removed : " + str(nb_tuples_let_removed))
+            #
+            while not tp_queue_fifo_rt_ntuples_let.empty():
+                self.tp_queue_rt_ntuples_let.put(tp_queue_fifo_rt_ntuples_let.get())
+
+            tp_dict_layers_to_commit_is_empty = len(self.tp_dict_layers_to_commit.keys()) == 0
+            tp_dict_key_l_values_et_is_empty = len(self.tp_dict_key_l_values_et.keys()) == 0
+            tp_dict_key_l_values_listfeatures_is_empty = len(self.tp_dict_key_l_values_listfeatures.keys()) == 0
+
+            for layer_id in theLayerIds:
+                if layer_id in self.tp_dict_layers_to_commit:
+                    qgis_log_tools.logMessageINFO("delete key: " + str(layer_id) + "in dict: self.tp_dict_layers_to_commit")
+                    del self.tp_dict_layers_to_commit[layer_id]
+
+                if layer_id in self.tp_dict_key_l_values_et:
+                    qgis_log_tools.logMessageINFO("delete key: " + str(layer_id) + "in dict: self.tp_dict_key_l_values_et")
+                    del self.tp_dict_key_l_values_et[layer_id]
+
+                if layer_id in self.tp_dict_key_l_values_listfeatures:
+                    qgis_log_tools.logMessageINFO("delete key: " + str(layer_id) + "in dict: self.tp_dict_key_l_values_listfeatures")
+                    del self.tp_dict_key_l_values_listfeatures[layer_id]
+
+        if not(tp_dict_layers_to_commit_is_empty) and len(self.tp_dict_layers_to_commit.keys()) == 0:
+            pass
+        if not(tp_dict_key_l_values_et_is_empty) and len(self.tp_dict_key_l_values_et.keys()) == 0:
+            qgis_log_tools.logMessageINFO("Need to stop QTimer : qtimer_tracking_position_memory_to_geom ! ")
+            self.qtimer_tracking_position_memory_to_geom.stop()
+        if not(tp_dict_key_l_values_listfeatures_is_empty) and len(self.tp_dict_key_l_values_listfeatures.keys()) == 0:
+            qgis_log_tools.logMessageINFO("Need to stop QTimer : qtimer_tracking_position_geom_to_layer ! ")
+            self.qtimer_tracking_position_geom_to_layer.stop()
+
+        #
+        self.qgsmaplayerregistry.layersRemoved.connect(self.slot_LayersRemoved)
+
+    def slot_LayersRemoved(self, theLayerIds):
+        qgis_log_tools.logMessageINFO("# slot_LayersRemoved")
+
+        for id_layer in theLayerIds:
+            qgis_log_tools.logMessageINFO("id_layer: " + str(id_layer))
+            try:
+                if id_layer == self.tp_layer.id():
+                    qgis_log_tools.logMessageINFO("QGIS want to remove our tracking layer !")
+                    self.tp_layer = None
+            except:
+                pass
+
+        self.tp_layer = None
+        self.refreshComboBoxLayers()
+
+        self.tp_mutex_on_layers.unlock()
+
+        self.qgsmaplayerregistry.layersRemoved.disconnect(self.slot_LayersRemoved)
+
     # TODO: optimize update_track_position because it's a (critical) real-time method !
     def update_track_position(self, bWithProjectionInCRSLayer=True, bUseEmptyFields=False):
         """ Perform the update tracking position (in real-time)
@@ -1092,13 +1237,13 @@ class interactive_map_tracking:
 
         """
 
-        if self.currentLayerForTrackingPosition is None:
+        if self.tp_layer is None:
             return -1
 
         mapCanvas = self.iface.mapCanvas()
         mapcanvas_extent = mapCanvas.extent()
 
-        layer_for_polygon_extent = self.currentLayerForTrackingPosition
+        layer_for_polygon_extent = self.tp_layer
 
         # # filter on extent size
         # try:
@@ -1183,7 +1328,7 @@ class interactive_map_tracking:
         bIsTimeToUpdate = self.tp_timers.is_time_to_update("update_track_position_with_qtimers", "tp_threshold_time_for_realtime_tracking_position")
         if bIsTimeToUpdate:
             # Do we have a current layer activate for tracking position ?
-            if self.currentLayerForTrackingPosition is None:
+            if self.tp_layer is None:
             # if not, no need to go further
                 return -1
 
@@ -1191,7 +1336,7 @@ class interactive_map_tracking:
             mapcanvas_extent = mapCanvas.extent()
 
             # Add a filter to prevent to save the same extent (useful in regards to our 'dummy' approach to refresh map)
-            if imt_tools.extent_equal(self.tp_last_extent_saved, mapcanvas_extent, 0.01):   # 10 mm
+            if imt_tools.extent_equal(self.tp_last_extent_saved, mapcanvas_extent, 0.01):   # 1.0 %
                 return -3
 
             # Filter on extent map scale (size)
@@ -1203,25 +1348,34 @@ class interactive_map_tracking:
                     "\tThreshold scale= " + str(self.threshold))
                 return -2
 
-            layer_for_itp = self.currentLayerForTrackingPosition
+            with QReadLocker(self.tp_mutex_on_layers):
+                layer_for_itp = self.tp_layer
+                try:
+                    id_layer_for_itp = layer_for_itp.id()
 
-            # Build the tuple contains:
-            # - layer used for tracking position
-            # - list of points extract from the current extent for QGIS Map Canvas
-            # - acquisition time for this track
-            rt_ntuple = self.TP_NAMEDTUPLE_LET(
-                layer_for_itp,
-                imt_tools.construct_listpoints_from_extent(mapcanvas_extent),
-                imt_tools.get_timestamp()
-            )
+                    # Build the tuple contains:
+                    # - layer used for tracking position
+                    # - list of points extract from the current extent for QGIS Map Canvas
+                    # - acquisition time for this track
+                    rt_ntuple = self.TP_NAMEDTUPLE_LET(
+                        id_layer_for_itp,
+                        imt_tools.construct_listpoints_from_extent(mapcanvas_extent),
+                        imt_tools.get_timestamp()
+                    )
+
+                    qgis_log_tools.logMessageINFO("## id_layer_for_itp : " + str(id_layer_for_itp))
+
+                    # This queue is not protect (multi-threads context)
+                    # but it's oki in your case
+                    # queue in write-append only here !
+                    self.tp_queue_rt_ntuples_let.put(rt_ntuple)
+                except:
+                    qgis_log_tools.logMessageWARNING("update_track_position_with_qtimers : exception here !")
+                    pass
+
             self.tp_last_extent_saved = mapcanvas_extent
 
             self.tp_timers.update("update_track_position_with_qtimers")
-
-            # This queue is not protect (multi-threads context)
-            # but it's oki in your case
-            # queue in write-append only here !
-            self.tp_queue_rt_ntuples_let.put(rt_ntuple)
 
             interval = self.tp_timers.get_delay("tp_threshold_time_for_tp_to_mem")
             self.qtimer_tracking_position_rtt_to_memory.start(interval)
@@ -1245,25 +1399,27 @@ class interactive_map_tracking:
         # bIsTimeToUpdate = self.tp_timers.is_time_to_update("tp_time_last_rttp_to_mem",
         #                                                    "tp_threshold_time_for_tp_to_mem")
 
-        size_tp_queue = self.tp_queue_rt_ntuples_let.qsize()
+        with QReadLocker(self.tp_mutex_on_layers):
 
-        # this queue is not protect (multi-threads context)
-        # but it's oki in your case
-        while not self.tp_queue_rt_ntuples_let.empty():
-            # queue in read-write-delete/pop here
-            tp_tuple = self.tp_queue_rt_ntuples_let.get()
-            self.tp_queue_rt_ntuples_let.task_done()
+            # this queue is not protect (multi-threads context)
+            # but it's oki in your case
+            size_tp_queue = self.tp_queue_rt_ntuples_let.qsize()
 
-            # url: http://stackoverflow.com/questions/20585920/how-to-add-multiple-values-to-a-dictionary-key-in-python
-            self.tp_dict_key_l_values_et.setdefault(tp_tuple.layer, []).append(
-                self.TP_NAMEDTUPLE_ET(tp_tuple.extent, tp_tuple.w_time)
-            )
+            while not self.tp_queue_rt_ntuples_let.empty():
+                # queue in read-write-delete/pop here
+                tp_tuple = self.tp_queue_rt_ntuples_let.get()
+                self.tp_queue_rt_ntuples_let.task_done()
 
-        if size_tp_queue != 0:
-            # update timer
-            # self.tp_timers.update("tp_time_last_rttp_to_mem")
-            #
-            qgis_log_tools.logMessageINFO("** Pack " + str(size_tp_queue) + " tuples for 1 call -> mem")
+                # url: http://stackoverflow.com/questions/20585920/how-to-add-multiple-values-to-a-dictionary-key-in-python
+                self.tp_dict_key_l_values_et.setdefault(tp_tuple.id_layer, []).append(
+                    self.TP_NAMEDTUPLE_ET(tp_tuple.extent, tp_tuple.w_time)
+                )
+
+            if size_tp_queue != 0:
+                # update timer
+                # self.tp_timers.update("tp_time_last_rttp_to_mem")
+                #
+                qgis_log_tools.logMessageINFO("** Pack " + str(size_tp_queue) + " tuples for 1 call -> mem")
 
         #####################
         # Process Management
@@ -1295,55 +1451,58 @@ class interactive_map_tracking:
         extent_src_crs = mapCanvas.mapSettings().destinationCrs()
 
         append_in_dic = False
-        for layer in self.tp_dict_key_l_values_et.keys():
-            layer_to_commit = layer
 
-            # url: http://qgis.org/api/classQgsMapLayer.html#a40b79e2d6043f8ec316a28cb17febd6c
-            extent_dst_crs = layer_to_commit.crs()
-            # url: http://docs.qgis.org/testing/en/docs/pyqgis_developer_cookbook/crs.html
-            xform = QgsCoordinateTransform(extent_src_crs, extent_dst_crs)
+        with QReadLocker(self.tp_mutex_on_layers):
+            for id_layer in self.tp_dict_key_l_values_et.keys():
+                layer = self.qgsmaplayerregistry.mapLayer(id_layer)
+                layer_to_commit = layer
 
-            tp_list_fets = []
+                # url: http://qgis.org/api/classQgsMapLayer.html#a40b79e2d6043f8ec316a28cb17febd6c
+                extent_dst_crs = layer_to_commit.crs()
+                # url: http://docs.qgis.org/testing/en/docs/pyqgis_developer_cookbook/crs.html
+                xform = QgsCoordinateTransform(extent_src_crs, extent_dst_crs)
 
-            # pop key from tracking position dictionary
-            list_ntuples = self.tp_dict_key_l_values_et.pop(layer)
-            append_at_least_1_fet = False
-            for tp_namedtuple in list_ntuples:
-                mapcanvas_extent = tp_namedtuple.extent
+                tp_list_fets = []
 
-                w_time = tp_namedtuple.w_time
+                # pop key from tracking position dictionary
+                list_ntuples = self.tp_dict_key_l_values_et.pop(id_layer)
+                append_at_least_1_fet = False
+                for tp_namedtuple in list_ntuples:
+                    mapcanvas_extent = tp_namedtuple.extent
 
-                # get the list points from the current extent (from QGIS MapCanvas)
-                list_points_from_mapcanvas = mapcanvas_extent
+                    w_time = tp_namedtuple.w_time
 
-                # TODO: add a option for this feature (Projected points in CRS destination layer) in GUI
-                bWithProjectionInCRSLayer = True
-                if bWithProjectionInCRSLayer:
-                    #
-                    list_points = [xform.transform(point) for point in list_points_from_mapcanvas]
-                else:
-                    list_points = list_points_from_mapcanvas
+                    # get the list points from the current extent (from QGIS MapCanvas)
+                    list_points_from_mapcanvas = mapcanvas_extent
 
-                # list of lists of points
-                gPolygon = QgsGeometry.fromPolygon([list_points])
+                    # TODO: add a option for this feature (Projected points in CRS destination layer) in GUI
+                    bWithProjectionInCRSLayer = True
+                    if bWithProjectionInCRSLayer:
+                        #
+                        list_points = [xform.transform(point) for point in list_points_from_mapcanvas]
+                    else:
+                        list_points = list_points_from_mapcanvas
 
-                fet = QgsFeature()
+                    # list of lists of points
+                    gPolygon = QgsGeometry.fromPolygon([list_points])
 
-                fet.setGeometry(gPolygon)
+                    fet = QgsFeature()
 
-                # update the time stamp attribute
-                self.values[self.tp_id_w_time] = imt_tools.convert_timestamp_to_qt_string_format(w_time)
+                    fet.setGeometry(gPolygon)
 
-                fet.setAttributes(self.values)
+                    # update the time stamp attribute
+                    self.values[self.tp_id_w_time] = imt_tools.convert_timestamp_to_qt_string_format(w_time)
 
-                tp_list_fets.append(fet)
-                append_at_least_1_fet = True
+                    fet.setAttributes(self.values)
 
-            if append_at_least_1_fet:
-                self.tp_dict_key_l_values_listfeatures.setdefault(layer, []).append(tp_list_fets)
-                append_in_dic = True
-                qgis_log_tools.logMessageINFO(
-                    "-- Pack " + str(len(tp_list_fets)) + " features in layer: " + layer.name())
+                    tp_list_fets.append(fet)
+                    append_at_least_1_fet = True
+
+                if append_at_least_1_fet:
+                    self.tp_dict_key_l_values_listfeatures.setdefault(id_layer, []).append(tp_list_fets)
+                    append_in_dic = True
+                    qgis_log_tools.logMessageINFO(
+                        "-- Pack " + str(len(tp_list_fets)) + " features in layer: " + layer.name())
 
         if append_in_dic:
 
@@ -1385,22 +1544,29 @@ class interactive_map_tracking:
         if bNotMovingOnQGISMap:
             append_in_dict_one_time = False
 
-            for layer in self.tp_dict_key_l_values_listfeatures.keys():
-                # from the dict we retrieve a list of list
-                tp_list_of_list_fets = self.tp_dict_key_l_values_listfeatures.pop(layer)
+            with QReadLocker(self.tp_mutex_on_layers):
 
-                # How can I programatically create and add features to a memory layer in QGIS 1.9?
-                # url: http://gis.stackexchange.com/questions/60473/how-can-i-programatically-create-and-add-features-to-a-memory-layer-in-qgis-1-9
-                # write the layer and send request to DB
-                layer.startEditing()
-                for tp_list_fets in tp_list_of_list_fets:
-                    layer.addFeatures(tp_list_fets, False)  # bool_makeSelected=False
+                for id_layer in self.tp_dict_key_l_values_listfeatures.keys():
+                    # from the dict we retrieve a list of list
+                    tp_list_of_list_fets = self.tp_dict_key_l_values_listfeatures.pop(id_layer)
 
-                self.tp_dict_layers_to_commit[layer] = 1
-                append_in_dict_one_time = True
+                    layer = self.qgsmaplayerregistry.mapLayer(id_layer)
+                    try:
+                        # How can I programatically create and add features to a memory layer in QGIS 1.9?
+                        # url: http://gis.stackexchange.com/questions/60473/how-can-i-programatically-create-and-add-features-to-a-memory-layer-in-qgis-1-9
+                        # write the layer and send request to DB
+                        layer.startEditing()
+                        for tp_list_fets in tp_list_of_list_fets:
+                            layer.addFeatures(tp_list_fets, False)  # bool_makeSelected=False
 
-                qgis_log_tools.logMessageINFO(
-                    "++ Pack requests => " + str(len(tp_list_of_list_fets)) + " extents for layer: " + layer.name())
+                        qgis_log_tools.logMessageINFO(
+                            "++ Pack requests => " + str(len(tp_list_of_list_fets)) + " extents for layer: " + layer.name())
+                    except:
+                        qgis_log_tools.logMessageWARNING("tracking_position_qtimer_geom_to_layer : exception here !")
+                        pass
+
+                    self.tp_dict_layers_to_commit[id_layer] = 1
+                    append_in_dict_one_time = True
 
             if append_in_dict_one_time:
                 # update timer
@@ -1412,7 +1578,12 @@ class interactive_map_tracking:
                 self.qtimer_tracking_position_geom_to_layer.stop()
                 #
                 interval = self.tp_timers.get_delay("tp_threshold_time_for_sending_layer_to_dp")
-                interval += CONVERT_S_TO_MS(max(0.0, self.tp_timers.get_delay("delay_time_still_moving")-self.tp_timers.delta_with_current_time("still moving")))
+                interval += CONVERT_S_TO_MS(
+                    max(
+                        0.0,
+                        self.tp_timers.get_delay("delay_time_still_moving") - self.tp_timers.delta_with_current_time("still moving")
+                    )
+                )
                 self.qtimer_tracking_position_layers_to_commit.start(interval)
                 #####################
 
@@ -1435,23 +1606,29 @@ class interactive_map_tracking:
         # qgis_log_tools.logMessage("bNotMovingOnQGISMap: " + str(bNotMovingOnQGISMap))
 
         if bNotMovingOnQGISMap:
-            layers = self.tp_dict_layers_to_commit.keys()
-            # clear dict
-            self.tp_dict_layers_to_commit.clear()
 
-            for layer_to_commit in layers:
-                #
-                try:
-                    # update timer
-                    # self.tp_timers.update("tracking_position_qtimer_layers_to_commit")
+            with QReadLocker(self.tp_mutex_on_layers):
 
-                    resultCommit = layer_to_commit.commitChanges()
+                id_layers = self.tp_dict_layers_to_commit.keys()
+                # clear dict
+                self.tp_dict_layers_to_commit.clear()
 
-                    if resultCommit:
-                        qgis_log_tools.logMessageINFO("* Commit change layer:" + layer_to_commit.name + " [OK]")
-                except:
-                    # TODO : deal with errors/exceptions
-                    pass
+                for id_layer_to_commit in id_layers:
+                    layer_to_commit = self.qgsmaplayerregistry.mapLayer(id_layer_to_commit)
+
+                    #
+                    try:
+                        # update timer
+                        # self.tp_timers.update("tracking_position_qtimer_layers_to_commit")
+
+                        resultCommit = layer_to_commit.commitChanges()
+
+                        if resultCommit:
+                            qgis_log_tools.logMessageINFO("* Commit change layer:" + layer_to_commit.name + " [OK]")
+                    except:
+                        # TODO : deal with errors/exceptions
+                        qgis_log_tools.logMessageWARNING("exception here !")
+                        pass
 
             #####################
             # Process Management
