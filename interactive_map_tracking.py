@@ -31,7 +31,7 @@ import os.path
 from PyQt4.QtCore import QSettings, QTranslator, qVersion, QCoreApplication
 from PyQt4.QtCore import QObject, SIGNAL, QUrl, QReadWriteLock, QReadLocker, QWriteLocker, pyqtSlot
 from PyQt4.QtGui import QAction, QIcon, QTabWidget
-#from PyQt4.QtWebKit import QWebSettings, QWebView
+from PyQt4.QtWebKit import QWebSettings
 
 from qgis.gui import QgsMessageBar
 
@@ -1101,8 +1101,13 @@ class interactive_map_tracking:
         # url : http://qt-project.org/doc/qt-4.8/qwebview.html#settings
         websetting = webview.settings()
         websetting.clearMemoryCaches()
+
         globalsettings = websetting.globalSettings()
+        #
         globalsettings.clearMemoryCaches()
+        # Enables plugins in Web pages (e.g. using NPAPI).
+        # url: http://doc.qt.io/qt-4.8/qwebsettings.html#WebAttribute-enum
+        globalsettings.setAttribute(QWebSettings.PluginsEnabled, True)
 
         if tuple_webview.state == 'offline':    # offline
             webview.load(tuple_webview.offline_url)
