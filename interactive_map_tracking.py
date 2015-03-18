@@ -210,8 +210,7 @@ class interactive_map_tracking:
         self.webview_online_user_doc = "https://github.com/Remi-C/interactive_map_tracking/wiki/[User]-User-Guide"
         #
         self.webview_online_itown = "http://www.itowns.fr/api/testAPI.html"
-        # self.webview_online_about = self.webview_online_itown
-
+        #
         self.webview_dict = {}
         # url : http://qt-project.org/doc/qt-4.8/qurl.html
         self.webview_default_tuple = self.TP_NAMEDTUPLE_WEBVIEW('init', 0, 0, QUrl(""), QUrl(""))
@@ -226,6 +225,12 @@ class interactive_map_tracking:
             0, 0,
             QUrl(self.webview_online_about),
             QUrl(self.webview_offline_about)
+        )
+        self.webview_dict[self.dlg.webView_itowns] = self.TP_NAMEDTUPLE_WEBVIEW(
+            'init',
+            0, 0,
+            QUrl(self.webview_online_itown),
+            QUrl(self.webview_online_itown)
         )
         self.webview_current = None
         self.webview_margin = 60
@@ -485,6 +490,7 @@ class interactive_map_tracking:
             self.dlg.threshold_extent.setDisabled(True)
             #
             QObject.disconnect(self.dlg.threshold_extent, SIGNAL("returnPressed ()"), self.thresholdChanged)
+            #
             QObject.disconnect(self.dlg.webView_about, SIGNAL("loadFinished (bool)"), self.webview_loadFinished)
             QObject.disconnect(self.dlg.webView_userdoc, SIGNAL("loadFinished (bool)"), self.webview_loadFinished)
             #
@@ -1081,7 +1087,7 @@ class interactive_map_tracking:
             else: # we already failed last, time, stopping to try
                 qgis_log_tools.logMessageINFO("## WebView : stopping to try to retrieve html")
 
-    def webview_load_page(self, webview, margin=60):
+    def webview_load_page(self, webview, clearCaches = True, activePlugings = True, reloadPage = True, margin=60):
         """
 
         :param webview:
@@ -1097,22 +1103,28 @@ class interactive_map_tracking:
         # signal : 'loadFinished(bool)'
         QObject.connect(webview, SIGNAL("loadFinished (bool)"), self.webview_loadFinished)
 
-        # reset/clear the web widget
-        # url : http://qt-project.org/doc/qt-4.8/qwebview.html#settings
-        websetting = webview.settings()
-        websetting.clearMemoryCaches()
+        if clearCaches == True:
+            # reset/clear the web widget
+            # url : http://qt-project.org/doc/qt-4.8/qwebview.html#settings
+            websetting = webview.settings()
+            websetting.clearMemoryCaches()
+            #
+            globalsettings = websetting.globalSettings()
+            globalsettings.clearMemoryCaches()
 
-        globalsettings = websetting.globalSettings()
-        #
-        globalsettings.clearMemoryCaches()
-        # Enables plugins in Web pages (e.g. using NPAPI).
-        # url: http://doc.qt.io/qt-4.8/qwebsettings.html#WebAttribute-enum
-        globalsettings.setAttribute(QWebSettings.PluginsEnabled, True)
+        if activePlugings == True:
+            # url : http://qt-project.org/doc/qt-4.8/qwebview.html#settings
+            websetting = webview.settings()
+            globalsettings = websetting.globalSettings()
+            # Enables plugins in Web pages (e.g. using NPAPI).
+            # url: http://doc.qt.io/qt-4.8/qwebsettings.html#WebAttribute-enum
+            globalsettings.setAttribute(QWebSettings.PluginsEnabled, True)
 
-        if tuple_webview.state == 'offline':    # offline
-            webview.load(tuple_webview.offline_url)
-        else:   # 'init' or 'online'
-            webview.load(tuple_webview.online_url)
+        if reloadPage or tuple_webview.state == 'init':
+            if tuple_webview.state == 'offline':    # offline
+                webview.load(tuple_webview.offline_url)
+            else:   # 'init' or 'online'
+                webview.load(tuple_webview.online_url)
 
     def QTabWidget_CurrentChanged(self, index):
         """
@@ -1122,6 +1134,7 @@ class interactive_map_tracking:
         """
         QObject.disconnect(self.dlg.webView_about, SIGNAL("loadFinished (bool)"), self.webview_loadFinished)
         QObject.disconnect(self.dlg.webView_userdoc, SIGNAL("loadFinished (bool)"), self.webview_loadFinished)
+        QObject.disconnect(self.dlg.webView_itowns, SIGNAL("loadFinished (bool)"), self.webview_loadFinished)
 
         if index == 3:
             qgis_log_tools.logMessageINFO("## Tab : User Doc")
@@ -1129,6 +1142,9 @@ class interactive_map_tracking:
         elif index == 4:
             qgis_log_tools.logMessageINFO("## Tab : About")
             self.webview_load_page(self.dlg.webView_about, self.webview_margin)
+        elif index == 5:
+            qgis_log_tools.logMessageINFO("## Tab : Test ITowns WebView")
+            self.webview_load_page(self.dlg.webView_itowns, self.webview_margin, False, False, False)
         else:
             self.dict_tabs_size[index] = self.dict_tabs_size.setdefault(index, self.dlg.minimumSize())
             self.dlg.resize(self.dict_tabs_size[index])
