@@ -208,7 +208,9 @@ class interactive_map_tracking:
         self.webview_offline_user_doc = os.path.join(self.qgis_plugins_directory , "gui_doc", "Simplified_User_Guide.htm" ) 
         self.webview_online_about = "https://github.com/Remi-C/interactive_map_tracking/wiki/[User]-About"
         self.webview_online_user_doc = "https://github.com/Remi-C/interactive_map_tracking/wiki/[User]-User-Guide"
-
+        #
+        self.webview_online_itown = "http://www.itowns.fr/api/testAPI.html"
+        # self.webview_online_about = self.webview_online_itown
 
         self.webview_dict = {}
         # url : http://qt-project.org/doc/qt-4.8/qurl.html
@@ -441,7 +443,9 @@ class interactive_map_tracking:
         self.dlg.exec_()
 
         # release signals on QGIS
-        self.qgsmaplayerregistry.layersWillBeRemoved.disconnect(self.slot_LayersWillBeRemoved)
+        if self.bSignalForLayerDeleted:
+            self.qgsmaplayerregistry.layersWillBeRemoved.disconnect(self.slot_LayersWillBeRemoved)
+            self.bSignalForLayerDeleted = False
 
     def init_plugin(self):
         """ Init the plugin
