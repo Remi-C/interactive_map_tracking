@@ -254,21 +254,21 @@ class interactive_map_tracking:
         proxyPassword = s.value("proxy/proxyPassword", "" )
         if proxyEnabled == "true": # test if there are proxy settings
             proxy = QNetworkProxy()
-        if proxyType == "DefaultProxy":
-            proxy.setType(QNetworkProxy.DefaultProxy)
-        elif proxyType == "Socks5Proxy":
-            proxy.setType(QNetworkProxy.Socks5Proxy)
-        elif proxyType == "HttpProxy":
-            proxy.setType(QNetworkProxy.HttpProxy)
-        elif proxyType == "HttpCachingProxy":
-            proxy.setType(QNetworkProxy.HttpCachingProxy)
-        elif proxyType == "FtpCachingProxy":
-            proxy.setType(QNetworkProxy.FtpCachingProxy)
-        proxy.setHostName(proxyHost)
-        proxy.setPort(int(proxyPort))
-        proxy.setUser(proxyUser)
-        proxy.setPassword(proxyPassword)
-        QNetworkProxy.setApplicationProxy(proxy)
+            if proxyType == "DefaultProxy":
+                proxy.setType(QNetworkProxy.DefaultProxy)
+            elif proxyType == "Socks5Proxy":
+                proxy.setType(QNetworkProxy.Socks5Proxy)
+            elif proxyType == "HttpProxy":
+                proxy.setType(QNetworkProxy.HttpProxy)
+            elif proxyType == "HttpCachingProxy":
+                proxy.setType(QNetworkProxy.HttpCachingProxy)
+            elif proxyType == "FtpCachingProxy":
+                proxy.setType(QNetworkProxy.FtpCachingProxy)
+            proxy.setHostName(proxyHost)
+            proxy.setPort(int(proxyPort))
+            proxy.setUser(proxyUser)
+            proxy.setPassword(proxyPassword)
+            QNetworkProxy.setApplicationProxy(proxy)
 
         self.dict_tabs_size = {}
 
