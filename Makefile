@@ -40,6 +40,7 @@ SOURCES = \
 	__init__.py \
 	interactive_map_tracking.py \
 	interactive_map_tracking_dialog.py \
+	itp_webview_itown.py \
 	qgis_gui_tools.py \
 	qgis_layer_tools.py \
 	qgis_mapcanvas_tools.py \
@@ -51,6 +52,7 @@ PLUGINNAME = interactive_map_tracking
 PY_FILES = \
 	interactive_map_tracking.py \
 	interactive_map_tracking_dialog.py \
+	itp_webview_itown.py \
 	qgis_gui_tools.py \
 	qgis_layer_tools.py \
 	qgis_mapcanvas_tools.py \

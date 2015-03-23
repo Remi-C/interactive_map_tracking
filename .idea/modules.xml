@@ -2,6 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
+      <module fileurl="file://$USER_HOME$/.qgis2/python/plugins/go2streetview/.idea/go2streetview.iml" filepath="$USER_HOME$/.qgis2/python/plugins/go2streetview/.idea/go2streetview.iml" />
       <module fileurl="file://$PROJECT_DIR$/.idea/interactive_map_tracking.iml" filepath="$PROJECT_DIR$/.idea/interactive_map_tracking.iml" />
     </modules>
   </component>

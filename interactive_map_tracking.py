@@ -41,6 +41,8 @@ import qgis_layer_tools
 #import qgis_mapcanvas_tools
 import qgis_log_tools
 import imt_tools
+#
+from itp_webview_itown import *
 
 #
 # for beta test purposes
@@ -210,7 +212,7 @@ class interactive_map_tracking:
         self.webview_online_user_doc = "https://github.com/Remi-C/interactive_map_tracking/wiki/[User]-User-Guide"
         #
         # self.webview_online_itown = "http://www.itowns.fr/api/testAPI.html"     # work
-        self.webview_online_itown = "http://www.itowns.fr/api/QT/testAPI.html"  # don't work
+        # self.webview_online_itown = "http://www.itowns.fr/api/QT/testAPI.html"  # don't work
         # self.webview_online_itown = "/home/latty/__DEV__/__REMI__/itowns/www_itowns_fr_api/QT"    # don't work
         #
         self.webview_dict = {}
@@ -229,16 +231,18 @@ class interactive_map_tracking:
             QUrl(self.webview_offline_about)
         )
         #
-        url_for_itowns = QUrl(self.webview_online_itown)
-        url_for_itowns.setUserInfo( "itowns:stereo" )
-        self.webview_dict[self.dlg.webView_itowns] = self.TP_NAMEDTUPLE_WEBVIEW(
-            'init',
-            0, 0,
-            url_for_itowns,
-            url_for_itowns
-        )
+        # url_for_itowns = QUrl(self.webview_online_itown)
+        # url_for_itowns.setUserInfo( "itowns:stereo" )
+        # self.webview_dict[self.dlg.webView_itowns] = self.TP_NAMEDTUPLE_WEBVIEW(
+        #     'init',
+        #     0, 0,
+        #     url_for_itowns,
+        #     url_for_itowns
+        # )
         self.webview_current = None
         self.webview_margin = 60
+        #
+        self.webview_itowns = ITP_WebView_iTowns(self.iface, self.dlg, self.dlg.webView_itowns)
         
         #getting proxy 
         s = QSettings() #getting proxy from qgis options settings
@@ -704,6 +708,19 @@ class interactive_map_tracking:
             QObject.connect(self.iface.mapCanvas(), SIGNAL("renderComplete(QPainter*)"),
                             self.canvasExtentsChangedAndRenderComplete)
 
+        #
+        bUseWebView_iTowns = True
+        if bUseWebView_iTowns:
+            mapCanvas = self.iface.mapCanvas()
+            mapcanvas_extent = mapCanvas.extent()
+            center = mapcanvas_extent.center()
+            #
+            qgis_log_tools.logMessageINFO(("self.webview_itowns.b_moveMap_QGIS: " + str(self.webview_itowns.synch_QGIS_iTowns_finish)))
+            if(self.webview_itowns.synch_QGIS_iTowns_finish):
+                self.webview_itowns.moveMap(center, mapCanvas.mapSettings().destinationCrs())
+            #
+            QObject.connect(self.iface.mapCanvas(), SIGNAL("renderComplete(QPainter*)"),
+                            self.canvasExtentsChangedAndRenderComplete)
 
     def canvasExtentsChangedAndRenderComplete(self):
         """ Action when the signal: 'Render Complete' from QGIS MapCanvas is emitted&captured (after a emitted&captured signal: 'Extent Changed')
@@ -715,6 +732,9 @@ class interactive_map_tracking:
 
         if self.bUseV2Functionnalities:
             self.update_track_position_with_qtimers()
+
+            # use for iTowns WebView
+            self.webview_itowns.synch_QGIS_iTowns_finish = True
         else:
             self.update_track_position()
 
@@ -892,7 +912,7 @@ class interactive_map_tracking:
         """
         self.bUseV2Functionnalities = self.dlg.enableUseMutexForTP.isChecked()
 
-        if not(self.dlg.enableUseMutexForTP.isChecked() and self.dlg.enableTrackPosition.isChecked()):
+        if not self.dlg.enableUseMutexForTP.isChecked() and self.dlg.enableTrackPosition.isChecked():
             self.stop_threads()
 
     def enabled_plugin(self):
@@ -1073,7 +1093,7 @@ class interactive_map_tracking:
             qgis_log_tools.logMessageINFO("### width : " + str(width) + " - height : " + str(height))
         else:
             if self.webview_dict[webview].state == 'online':
-                qgis_log_tools.logMessageINFO("## WebView : FAILED TO LOAD from " + str(self.webview_dict[webview].online_url))#online_url
+                qgis_log_tools.logMessageINFO("## WebView : FAILED TO LOAD from " + str(self.webview_dict[webview].online_url))
             else :
                 qgis_log_tools.logMessageINFO("## WebView : FAILED TO LOAD from " + str(self.webview_dict[webview].offline_url))
             #
@@ -1201,7 +1221,7 @@ class interactive_map_tracking:
         """
         QObject.disconnect(self.dlg.webView_about, SIGNAL("loadFinished (bool)"), self.webview_loadFinished)
         QObject.disconnect(self.dlg.webView_userdoc, SIGNAL("loadFinished (bool)"), self.webview_loadFinished)
-        QObject.disconnect(self.dlg.webView_itowns, SIGNAL("loadFinished (bool)"), self.webview_loadFinished)
+        # QObject.disconnect(self.dlg.webView_itowns, SIGNAL("loadFinished (bool)"), self.webview_loadFinished)
 
         if index == 3:
             qgis_log_tools.logMessageINFO("## Tab : User Doc")
@@ -1215,10 +1235,13 @@ class interactive_map_tracking:
             QObject.connect(self.dlg.webView_userdoc, SIGNAL("loadFinished (bool)"), self.webview_loadFinished)
         elif index == 5:
             qgis_log_tools.logMessageINFO("## Tab : Test ITowns WebView")
-            self.webview_load_page(self.dlg.webView_itowns, self.webview_margin, False, False, False)
-            # signal : 'loadFinished(bool)'
-            # QObject.connect(self.dlg.webView_itowns, SIGNAL("loadFinished (bool)"), self.webview_loadFinished)
-            QObject.connect(self.dlg.webView_itowns, SIGNAL("loadFinished (bool)"), self.webview_iTowns_loadFinished)
+            # self.webview_load_page(self.dlg.webView_itowns, self.webview_margin, False, False, False)
+            # # signal : 'loadFinished(bool)'
+            # # QObject.connect(self.dlg.webView_itowns, SIGNAL("loadFinished (bool)"), self.webview_loadFinished)
+            # QObject.connect(self.dlg.webView_itowns, SIGNAL("loadFinished (bool)"), self.webview_iTowns_loadFinished)
+            self.webview_itowns.load()
+            if not self.bSignalForExtentsChangedConnected:
+                self.connectSignalForExtentsChanged()
         else:
             self.dict_tabs_size[index] = self.dict_tabs_size.setdefault(index, self.dlg.minimumSize())
             self.dlg.resize(self.dict_tabs_size[index])
@@ -1282,12 +1305,12 @@ class interactive_map_tracking:
                     qgis_log_tools.logMessageINFO("delete key: " + str(layer_id) + "in dict: self.tp_dict_key_l_values_listfeatures")
                     del self.tp_dict_key_l_values_listfeatures[layer_id]
 
-        if not(tp_dict_layers_to_commit_is_empty) and len(self.tp_dict_layers_to_commit.keys()) == 0:
+        if not tp_dict_layers_to_commit_is_empty and len(self.tp_dict_layers_to_commit.keys()) == 0:
             pass
-        if not(tp_dict_key_l_values_et_is_empty) and len(self.tp_dict_key_l_values_et.keys()) == 0:
+        if not tp_dict_key_l_values_et_is_empty and len(self.tp_dict_key_l_values_et.keys()) == 0:
             qgis_log_tools.logMessageINFO("Need to stop QTimer : qtimer_tracking_position_memory_to_geom ! ")
             self.qtimer_tracking_position_memory_to_geom.stop()
-        if not(tp_dict_key_l_values_listfeatures_is_empty) and len(self.tp_dict_key_l_values_listfeatures.keys()) == 0:
+        if not tp_dict_key_l_values_listfeatures_is_empty and len(self.tp_dict_key_l_values_listfeatures.keys()) == 0:
             qgis_log_tools.logMessageINFO("Need to stop QTimer : qtimer_tracking_position_geom_to_layer ! ")
             self.qtimer_tracking_position_geom_to_layer.stop()
 
