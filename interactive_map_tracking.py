@@ -38,8 +38,6 @@ from qgis.gui import QgsMessageBar
 from qgis.core import *
 
 import qgis_layer_tools
-#import qgis_mapcanvas_tools
-import qgis_log_tools
 import imt_tools
 #
 from itp_webview_itown import *
@@ -58,12 +56,6 @@ from collections import namedtuple
 
 def CONVERT_S_TO_MS(s):
     return s*1000
-
-# with Qt resources files
-# gui_doc_about = ":/plugins/interactive_map_tracking/gui_doc/About.htm"
-# gui_doc_user_doc = ":/plugins/interactive_map_tracking/gui_doc/Simplified_User_Guide.htm"
-
-# with absolute (os) path
 
 
 class interactive_map_tracking:
@@ -211,10 +203,6 @@ class interactive_map_tracking:
         self.webview_online_about = "https://github.com/Remi-C/interactive_map_tracking/wiki/[User]-About"
         self.webview_online_user_doc = "https://github.com/Remi-C/interactive_map_tracking/wiki/[User]-User-Guide"
         #
-        # self.webview_online_itown = "http://www.itowns.fr/api/testAPI.html"     # work
-        # self.webview_online_itown = "http://www.itowns.fr/api/QT/testAPI.html"  # don't work
-        # self.webview_online_itown = "/home/latty/__DEV__/__REMI__/itowns/www_itowns_fr_api/QT"    # don't work
-        #
         self.webview_dict = {}
         # url : http://qt-project.org/doc/qt-4.8/qurl.html
         self.webview_default_tuple = self.TP_NAMEDTUPLE_WEBVIEW('init', 0, 0, QUrl(""), QUrl(""))
@@ -230,15 +218,6 @@ class interactive_map_tracking:
             QUrl(self.webview_online_about),
             QUrl(self.webview_offline_about)
         )
-        #
-        # url_for_itowns = QUrl(self.webview_online_itown)
-        # url_for_itowns.setUserInfo( "itowns:stereo" )
-        # self.webview_dict[self.dlg.webView_itowns] = self.TP_NAMEDTUPLE_WEBVIEW(
-        #     'init',
-        #     0, 0,
-        #     url_for_itowns,
-        #     url_for_itowns
-        # )
         self.webview_current = None
         self.webview_margin = 60
         #
@@ -1097,107 +1076,6 @@ class interactive_map_tracking:
             else: # we already failed last, time, stopping to try
                 qgis_log_tools.logMessageINFO("## WebView : stopping to try to retrieve html")
 
-    class WebPos(QObject):
-        """
-
-        """
-        mapMoved = pyqtSignal('double', 'double', 'double', name='mapMoved')
-
-        def __init__(self):
-            # Initialize the PunchingBag as a QObject
-            QObject.__init__(self)
-            #
-            e = 0
-            n = 0
-            h = 0
-
-        def connect_moveMap(self):
-            self.mapMoved.connect(self.onMapMoved)
-
-        # get a move command from ITowns (JS -> Python/Qt)
-        @pyqtSlot('double', 'double', 'double')
-        def onMapMoved(self, e,  n, h):
-            self.e = e
-            self.n = n
-            self.h = h
-            #
-            qgis_log_tools.logMessageINFO("Position changed, do something with new coord: " +
-                                          str(e) + ", " + str(n) + ", " + str(h))
-
-        # send a move command to ITowns (Python/Qt -> JS)
-        def moveMap(self, frame, e, n, h):
-            moveMapJS = "itowns.setPanoramicPosition(" \
-                        "{x:" + str(e) + ",y:" + str(n) + ",z:" + str(h) + "});  // Set position in lambert93 (easting,h, northing)"
-            # moveMapJS = "moveNow(" + str(e) + ", " + str(n) + ", " + str(h)+ ");  // Set position in lambert93 (easting, h, northing)"
-            frame.evaluateJavaScript(moveMapJS)
-
-    def call_move(self):
-        webview = self.webview_current
-        frame = webview.page().mainFrame()
-        self.webpos.moveMap(frame,
-                            651183.24+50,
-                            0,
-                            6861343+0)
-
-    def webview_iTowns_loadFinished(self, ok):
-        """
-
-        :param ok:
-        """
-        self.webview_loadFinished(ok)
-
-        self.webpos = self.WebPos()
-
-        # safe because we stop the listener of this event when we changed the tab
-        webview = self.webview_current
-        frame = webview.page().mainFrame()
-
-        frame.addToJavaScriptWindowObject("webpos", self.webpos)
-        self.webpos.connect_moveMap()
-        # test
-        QTimer.singleShot(5000, self.call_move)
-
-    def webview_load_page(self,
-                          webview,
-                          clearCaches = True,
-                          activePlugings = True,
-                          reloadPage = True, margin=60):
-        """
-
-        :param webview:
-        :param margin:
-        :return:
-        """
-        #
-        tuple_webview = self.webview_dict.setdefault(webview, self.webview_default_tuple)
-
-        self.webview_margin = margin
-        self.webview_current = webview
-
-        if clearCaches == True:
-            # reset/clear the web widget
-            # url : http://qt-project.org/doc/qt-4.8/qwebview.html#settings
-            websetting = webview.settings()
-            websetting.clearMemoryCaches()
-            #
-            globalsettings = websetting.globalSettings()
-            globalsettings.clearMemoryCaches()
-
-        if activePlugings == True:
-            # url : http://qt-project.org/doc/qt-4.8/qwebview.html#settings
-            websetting = webview.settings()
-            globalsettings = websetting.globalSettings()
-            # Enables plugins in Web pages (e.g. using NPAPI).
-            # url: http://doc.qt.io/qt-4.8/qwebsettings.html#WebAttribute-enum
-            globalsettings.setAttribute(QWebSettings.PluginsEnabled, True)
-
-        if reloadPage or tuple_webview.state == 'init':
-            if tuple_webview.state == 'offline':    # offline
-                webview.load(tuple_webview.offline_url)
-            else:   # 'init' or 'online'
-                qgis_log_tools.logMessageINFO("load url: " + str(tuple_webview.online_url.toString()))
-                webview.load(tuple_webview.online_url)
-
     def QTabWidget_CurrentChanged(self, index):
         """
 
@@ -1206,7 +1084,6 @@ class interactive_map_tracking:
         """
         QObject.disconnect(self.dlg.webView_about, SIGNAL("loadFinished (bool)"), self.webview_loadFinished)
         QObject.disconnect(self.dlg.webView_userdoc, SIGNAL("loadFinished (bool)"), self.webview_loadFinished)
-        # QObject.disconnect(self.dlg.webView_itowns, SIGNAL("loadFinished (bool)"), self.webview_loadFinished)
 
         if self.tabs_last_index != index and self.tabs_last_index == 5:
             self.webview_itowns.disconnectSignalForExtentsChanged()
@@ -1223,13 +1100,7 @@ class interactive_map_tracking:
             QObject.connect(self.dlg.webView_userdoc, SIGNAL("loadFinished (bool)"), self.webview_loadFinished)
         elif index == 5:
             qgis_log_tools.logMessageINFO("## Tab : Test ITowns WebView")
-            # self.webview_load_page(self.dlg.webView_itowns, self.webview_margin, False, False, False)
-            # # signal : 'loadFinished(bool)'
-            # # QObject.connect(self.dlg.webView_itowns, SIGNAL("loadFinished (bool)"), self.webview_loadFinished)
-            # QObject.connect(self.dlg.webView_itowns, SIGNAL("loadFinished (bool)"), self.webview_iTowns_loadFinished)
             self.webview_itowns.load()
-            # if not self.bSignalForExtentsChangedConnected:
-            #     self.connectSignalForExtentsChanged()
         else:
             self.dict_tabs_size[index] = self.dict_tabs_size.setdefault(index, self.dlg.minimumSize())
             self.dlg.resize(self.dict_tabs_size[index])
