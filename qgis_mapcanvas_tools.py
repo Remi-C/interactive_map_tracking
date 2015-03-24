@@ -41,8 +41,14 @@ def refreshMapCanvas(iface):
     """
     qgis_log_tools.logMessageINFO("Try to refresh mapcanvas")
 
-    mapRect = iface.mapCanvas().extent()
-    iface.mapCanvas().zoomByFactor(1.0 + DEFAULT_SEGMENT_EPSILON, mapRect.center())
+    try:
+        mapCanvas = iface.mapCanvas()
+
+        if mapCanvas:
+            mapRect = mapCanvas.extent()
+            mapCanvas.zoomByFactor(1.0 + DEFAULT_SEGMENT_EPSILON, mapRect.center())
+    except:
+        qgis_log_tools.logMessageWARNING("EXCEPTION")
 
 
 def refreshLayer(layer, iface):

@@ -1076,6 +1076,47 @@ class interactive_map_tracking:
             else: # we already failed last, time, stopping to try
                 qgis_log_tools.logMessageINFO("## WebView : stopping to try to retrieve html")
 
+    def webview_load_page(self,
+                          webview,
+                          clearCaches = True,
+                          activePlugings = True,
+                          reloadPage = True, margin=60):
+        """
+
+        :param webview:
+        :param margin:
+        :return:
+        """
+        #
+        tuple_webview = self.webview_dict.setdefault(webview, self.webview_default_tuple)
+
+        self.webview_margin = margin
+        self.webview_current = webview
+
+        if clearCaches == True:
+            # reset/clear the web widget
+            # url : http://qt-project.org/doc/qt-4.8/qwebview.html#settings
+            websetting = webview.settings()
+            websetting.clearMemoryCaches()
+            #
+            globalsettings = websetting.globalSettings()
+            globalsettings.clearMemoryCaches()
+
+        if activePlugings == True:
+            # url : http://qt-project.org/doc/qt-4.8/qwebview.html#settings
+            websetting = webview.settings()
+            globalsettings = websetting.globalSettings()
+            # Enables plugins in Web pages (e.g. using NPAPI).
+            # url: http://doc.qt.io/qt-4.8/qwebsettings.html#WebAttribute-enum
+            globalsettings.setAttribute(QWebSettings.PluginsEnabled, True)
+
+        if reloadPage or tuple_webview.state == 'init':
+            if tuple_webview.state == 'offline':    # offline
+                webview.load(tuple_webview.offline_url)
+            else:   # 'init' or 'online'
+                qgis_log_tools.logMessageINFO("load url: " + str(tuple_webview.online_url.toString()))
+                webview.load(tuple_webview.online_url)
+
     def QTabWidget_CurrentChanged(self, index):
         """
 
