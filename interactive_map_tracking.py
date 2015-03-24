@@ -284,6 +284,8 @@ class interactive_map_tracking:
         self.bSignalForLayerDeleted = True
         QObject.connect(self.qgsmaplayerregistry, SIGNAL("layersWillBeRemoved( QStringList )"), self.slot_LayersWillBeRemoved)
         # self.qgsmaplayerregistry.layersWillBeRemoved.connect(self.slot_LayersWillBeRemoved)
+        #
+        self.tabs_last_index = -1
 
     # noinspection PyMethodMayBeStatic
     def tr(self, message):
@@ -708,20 +710,6 @@ class interactive_map_tracking:
             QObject.connect(self.iface.mapCanvas(), SIGNAL("renderComplete(QPainter*)"),
                             self.canvasExtentsChangedAndRenderComplete)
 
-        #
-        bUseWebView_iTowns = True
-        if bUseWebView_iTowns:
-            mapCanvas = self.iface.mapCanvas()
-            mapcanvas_extent = mapCanvas.extent()
-            center = mapcanvas_extent.center()
-            #
-            qgis_log_tools.logMessageINFO(("self.webview_itowns.b_moveMap_QGIS: " + str(self.webview_itowns.synch_QGIS_iTowns_finish)))
-            if(self.webview_itowns.synch_QGIS_iTowns_finish):
-                self.webview_itowns.moveMap(center, mapCanvas.mapSettings().destinationCrs())
-            #
-            QObject.connect(self.iface.mapCanvas(), SIGNAL("renderComplete(QPainter*)"),
-                            self.canvasExtentsChangedAndRenderComplete)
-
     def canvasExtentsChangedAndRenderComplete(self):
         """ Action when the signal: 'Render Complete' from QGIS MapCanvas is emitted&captured (after a emitted&captured signal: 'Extent Changed')
 
@@ -732,9 +720,6 @@ class interactive_map_tracking:
 
         if self.bUseV2Functionnalities:
             self.update_track_position_with_qtimers()
-
-            # use for iTowns WebView
-            self.webview_itowns.synch_QGIS_iTowns_finish = True
         else:
             self.update_track_position()
 
@@ -1223,6 +1208,9 @@ class interactive_map_tracking:
         QObject.disconnect(self.dlg.webView_userdoc, SIGNAL("loadFinished (bool)"), self.webview_loadFinished)
         # QObject.disconnect(self.dlg.webView_itowns, SIGNAL("loadFinished (bool)"), self.webview_loadFinished)
 
+        if self.tabs_last_index != index and self.tabs_last_index == 5:
+            self.webview_itowns.disconnectSignalForExtentsChanged()
+
         if index == 3:
             qgis_log_tools.logMessageINFO("## Tab : User Doc")
             self.webview_load_page(self.dlg.webView_userdoc, self.webview_margin)
@@ -1240,11 +1228,13 @@ class interactive_map_tracking:
             # # QObject.connect(self.dlg.webView_itowns, SIGNAL("loadFinished (bool)"), self.webview_loadFinished)
             # QObject.connect(self.dlg.webView_itowns, SIGNAL("loadFinished (bool)"), self.webview_iTowns_loadFinished)
             self.webview_itowns.load()
-            if not self.bSignalForExtentsChangedConnected:
-                self.connectSignalForExtentsChanged()
+            # if not self.bSignalForExtentsChangedConnected:
+            #     self.connectSignalForExtentsChanged()
         else:
             self.dict_tabs_size[index] = self.dict_tabs_size.setdefault(index, self.dlg.minimumSize())
             self.dlg.resize(self.dict_tabs_size[index])
+
+        self.tabs_last_index = index
 
     @pyqtSlot('QStringList')
     def slot_LayersWillBeRemoved(self, theLayerIds):
