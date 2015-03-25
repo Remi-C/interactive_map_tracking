@@ -90,6 +90,7 @@ class ITP_WebView_iTowns(QObject):
         self.synch_iTowns_QGIS_finish = True
         #
         self.aim_geometry = QgsRubberBand(self.iface.mapCanvas(), False)
+        self.frustum_geometry = QgsRubberBand(self.iface.mapCanvas(), False)
         self.position_geometry = QgsVertexMarker(self.iface.mapCanvas())
         #
         self.bSignalForExtentsChangedConnected = False
@@ -103,11 +104,17 @@ class ITP_WebView_iTowns(QObject):
         """
         qgis_log_tools.logMessageINFO("")
         #
-        self.signal_apiIsInisialized.connect(self.slot_apiIsInisialized)  # problem
+        self.signal_apiIsInisialized.connect(self.slot_apiIsInisialized)  # synch problem
         #
-        self.slot_apiIsInisialized()
+        self.slot_apiIsInisialized()    # launch 'manually' the initialisation slot
 
     def emit_moveMap(self, e, n, h):
+        """
+
+        :param e:
+        :param n:
+        :param h:
+        """
         self.signal_moveMap.emit(e, n, h)
         qgis_log_tools.logMessageINFO("emit_moveMap")
 
@@ -132,23 +139,38 @@ class ITP_WebView_iTowns(QObject):
     # get a zoom changed from iTowns (JS -> Python/Qt)
     @pyqtSlot('int')
     def slot_onZoomChanged(self, fov):
+        """
+
+        :param fov:
+        """
         qgis_log_tools.logMessageINFO("Zoom changed, do something with the new fov: " +
                                       str(fov))
         #
+        self.fov = math.radians(fov)
+        #
+        self.update_2dfrustum(qt_color=Qt.darkYellow, icon_size=16, pen_width=8)
 
     # get an orienation changed from iTowns (JS -> Python/Qt)
     @pyqtSlot('double', 'double')
     def slot_onOrientationChanged(self, yaw, pitch):
+        """
+
+        :param yaw:
+        :param pitch:
+        """
         qgis_log_tools.logMessageINFO("Orienation changed, do something with the new orientation: " +
                                       str(yaw) + ", " + str(pitch))
         #
         self.yaw = yaw
         self.pitch = pitch
         #
-        # qgis_mapcanvas_tools.refreshMapCanvas(self.iface)
+        self.update_2dfrustum(qt_color=Qt.magenta, icon_size=16, pen_width=8)
 
     @pyqtSlot()
     def slot_apiIsInisialized(self):
+        """
+
+        """
         qgis_log_tools.logMessageINFO("api iTowns is initialized")
         #
         self.bApiIsInisialized = True
@@ -165,50 +187,122 @@ class ITP_WebView_iTowns(QObject):
             qgis_log_tools.logMessageWARNING("EXCEPTION: \
             self.moveMap(mapCanvas=mapCanvas)")
 
-    def update_frustum(self, **keys):
+    class QgsPoint_Arith(QgsPoint):
+        """
+
+        """
+
+        def __init__(self, **keys):
+            """
+            urls:
+            - http://stackoverflow.com/questions/1385759/should-init-call-the-parent-classs-init
+
+            """
+            super(ITP_WebView_iTowns.QgsPoint_Arith, self).__init__()
+            #
+            if 'angle' in keys:
+                angle = keys['angle']
+                radius = keys.setdefault('radius', 1.0)
+                #
+                x = math.cos(angle) * radius
+                y = math.sin(angle) * radius
+                #
+                self.set(x, y)
+                #
+                qgis_log_tools.logMessageINFO("angle: " + str(angle))
+                qgis_log_tools.logMessageINFO("radius: " + str(radius))
+
+        def __add__(self, other):
+            """
+            urls:
+            - https://docs.python.org/2/library/operator.html
+
+            """
+            return QgsPoint(self.x()+other.x(), self.y()+other.y())
+
+    def update_aim(self, mapCanvas):
+        """
+        :param mapCanvas:
+        """
+        #
+        self.aim_geometry.reset()
+        self.aim_geometry = QgsRubberBand(self.iface.mapCanvas(), False)
+        #
+        aim_CS = mapCanvas.mapUnitsPerPixel()*100
+        aim_angle = math.pi/2.0 - self.yaw
+        #
+        aim_point = self.QgsPoint_Arith(angle=aim_angle, radius=aim_CS) + self.point_qgis
+        #
+        aim_list_points = [self.point_qgis, aim_point]
+        #
+        self.aim_geometry.setToGeometry(QgsGeometry.fromPolyline(aim_list_points), None)
+        #
+        self.aim_geometry.setColor(Qt.green)
+        self.aim_geometry.setWidth(5)
+        #
+
+    def update_frustum(self, mapCanvas):
+        aim_CS = mapCanvas.mapUnitsPerPixel()*100
+        aim_angle = math.pi/2.0 - self.yaw
+        #
+        self.frustum_geometry.reset()
+        self.frustum_geometry = QgsRubberBand(self.iface.mapCanvas(), False)
+        #
+        frustum_CS = aim_CS * 4
+        frustum_angle = aim_angle
+        frustum_hfov = self.fov * 0.5
+        #
+        frustum_point_0 = self.QgsPoint_Arith(angle=frustum_angle-frustum_hfov, radius=frustum_CS) + self.point_qgis
+        frustum_point_1 = self.QgsPoint_Arith(angle=frustum_angle+frustum_hfov, radius=frustum_CS)  + self.point_qgis
+        #
+        frustum_list_lines = [
+            [self.point_qgis, frustum_point_0],
+            [self.point_qgis, frustum_point_1]]
+        #
+        self.frustum_geometry.setToGeometry(QgsGeometry.fromMultiPolyline(frustum_list_lines), None)
+        #
+        self.frustum_geometry.setColor(Qt.darkCyan)
+        self.frustum_geometry.setWidth(3)
+
+    def update_position(self, **keys):
         """
         Add a icon on Qgis Map to localize the current position in iTowns
-        Now it's just a position information (no orientation)
 
+        """
+        if 'qt_color' in keys:
+            self.position_geometry.setColor(keys['qt_color'])
+        if 'icon_type'in keys:
+            self.position_geometry.setIconType(keys['icon_type'])
+        if 'icon_size' in keys:
+            self.position_geometry.setIconSize(keys['icon_size'])
+        if 'pen_width' in keys:
+            self.position_geometry.setPenWidth(keys['pen_width'])
+        #
+        if keys.setdefault('update_position', True):
+            self.position_geometry.setCenter(self.point_qgis)
+
+    def update_2dfrustum(self, **keys):
+        """
+        Add a icon on Qgis Map to represent the current:
+            - position in iTowns
+            - orientation of iTowns camera
+            - zoom/fov of iTowns camera
         """
         qgis_log_tools.logMessageINFO("")
 
-        if self.point_qgis:
+        mapCanvas = self.iface.mapCanvas()
 
-            self.aim_geometry.reset()
-            self.aim_geometry = QgsRubberBand(self.iface.mapCanvas(), False)
-            mapCanvas = self.iface.mapCanvas()
-            CS = mapCanvas.mapUnitsPerPixel()*100
-            angle = math.pi/2.0 - self.yaw
-            x = math.cos(angle)*CS
-            y = math.sin(angle)*CS
-            x = x + self.point_qgis.x()
-            y = y + self.point_qgis.y()
-            aim = QgsPoint(x, y)
-            points = [self.point_qgis, aim]
-            self.aim_geometry.setToGeometry(QgsGeometry.fromPolyline(points), None)
-            self.aim_geometry.setColor(Qt.green)
-            self.aim_geometry.setWidth(3)
-            #
-            qgis_log_tools.logMessageINFO("CS: " + str(CS))
-            qgis_log_tools.logMessageINFO("x: " + str(x) + ", y: " + str(y))
-
-            if 'qt_color' in keys:
-                self.position_geometry.setColor(keys['qt_color'])
-            if 'icon_type'in keys:
-                self.position_geometry.setIconType(keys['icon_type'])
-            if 'icon_size' in keys:
-                self.position_geometry.setIconSize(keys['icon_size'])
-            if 'pen_width' in keys:
-                self.position_geometry.setPenWidth(keys['pen_width'])
-            #
-            if keys.setdefault('update_position', True):
-                self.position_geometry.setCenter(self.point_qgis)
-            #
-            qgis_log_tools.logMessageINFO("qt_color:" + str(keys['qt_color']))
+        self.update_aim(mapCanvas)
+        self.update_frustum(mapCanvas)
+        self.update_position(**keys)
+        #
+        # qgis_log_tools.logMessageINFO("qt_color:" + str(keys['qt_color']))
 
     # synch the map position from iTowns to QGIS
     def moveMap_iTowns_to_QGIS(self):
+        """
+
+        """
         mapCanvas = self.iface.mapCanvas()
         mapcanvas_extent = mapCanvas.extent()
         #
@@ -242,12 +336,14 @@ class ITP_WebView_iTowns(QObject):
         self.emit_moveMap(e, n, h)
         # TODO: need a event to know when iTowns state is on : 'render complete'
         # self.synch_QGIS_iTowns_finish = True
-        #
-        # qgis_mapcanvas_tools.refreshMapCanvas(self.iface)
 
     # Comment effectuer une surcharge de fonctions (ou polymorphisme paramétrique) ?
     # url: http://python.developpez.com/faq/?page=Les-fonctions
     def moveMap_QGIS_to_iTowns(self, **keys):
+        """
+
+        :param keys:
+        """
         #
         qgis_log_tools.logMessageINFO("")
         #
@@ -281,6 +377,7 @@ class ITP_WebView_iTowns(QObject):
 
     def load(self):
         """
+
         """
         #
         qgis_log_tools.logMessageINFO("")
@@ -291,6 +388,8 @@ class ITP_WebView_iTowns(QObject):
 
     def loadFinished(self, ok):
         """
+
+        :param ok:
         """
         if ok:
             self.page = self.webview.page()
@@ -303,7 +402,6 @@ class ITP_WebView_iTowns(QObject):
                 self.frame)
             #
             qgis_log_tools.logMessageINFO("### width : " + str(width) + " - height : " + str(height))
-
             #
             self.frame.addToJavaScriptWindowObject("webpos", self)
             #
@@ -317,7 +415,6 @@ class ITP_WebView_iTowns(QObject):
         :param dlg:
         :param frame:
         :param margin_width:
-        :return:
         """
         width = frame.contentsSize().width()
         height = frame.contentsSize().height()
@@ -394,8 +491,10 @@ class ITP_WebView_iTowns(QObject):
         #
         if not self.synch_iTowns_QGIS_finish:
             self.synch_iTowns_QGIS_finish = True
-            self.update_frustum(qt_color=Qt.red, icon_size=16, pen_width=8)
+            #
+            self.update_2dfrustum(qt_color=Qt.red, icon_size=16, pen_width=8)
         #
         if not self.synch_QGIS_iTowns_finish:
             self.synch_QGIS_iTowns_finish = True
-            self.update_frustum(qt_color=Qt.blue, icon_size=16, pen_width=8)
+            #
+            self.update_2dfrustum(qt_color=Qt.blue, icon_size=16, pen_width=8)
