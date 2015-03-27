@@ -21,14 +21,59 @@
  ***************************************************************************/
 """
 
-from PyQt4.QtCore import QObject, SIGNAL, QUrl
-from PyQt4.QtCore import pyqtSignal, pyqtSlot, Qt
-from qgis.core import QgsCoordinateReferenceSystem, QgsCoordinateTransform, QgsPoint, QGis, QgsGeometry
-from qgis._gui import QgsRubberBand, QgsVertexMarker
-import qgis_log_tools
-import qgis_mapcanvas_tools
+from qgis.core import QgsCoordinateReferenceSystem, QgsCoordinateTransform, QgsPoint, QgsGeometry
 import math
 
+from PyQt4.QtCore import QObject, SIGNAL, QUrl, QTimer, QSizeF
+from PyQt4.QtCore import pyqtSignal, pyqtSlot, Qt
+from PyQt4.QtGui import QTextDocument
+from qgis._gui import QgsRubberBand, QgsVertexMarker, QgsTextAnnotationItem
+
+import qgis_log_tools
+import qgis_mapcanvas_tools
+
+# 'local' (to the class) namespace for this overloading
+# now 'QgsPoint' it's our implementation
+class QgsPoint(QgsPoint):
+    """
+
+    """
+    # add a another way to init QgsPoint
+    @staticmethod
+    def fromParams(**keys):
+        """
+        urls:
+        - http://stackoverflow.com/questions/1385759/should-init-call-the-parent-classs-init
+
+        """
+        x, y = 0, 0
+        #
+        if 'angle' in keys:
+            #
+            angle = keys['angle']
+            radius = keys.setdefault('radius', 1.0)
+            #
+            x = math.cos(angle) * radius
+            y = math.sin(angle) * radius
+        elif 'x' in keys or 'y' in keys:
+            x = keys.setdefault('x', 0.0)
+            y = keys.setdefault('y', 0.0)
+        elif 'QgsPoint' in keys:
+            qgspoint = keys.setdefault('QgsPoint', QgsPoint())
+            #
+            x = qgspoint.x()
+            y = qgspoint.y()
+        #
+        return QgsPoint(x, y)
+
+    # now, we can add usefuls operators for QgsPoint (vectoriel stuffs for example)
+    def __add__(self, other):
+        """
+        urls:
+        - https://docs.python.org/2/library/operator.html
+
+        """
+        return QgsPoint(self.x()+other.x(), self.y()+other.y())
 
 class ITP_WebView_iTowns(QObject):
     """
@@ -41,13 +86,15 @@ class ITP_WebView_iTowns(QObject):
     signal_orientationChanged = pyqtSignal('double', 'double', name='orientationChanged')
     #
     signal_moveMap = pyqtSignal('double', 'double', 'double', name='moveMap')
+    signal_addLayer = pyqtSignal('QString', name='addLayer')
+    signal_measured = pyqtSignal('double', 'double', 'double', name='measured')
 
     def __init__(
             self,
             qgis_iface,
             qt_dlg,
             qt_webview,
-            url="http://www.itowns.fr/api/QT/testAPI.html",
+            url="",
             crs_theDefinition="IGNF:LAMB93"):
         """
         """
@@ -65,8 +112,7 @@ class ITP_WebView_iTowns(QObject):
         self.page = self.webview.page()
         self.frame = self.page.currentFrame()
         #
-        self.url = url
-        self.qurl = QUrl(self.url)
+        self.qurl = QUrl(url)
         self.qurl.setUserInfo( "itowns:stereo" )
         #
         self.e = 0
@@ -97,6 +143,14 @@ class ITP_WebView_iTowns(QObject):
         self.bSignalForExtentsChangedConnectedAndRenderCompleteConnected = False
         #
         self.bApiIsInisialized = False
+        #
+        self.qtimer_pointcloud = QTimer()
+        self.qtimer_pointcloud.timeout.connect(self.cron_finish_init_api)
+        #
+        self.list_measures = []
+        #
+        self.measure_add_vertexmarker = True
+        self.measure_add_annotation = True
 
     def connect_JS_to_QT(self):
         """
@@ -117,6 +171,75 @@ class ITP_WebView_iTowns(QObject):
         """
         self.signal_moveMap.emit(e, n, h)
         qgis_log_tools.logMessageINFO("emit_moveMap")
+
+    def emit_addLayer(self, layer_name):
+        """
+
+        :param layer_name:
+        """
+
+        addLayer_JS = 'addLayerNow("' + layer_name + ')'
+
+        # self.signal_addLayer.emit(layer_name)     # problem
+        self.frame.evaluateJavaScript(addLayer_JS)
+        #
+        # qgis_log_tools.logMessageINFO("emit_addLayer: " + layer_name)
+        qgis_log_tools.logMessageINFO('self.frame.evaluateJavaScript(' + addLayer_JS + ')')
+
+    def add_measure(self, e, n, h):
+        """
+
+        :param e:
+        :param n:
+        :param h:
+        """
+        mapCanvas = self.iface.mapCanvas()
+        #
+        src_crs = self.itown_crs
+        dst_crs = mapCanvas.mapSettings().destinationCrs()
+        #(
+        xform = QgsCoordinateTransform(src_crs, dst_crs)
+        #
+        measure_itowns = QgsPoint(e, n)
+        point_qgis = xform.transform(measure_itowns)
+        #
+        vm = None
+        if self.measure_add_vertexmarker:
+            vm = QgsVertexMarker(mapCanvas)
+            self.vertexmarker_update_parameters(vm,
+                                                qt_color=Qt.darkYellow,
+                                                icon_size=8,
+                                                pen_width=4,
+                                                icon_type=QgsVertexMarker.ICON_BOX)
+        #
+        vm.setCenter(point_qgis)
+        #
+        textItem = None
+        if self.measure_add_annotation:
+            textItem = QgsTextAnnotationItem(mapCanvas)
+            textItem.setMapPosition(point_qgis)
+            textItem.setFrameSize(QSizeF(128, 60))
+            # textItem.setDocument(QTextDocument('E:{0}\nN:{1}\nh:{2}'.format(e, n, h)))
+            textItem.setDocument(QTextDocument('E: %f\nN: %f\nh: %f' % (e, n, h)))
+            textItem.update()
+        #
+        self.list_measures.append({'vertexmarker': vm, 'iTowns_position': [e, n, h], 'textItem': textItem})
+        #
+        # print self.list_measures
+        # print point_qgis
+
+    @pyqtSlot('double', 'double', 'double')
+    def slot_onMeasured(self, e, n, h):
+        """
+
+        :param e:
+        :param n:
+        :param h:
+        """
+        #
+        self.add_measure(e, n, h)
+        #
+        qgis_log_tools.logMessageINFO("Measure 3D: " + str(e) + ", " + str(n) + ", " + str(h))
 
     # get a move command from ITowns (JS -> Python/Qt)
     @pyqtSlot('double', 'double', 'double')
@@ -166,6 +289,20 @@ class ITP_WebView_iTowns(QObject):
         #
         self.update_2dfrustum(qt_color=Qt.magenta, icon_size=16, pen_width=8)
 
+    def cron_finish_init_api(self):
+        """
+
+        """
+        #
+        # self.emit_addLayer("pointCloud")
+        self.frame.evaluateJavaScript('addLayerNow("pointCloud")')
+        #
+        self.frame.evaluateJavaScript('itowns.createSearchInput();')    # add search adress
+        #
+        self.emit_moveMap(651187, 0, 6861382)   # move to a localisation with points cloud
+        #
+        qgis_log_tools.logMessageINFO("")
+
     @pyqtSlot()
     def slot_apiIsInisialized(self):
         """
@@ -178,6 +315,7 @@ class ITP_WebView_iTowns(QObject):
         self.signal_mapMoved.connect(self.slot_onMapMoved)
         self.signal_zoomChanged.connect(self.slot_onZoomChanged)
         self.signal_orientationChanged.connect(self.slot_onOrientationChanged)
+        self.signal_measured.connect(self.slot_onMeasured)
         #
         self.connectSignalForExtentsChanged()
         #
@@ -186,52 +324,26 @@ class ITP_WebView_iTowns(QObject):
         except:
             qgis_log_tools.logMessageWARNING("EXCEPTION: \
             self.moveMap(mapCanvas=mapCanvas)")
+        #
+        # self.qtimer_pointcoud.start(1000)
+        QTimer.singleShot(2000, self.cron_finish_init_api)
+        #
+        # self.emit_moveMap(651187, 0, 6861382)
+        # self.emit_addLayer("pointCloud")
 
-    class QgsPoint_Arith(QgsPoint):
-        """
-
-        """
-
-        def __init__(self, **keys):
-            """
-            urls:
-            - http://stackoverflow.com/questions/1385759/should-init-call-the-parent-classs-init
-
-            """
-            super(ITP_WebView_iTowns.QgsPoint_Arith, self).__init__()
-            #
-            if 'angle' in keys:
-                angle = keys['angle']
-                radius = keys.setdefault('radius', 1.0)
-                #
-                x = math.cos(angle) * radius
-                y = math.sin(angle) * radius
-                #
-                self.set(x, y)
-                #
-                qgis_log_tools.logMessageINFO("angle: " + str(angle))
-                qgis_log_tools.logMessageINFO("radius: " + str(radius))
-
-        def __add__(self, other):
-            """
-            urls:
-            - https://docs.python.org/2/library/operator.html
-
-            """
-            return QgsPoint(self.x()+other.x(), self.y()+other.y())
-
-    def update_aim(self, mapCanvas):
+    def update_aim(self, mapCanvas, CS=100):
         """
         :param mapCanvas:
+
         """
         #
         self.aim_geometry.reset()
         self.aim_geometry = QgsRubberBand(self.iface.mapCanvas(), False)
         #
-        aim_CS = mapCanvas.mapUnitsPerPixel()*100
+        aim_CS = mapCanvas.mapUnitsPerPixel()*CS
         aim_angle = math.pi/2.0 - self.yaw
         #
-        aim_point = self.QgsPoint_Arith(angle=aim_angle, radius=aim_CS) + self.point_qgis
+        aim_point = QgsPoint.fromParams(angle=aim_angle, radius=aim_CS) + self.point_qgis
         #
         aim_list_points = [self.point_qgis, aim_point]
         #
@@ -241,8 +353,15 @@ class ITP_WebView_iTowns(QObject):
         self.aim_geometry.setWidth(5)
         #
 
-    def update_frustum(self, mapCanvas):
-        aim_CS = mapCanvas.mapUnitsPerPixel()*100
+    def update_frustum(self, mapCanvas, CS=100):
+        """
+
+        :param mapCanvas:
+
+        """
+        #
+        aim_CS = mapCanvas.mapUnitsPerPixel()*CS
+        #
         aim_angle = math.pi/2.0 - self.yaw
         #
         self.frustum_geometry.reset()
@@ -252,8 +371,8 @@ class ITP_WebView_iTowns(QObject):
         frustum_angle = aim_angle
         frustum_hfov = self.fov * 0.5
         #
-        frustum_point_0 = self.QgsPoint_Arith(angle=frustum_angle-frustum_hfov, radius=frustum_CS) + self.point_qgis
-        frustum_point_1 = self.QgsPoint_Arith(angle=frustum_angle+frustum_hfov, radius=frustum_CS)  + self.point_qgis
+        frustum_point_0 = QgsPoint.fromParams(angle=frustum_angle-frustum_hfov, radius=frustum_CS) + self.point_qgis
+        frustum_point_1 = QgsPoint.fromParams(angle=frustum_angle+frustum_hfov, radius=frustum_CS) + self.point_qgis
         #
         frustum_list_lines = [
             [self.point_qgis, frustum_point_0],
@@ -264,19 +383,28 @@ class ITP_WebView_iTowns(QObject):
         self.frustum_geometry.setColor(Qt.darkCyan)
         self.frustum_geometry.setWidth(3)
 
+    def vertexmarker_update_parameters(self, vm, **keys):
+        """
+
+        :param vm:
+        :param keys:
+
+        """
+        if 'qt_color' in keys:
+            vm.setColor(keys['qt_color'])
+        if 'icon_type'in keys:
+            vm.setIconType(keys['icon_type'])
+        if 'icon_size' in keys:
+            vm.setIconSize(keys['icon_size'])
+        if 'pen_width' in keys:
+            vm.setPenWidth(keys['pen_width'])
+
     def update_position(self, **keys):
         """
         Add a icon on Qgis Map to localize the current position in iTowns
 
         """
-        if 'qt_color' in keys:
-            self.position_geometry.setColor(keys['qt_color'])
-        if 'icon_type'in keys:
-            self.position_geometry.setIconType(keys['icon_type'])
-        if 'icon_size' in keys:
-            self.position_geometry.setIconSize(keys['icon_size'])
-        if 'pen_width' in keys:
-            self.position_geometry.setPenWidth(keys['pen_width'])
+        self.vertexmarker_update_parameters(self.position_geometry, **keys)
         #
         if keys.setdefault('update_position', True):
             self.position_geometry.setCenter(self.point_qgis)
@@ -287,6 +415,7 @@ class ITP_WebView_iTowns(QObject):
             - position in iTowns
             - orientation of iTowns camera
             - zoom/fov of iTowns camera
+
         """
         qgis_log_tools.logMessageINFO("")
 
@@ -298,9 +427,9 @@ class ITP_WebView_iTowns(QObject):
         #
         # qgis_log_tools.logMessageINFO("qt_color:" + str(keys['qt_color']))
 
-    # synch the map position from iTowns to QGIS
     def moveMap_iTowns_to_QGIS(self):
         """
+        Synchronize the map position from iTowns to QGIS
 
         """
         mapCanvas = self.iface.mapCanvas()
@@ -322,9 +451,10 @@ class ITP_WebView_iTowns(QObject):
         #
         qgis_log_tools.logMessageINFO("point_qgis: " + str(self.point_qgis.x()) + ", " + str(self.point_qgis.y()))
 
-    # send a move command to ITowns (Python/Qt -> JS)
     def moveMap_iTowns(self, e, n, h):
         """
+        Send a move command to ITowns (Python/Qt -> JS)
+
         :param frame:
         :param e:
         :param n:
@@ -337,10 +467,10 @@ class ITP_WebView_iTowns(QObject):
         # TODO: need a event to know when iTowns state is on : 'render complete'
         # self.synch_QGIS_iTowns_finish = True
 
-    # Comment effectuer une surcharge de fonctions (ou polymorphisme paramétrique) ?
-    # url: http://python.developpez.com/faq/?page=Les-fonctions
     def moveMap_QGIS_to_iTowns(self, **keys):
         """
+        Comment effectuer une surcharge de fonctions (ou polymorphisme paramétrique) ?
+        url: http://python.developpez.com/faq/?page=Les-fonctions
 
         :param keys:
         """
@@ -370,8 +500,6 @@ class ITP_WebView_iTowns(QObject):
             itowns_point = xform.transform(qgis_point_coords)
 
             self.moveMap_iTowns(itowns_point.x(), z, itowns_point.y())
-            #
-            # qgis_mapcanvas_tools.refreshMapCanvas(self.iface)
         except:
             qgis_log_tools.logMessageINFO("EXCEPTION")
 
@@ -385,6 +513,8 @@ class ITP_WebView_iTowns(QObject):
         self.webview.load(self.qurl)
         #
         QObject.connect(self.webview, SIGNAL("loadFinished (bool)"), self.loadFinished)
+        #
+        qgis_log_tools.logMessageINFO("load url: " + str(self.qurl.toString()))
 
     def loadFinished(self, ok):
         """
@@ -407,7 +537,7 @@ class ITP_WebView_iTowns(QObject):
             #
             self.connect_JS_to_QT()
         else:
-            qgis_log_tools.logMessageINFO("## WebView : FAILED TO LOAD from " + str(self.url))
+            qgis_log_tools.logMessageINFO("## WebView : FAILED TO LOAD from " + str(self.qurl.toString()))
 
     def update_size_dlg_from_frame(self, dlg, frame, margin_width=60):
         """

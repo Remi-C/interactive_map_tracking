@@ -94,7 +94,6 @@ def logMessageINFO(message, level=QgsMessageLog.INFO, tag=log_tag):
     """
     logMessage(message, level, tag, sys._getframe().f_back.f_code.co_name)
 
-
 def logMessageWARNING(message, level=QgsMessageLog.WARNING, tag=log_tag):
     """ Send a WARNING QGIS log message (Helper using logMessage(...))
 

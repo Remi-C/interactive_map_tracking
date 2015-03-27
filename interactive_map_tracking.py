@@ -221,7 +221,12 @@ class interactive_map_tracking:
         self.webview_current = None
         self.webview_margin = 60
         #
-        self.webview_itowns = ITP_WebView_iTowns(self.iface, self.dlg, self.dlg.webView_itowns)
+        self.webview_itowns = ITP_WebView_iTowns(
+            self.iface,
+            self.dlg,
+            self.dlg.webView_itowns,
+            # "http://www.itowns.fr/api/beta/testAPI.html")
+            "http://www.itowns.fr/api/beta/testAPI_QT.html")
         
         #getting proxy 
         s = QSettings() #getting proxy from qgis options settings
