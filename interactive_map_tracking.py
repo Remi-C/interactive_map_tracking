@@ -38,9 +38,9 @@ from qgis.gui import QgsMessageBar
 from qgis.core import *
 
 import qgis_layer_tools
-#import qgis_mapcanvas_tools
 import qgis_log_tools
 import imt_tools
+from signalsmanager import SignalsManager
 
 #
 # for beta test purposes
@@ -50,12 +50,13 @@ import Queue
 
 from collections import namedtuple
 
-#import time
+# import time
 #import threading
 
 
 def CONVERT_S_TO_MS(s):
-    return s*1000
+    return s * 1000
+
 
 # with Qt resources files
 # gui_doc_about = ":/plugins/interactive_map_tracking/gui_doc/About.htm"
@@ -78,6 +79,7 @@ class interactive_map_tracking:
 
         import time
         from PyQt4.QtNetwork import QNetworkProxy
+
         current_time = time.time()
 
         # Save reference to the QGIS interface
@@ -111,18 +113,12 @@ class interactive_map_tracking:
         # self.selections = []
         self.qsettings_prefix_name = "imt/"
 
-        self.bSignalForLayerModifiedConnected = False
-        self.bSignalForLayerChangedConnected = False
-        self.bSignalForExtentsChangedConnected = False
+        self.signals_manager = SignalsManager.getInstance()
 
-        # self.idCameraPositionLayerInBox = 0
         self.tp_layer = None
 
-        # self.bSignalForProjectReadConnected = True
-        # QObject.connect(self.iface, SIGNAL("projectRead()"), self.qgisInterfaceProjectRead)
-
         # MUTEX
-        self.bUseV2Functionnalities = self.dlg.enableUseMutexForTP.isChecked()
+        self.b_use_asynch = self.dlg.enableUseMutexForTP.isChecked()
 
         # url: https://docs.python.org/2/library/collections.html#collections.namedtuple
         # Definition : namedtuples 'type'
@@ -136,13 +132,22 @@ class interactive_map_tracking:
         self.tp_dict_layers_to_commit = {}
         #
         self.qtimer_tracking_position_rtt_to_memory = QTimer()
-        self.qtimer_tracking_position_rtt_to_memory.timeout.connect(self.tracking_position_qtimer_rttp_to_memory)
         self.qtimer_tracking_position_memory_to_geom = QTimer()
-        self.qtimer_tracking_position_memory_to_geom.timeout.connect(self.tracking_position_qtimer_memory_to_geom)
         self.qtimer_tracking_position_geom_to_layer = QTimer()
-        self.qtimer_tracking_position_geom_to_layer.timeout.connect(self.tracking_position_qtimer_geom_to_layer)
         self.qtimer_tracking_position_layers_to_commit = QTimer()
-        self.qtimer_tracking_position_layers_to_commit.timeout.connect(self.tracking_position_qtimer_layers_to_commit)
+        #
+        self.signals_manager.add_timeout(self.qtimer_tracking_position_rtt_to_memory,
+                                         self.slot_tp_rttp_to_memory,
+                                         "QTIMER")
+        self.signals_manager.add_timeout(self.qtimer_tracking_position_memory_to_geom,
+                                         self.slot_memory_to_geom_tp,
+                                         "QTIMER")
+        self.signals_manager.add_timeout(self.qtimer_tracking_position_geom_to_layer,
+                                         self.slot_geom_to_layer_tp,
+                                         "QTIMER")
+        self.signals_manager.add_timeout(self.qtimer_tracking_position_layers_to_commit,
+                                         self.slot_layers_to_commit_tp,
+                                         "QTIMER")
 
         # OPTIONS: timing reactions
         #
@@ -204,8 +209,9 @@ class interactive_map_tracking:
         )
         # very dirty @FIXME @TODO : here is the proper way to do it (from within the class `self.plugin_dir`)
         self.qgis_plugins_directory = self.plugin_dir
-        self.webview_offline_about = os.path.join(self.qgis_plugins_directory , "gui_doc","About.htm" )
-        self.webview_offline_user_doc = os.path.join(self.qgis_plugins_directory , "gui_doc", "Simplified_User_Guide.htm" ) 
+        self.webview_offline_about = os.path.join(self.qgis_plugins_directory, "gui_doc", "About.htm")
+        self.webview_offline_user_doc = os.path.join(self.qgis_plugins_directory, "gui_doc",
+                                                     "Simplified_User_Guide.htm")
         self.webview_online_about = "https://github.com/Remi-C/interactive_map_tracking/wiki/[User]-About"
         self.webview_online_user_doc = "https://github.com/Remi-C/interactive_map_tracking/wiki/[User]-User-Guide"
         #
@@ -229,16 +235,17 @@ class interactive_map_tracking:
         )
         self.webview_current = None
         self.webview_margin = 60
-        
+        self.webview_tab_index = -1
+
         #getting proxy 
-        s = QSettings() #getting proxy from qgis options settings
+        s = QSettings()  #getting proxy from qgis options settings
         proxyEnabled = s.value("proxy/proxyEnabled", "")
-        proxyType = s.value("proxy/proxyType", "" )
-        proxyHost = s.value("proxy/proxyHost", "" )
-        proxyPort = s.value("proxy/proxyPort", "" )
-        proxyUser = s.value("proxy/proxyUser", "" )
-        proxyPassword = s.value("proxy/proxyPassword", "" )
-        if proxyEnabled == "true": # test if there are proxy settings
+        proxyType = s.value("proxy/proxyType", "")
+        proxyHost = s.value("proxy/proxyHost", "")
+        proxyPort = s.value("proxy/proxyPort", "")
+        proxyUser = s.value("proxy/proxyUser", "")
+        proxyPassword = s.value("proxy/proxyPassword", "")
+        if proxyEnabled == "true":  # test if there are proxy settings
             proxy = QNetworkProxy()
             if proxyType == "DefaultProxy":
                 proxy.setType(QNetworkProxy.DefaultProxy)
@@ -267,9 +274,7 @@ class interactive_map_tracking:
 
         self.qgsmaplayerregistry = QgsMapLayerRegistry.instance()
         #
-        self.bSignalForLayerDeleted = True
-        QObject.connect(self.qgsmaplayerregistry, SIGNAL("layersWillBeRemoved( QStringList )"), self.slot_LayersWillBeRemoved)
-        # self.qgsmaplayerregistry.layersWillBeRemoved.connect(self.slot_LayersWillBeRemoved)
+        self.mapCanvas = self.iface.mapCanvas()
 
     # noinspection PyMethodMayBeStatic
     def tr(self, message):
@@ -361,7 +366,6 @@ class interactive_map_tracking:
 
     def initGui(self):
         """Create the menu entries and toolbar icons inside the QGIS GUI."""
-
         qgis_log_tools.logMessageINFO("Launch 'InitGui(...)' ...")
 
         """Create the menu entries and toolbar icons inside the QGIS GUI."""
@@ -377,43 +381,14 @@ class interactive_map_tracking:
         #
         self.init_plugin()
 
-        # Connections
-        # activate/desactivate plugin
-        self.dlg.enablePlugin.clicked.connect(self.enabled_plugin)
-        # activate/desactivate autosave
-        self.dlg.enableAutoSave.clicked.connect(self.enabled_autosave)
-        # activate/desactive tracking position
-        self.dlg.enableTrackPosition.clicked.connect(self.enabled_trackposition)
-        # box for tracking layers
-        self.dlg.refreshLayersListForTrackPosition.clicked.connect(self.refreshComboBoxLayers)
-        QObject.connect(self.dlg.trackingPositionLayerCombo, SIGNAL("currentIndexChanged ( const QString & )"),
-                        self.currentIndexChangedTPLCB)
-        QObject.connect(self.dlg.IMT_Window_Tabs, SIGNAL("currentChanged (int)"), self.QTabWidget_CurrentChanged)
-
-        # Dev Debug
-        self.dlg.enableLogging.clicked.connect(self.enableLogging)
-        self.dlg.enableUseMutexForTP.clicked.connect(self.enableUseMutexForTP)
-
-        # hide the window plugin
-        # don't change the state (options) of the plugin
-        self.dlg.buttonHide.clicked.connect(self.hide_plugin)
-        #
-        self.refreshComboBoxLayers()
-
-        self.thresholdChanged()
-
-        #
-        #QgsMessageLog.logMessage("enableLogging()")
-        self.enableLogging()
-        self.enableUseMutexForTP()
-
     def unload(self):
         """Removes the plugin menu item and icon from QGIS GUI."""
+        # print "unload"
         for action in self.actions:
-            self.iface.removePluginMenu(
-                self.tr(u'&Interactive Map Tracking'),
-                action)
+            self.iface.removePluginMenu(self.tr(u'&Interactive Map Tracking'), action)
             self.iface.removeToolBarIcon(action)
+        #
+        self.signals_manager.disconnect_all()
 
     def onResizeEvent(self, event):
         # url: http://openclassrooms.com/forum/sujet/dimensionnement-automatique-d-une-qtabwidget
@@ -427,6 +402,8 @@ class interactive_map_tracking:
         # set the icon IMT ^^
         icon_path = ':/plugins/interactive_map_tracking/icon.png'
         self.dlg.setWindowIcon(QIcon(icon_path))
+
+        self.init_signals()
 
         # set the tab at init
         self.dlg.IMT_Window_Tabs.setCurrentIndex(0)
@@ -442,10 +419,8 @@ class interactive_map_tracking:
         # Run the dialog event loop
         self.dlg.exec_()
 
-        # release signals on QGIS
-        if self.bSignalForLayerDeleted:
-            self.qgsmaplayerregistry.layersWillBeRemoved.disconnect(self.slot_LayersWillBeRemoved)
-            self.bSignalForLayerDeleted = False
+        self.signals_manager.disconnect_group("GUI")
+        self.signals_manager.disconnect_group("WEB")
 
     def init_plugin(self):
         """ Init the plugin
@@ -455,13 +430,13 @@ class interactive_map_tracking:
 
         qgis_log_tools.logMessageINFO("Launch 'init_plugin(...)' ...")
         s = QSettings()
-          
+
         # retrieve default states from Qt Creator GUI design
         self.update_setting(s, "enabledPlugin", self.dlg.enablePlugin)
         self.update_setting(s, "enabledAutoSave", self.dlg.enableAutoSave)
         self.update_setting(s, "enabledTrackPosition", self.dlg.enableTrackPosition)
         self.update_setting(s, "enabledLogging", self.dlg.enableLogging)
-        self.update_setting(s, "enableV2", self.dlg.enableUseMutexForTP) 
+        self.update_setting(s, "enableV2", self.dlg.enableUseMutexForTP)
         self.thresholdChanged()
         s.setValue(self.qsettings_prefix_name + "threshold", str(self.threshold))
 
@@ -473,7 +448,7 @@ class interactive_map_tracking:
             #
             self.dlg.thresholdLabel.setEnabled(True)
             self.dlg.threshold_extent.setEnabled(True)
-            QObject.connect(self.dlg.threshold_extent, SIGNAL("returnPressed ()"), self.thresholdChanged)
+            #
             self.thresholdChanged()
         else:
             #
@@ -483,12 +458,52 @@ class interactive_map_tracking:
             self.dlg.enableUseMutexForTP.setDisabled(True)
             self.dlg.thresholdLabel.setDisabled(True)
             self.dlg.threshold_extent.setDisabled(True)
-            #
-            QObject.disconnect(self.dlg.threshold_extent, SIGNAL("returnPressed ()"), self.thresholdChanged)
-            QObject.disconnect(self.dlg.webView_about, SIGNAL("loadFinished (bool)"), self.webview_loadFinished)
-            QObject.disconnect(self.dlg.webView_userdoc, SIGNAL("loadFinished (bool)"), self.webview_loadFinished)
-            #
-            # QObject.disconnect(self.qgsmaplayerregistry, SIGNAL("layersWillBeRemoved (QStringList)"), self.slot_LayersWillBeRemoved)
+        #
+        self.refreshComboBoxLayers()
+        self.thresholdChanged()
+        #
+        self.enable_logging()
+        self.enable_use_asynch()
+
+    def init_signals(self):
+        """
+
+        :return:
+        """
+        self.init_signals_gui()
+
+    def init_signals_gui(self):
+        """
+
+        :return:
+        """
+        # Connections
+        # activate/desactivate :
+        # - plugin
+        # - autosave
+        # - tracking position
+        self.signals_manager.add_clicked(self.dlg.enablePlugin, self.enabled_plugin, "GUI")
+        self.signals_manager.add_clicked(self.dlg.enableAutoSave, self.enabled_autosave, "GUI")
+        self.signals_manager.add_clicked(self.dlg.enableTrackPosition, self.enabled_trackposition, "GUI")
+        # box for tracking layers
+        self.signals_manager.add_clicked(self.dlg.refreshLayersListForTrackPosition, self.refreshComboBoxLayers, "GUI")
+        #
+        self.signals_manager.add(self.dlg.trackingPositionLayerCombo,
+                                 "currentIndexChanged (const QString &)",
+                                 self.currentIndexChangedTPLCB,
+                                 "GUI")
+        self.signals_manager.add(self.dlg.IMT_Window_Tabs,
+                                 "currentChanged (int)",
+                                 self.QTabWidget_CurrentChanged,
+                                 "GUI")
+        # Dev Debug
+        self.signals_manager.add_clicked(self.dlg.enableLogging, self.enable_logging, "GUI")
+        self.signals_manager.add_clicked(self.dlg.enableUseMutexForTP, self.enable_use_asynch, "GUI")
+        # hide the window plugin
+        # don't change the state (options) of the plugin
+        self.signals_manager.add_clicked(self.dlg.buttonHide, self.hide_plugin, "GUI")
+        #
+        self.signals_manager.add(self.dlg.threshold_extent, "returnPressed ()", self.thresholdChanged, "GUI")
 
     def update_setting(self, _settings, _name_in_setting, _checkbox):
         """
@@ -522,111 +537,70 @@ class interactive_map_tracking:
             _checkbox.setChecked(False)
             _checkbox.setDisabled(True)
 
-
-    def disconnectSignaleForLayerCrsChanged(self, layer):
-        """ Disconnect the signal: 'layerCrsChanged' of the layer given
-
-        :param layer:
-        :return:
-        """
-        if None != layer and self.bSignalForLayerModifiedConnected:
-            QObject.disconnect(layer, SIGNAL("layerCrsChanged()"), self.currentLayerCrsChanged)
-            self.bSignalForLayerCrsChangedConnected = False
-            #
-            qgis_log_tools.logMessageINFO("Disconnect SIGNAL on layer: " + layer.name())
-
-    def disconnectSignalForLayerModified(self, layer):
+    def disconnect_signal_layerModified(self, layer):
         """ Disconnect the signal: 'Layer Modified' of the layer given
 
         :param layer: QGIS Layer
         :type layer: QgsMapLayer
 
         """
-        if None != layer and self.bSignalForLayerModifiedConnected:
-            QObject.disconnect(layer, SIGNAL("layerModified()"), self.currentLayerModified)
-            self.bSignalForLayerModifiedConnected = False
+        if None != layer:
+            self.signals_manager.disconnect(layer, "layerModified()")
             #
             qgis_log_tools.logMessageINFO("Disconnect SIGNAL on layer: " + layer.name())
 
-    def disconnectSignalForLayerChanged(self):
+    def disconnect_signal_currentLayerChanged(self):
         """ Disconnect the signal: 'Current Layer Changed' of the QGIS Interface"""
         #
-        if self.bSignalForLayerChangedConnected:
-            QObject.disconnect(self.iface, SIGNAL("currentLayerChanged(QgsMapLayer*)"),
-                               self.qgisInterfaceCurrentLayerChanged)
-            self.bSignalForLayerChangedConnected = False
-            #
-            qgis_log_tools.logMessageINFO("Disconnect SIGNAL on QGISInterface")
+        self.signals_manager.disconnect(self.iface, "currentLayerChanged(QgsMapLayer*)")
+        #
+        qgis_log_tools.logMessageINFO("Disconnect SIGNAL on QGISInterface")
 
-    def disconnectSignalForExtentsChanged(self):
+    def disconnect_signal_extentsChanged(self):
         """ Disconnect the signal: 'Canvas Extents Changed' of the QGIS MapCanvas """
         #
-        if self.bSignalForExtentsChangedConnected:
-            self.iface.mapCanvas().extentsChanged.disconnect(self.canvasExtentsChanged)
-            self.bSignalForExtentsChangedConnected = False
-            #
-            qgis_log_tools.logMessageINFO("Disconnect SIGNAL on QGISMapCanvas")
+        self.signals_manager.disconnect(self.mapCanvas, "extentsChanged()")
+        #
+        qgis_log_tools.logMessageINFO("Disconnect SIGNAL on QGISMapCanvas")
 
-    def connectSignaleForLayerCrsChanged(self, layer):
-        """ Disconnect the signal: 'layerCrsChanged' of the layer given
+    def connect_signal_qgis(self, qgis_object, signal_signature, slot):
+        """
 
-        :param layer:
+        :param qgis_object:
+        :param signal_signature:
+        :param slot:
         :return:
         """
-        if None != layer and not self.bSignalForLayerCrsChangedConnected:
-            QObject.connect(layer, SIGNAL("layerCrsChanged()"), self.currentLayerCrsChanged)
-            self.bSignalForLayerCrsChangedConnected = False
-            #
-            qgis_log_tools.logMessageINFO("Connect SIGNAL on layer: " + layer.name())
+        if qgis_object:
+            self.signals_manager.add(qgis_object,
+                                     signal_signature,
+                                     slot,
+                                     "QGIS")
 
-    def connectSignalForLayerModified(self, layer):
+    def connect_signal_layerModified(self, layer):
         """ Connect the signal: "Layer Modified" to the layer given
 
         :param layer: QGIS layer
         :type layer: QgsMapLayer
 
         """
-        if None != layer and not self.bSignalForLayerModifiedConnected:
-            QObject.connect(layer, SIGNAL("layerModified()"), self.currentLayerModified)
-            self.bSignalForLayerModifiedConnected = True
-            #
-            qgis_log_tools.logMessageINFO("Connect SIGNAL on layer: " + layer.name())
+        self.connect_signal_qgis(layer, "layerModified()", self.slot_layerModified)
+        #
+        # qgis_log_tools.logMessageINFO("Connect SIGNAL on layer: " + layer.name())
 
-    def connectSignalForLayerChanged(self):
+    def connect_signal_currentLayerChanged(self):
         """ Connect the signal: 'Layer Changed' to the layer given """
+        self.connect_signal_qgis(self.iface, "currentLayerChanged(QgsMapLayer*)", self.slot_currentLayerChanged)
         #
-        if not self.bSignalForLayerChangedConnected:
-            QObject.connect(self.iface, SIGNAL("currentLayerChanged(QgsMapLayer*)"),
-                            self.qgisInterfaceCurrentLayerChanged)
-            self.bSignalForLayerChangedConnected = True
-            #
-            qgis_log_tools.logMessageINFO("Connect SIGNAL on QGISInterface")
+        qgis_log_tools.logMessageINFO("Connect SIGNAL on QGISInterface")
 
-    def connectSignalForExtentsChanged(self):
+    def connect_signal_extentsChanged(self):
         """ Connect the signal: 'Extent Changed' to the QGIS MapCanvas """
+        self.connect_signal_qgis(self.mapCanvas, "extentsChanged()", self.slot_extentsChanged)
         #
-        if not self.bSignalForExtentsChangedConnected:
-            self.iface.mapCanvas().extentsChanged.connect(self.canvasExtentsChanged)
-            self.bSignalForExtentsChangedConnected = True
-            #
-            qgis_log_tools.logMessageINFO("Connect SIGNAL on QGISMapCanvas")
+        qgis_log_tools.logMessageINFO("Connect SIGNAL on QGISMapCanvas")
 
-    def disconnectSignals(self, layer):
-        """ Disconnect alls signals (of current layer & QGIS MapCanvas, Interface) """
-        #
-        qgis_log_tools.logMessageINFO("Disconnect all SIGNALS ...")
-        #
-        self.disconnectSignalForLayerModified(layer)
-        self.disconnectSignalForLayerChanged()
-        self.disconnectSignalForExtentsChanged()
-        self.disconnectSignaleForLayerCrsChanged()
-        #
-        QObject.disconnect(self.dlg.webView_about, SIGNAL("loadFinished (bool)"), self.webview_loadFinished)
-        QObject.disconnect(self.dlg.webView_userdoc, SIGNAL("loadFinished (bool)"), self.webview_loadFinished)
-        #
-        # QObject.disconnect(self.qgsmaplayerregistry, SIGNAL("layersWillBeRemoved(QStringList)"), self.slot_LayersWillBeRemoved)
-
-    def qgisInterfaceCurrentLayerChanged(self, layer):
+    def slot_currentLayerChanged(self, layer):
         """ Action when the signal: 'Current Layer Changed' from QGIS MapCanvas is emitted&captured
 
         :param layer: QGIS layer -> current layer using by Interactive_Map_Tracking plugin
@@ -635,19 +609,20 @@ class interactive_map_tracking:
         """
         # on deconnecte le layer courant
         if None != self.currentLayer:
-            self.disconnectSignalForLayerModified(self.currentLayer)
+            self.disconnect_signal_layerModified(self.currentLayer)
 
         # Filtre sur les layers a "surveiller"
         if not qgis_layer_tools.filter_layer_for_imt(layer):
             layer = None
 
-        if None != layer:
-            self.currentLayer = layer
+        self.currentLayer = layer
+
+        if layer is not None:
             #
             if self.dlg.enablePlugin.isChecked():
                 if self.dlg.enableAutoSave.isChecked():
                     qgis_layer_tools.commitChangesAndRefresh(self.currentLayer, self.iface, QSettings())
-                    self.connectSignalForLayerModified(self.currentLayer)
+                    self.connect_signal_layerModified(self.currentLayer)
 
             qgis_log_tools.logMessageINFO("Change Layer: layer.name=" + layer.name())
         else:
@@ -657,56 +632,56 @@ class interactive_map_tracking:
         """ Action when the signal: 'Project Read' from QGIS Inteface is emitted&captured """
         pass
 
-    def currentLayerModified(self):
+    def slot_layerModified(self):
         """ Action when the signal: 'Layer Modified' from QGIS Layer (current) is emitted&captured
         We connect a new signal: 'RenderComplete' to perform operation after the QGIS rendering (deferred strategy)
 
         """
         #
         if None != self.currentLayer:
-            if None != self.iface.mapCanvas():
-                QObject.connect(self.iface.mapCanvas(), SIGNAL("renderComplete(QPainter*)"),
-                                self.currentLayerModifiedAndRenderComplete)
+            if None != self.mapCanvas:
+                #
+                self.signals_manager.add(
+                    self.mapCanvas,
+                    "renderComplete(QPainter*)",
+                    self.slot_renderComplete_layerModified
+                )
+                #
                 qgis_log_tools.logMessageINFO("Detect modification on layer:" + self.currentLayer.name())
 
-    def currentLayerModifiedAndRenderComplete(self):
+    def slot_renderComplete_layerModified(self):
         """ Action when the signal: 'Render Complete' from QGIS Layer (current) is emitted&captured (after emitted&captured signal: 'Layer Modified') """
         #
-        QObject.disconnect(self.iface.mapCanvas(), SIGNAL("renderComplete(QPainter*)"),
-                           self.currentLayerModifiedAndRenderComplete)
+        self.signals_manager.disconnect(self.mapCanvas, "renderComplete(QPainter*)")
         #
-        # qgis_layer_tools.bRefreshMapFromAutoSave = True
         qgis_layer_tools.commitChangesAndRefresh(self.currentLayer, self.iface, QSettings())
 
-    def canvasExtentsChanged(self):
+    def slot_extentsChanged(self):
         """ Action when the signal: 'Extent Changed' from QGIS MapCanvas is emitted&captured
          We connect a new signal: 'RenderComplete' to perform operation after the QGIS rendering (deferred strategy)
 
         """
-        if self.bUseV2Functionnalities:
-            # filter on our dummy refreshMap using little zoom on mapcanvas (=> canvasExtentChanged was emitted)
-            # if self.bRefreshMapFromAutoSave:
-            #     self.bRefreshMapFromAutoSave = False
-            # else:
+        if self.b_use_asynch:
             self.update_track_position_with_qtimers()
         else:
-            QObject.connect(self.iface.mapCanvas(), SIGNAL("renderComplete(QPainter*)"),
-                            self.canvasExtentsChangedAndRenderComplete)
+            self.signals_manager.add(self.mapCanvas,
+                                     "renderComplete(QPainter*)",
+                                     self.slot_renderComplete_extentsChanged)
 
 
-    def canvasExtentsChangedAndRenderComplete(self):
+    def slot_renderComplete_extentsChanged(self):
         """ Action when the signal: 'Render Complete' from QGIS MapCanvas is emitted&captured (after a emitted&captured signal: 'Extent Changed')
 
         """
         #
-        QObject.disconnect(self.iface.mapCanvas(), SIGNAL("renderComplete(QPainter*)"),
-                           self.canvasExtentsChangedAndRenderComplete)
+        self.signals_manager.disconnect(self.mapCanvas, "renderComplete(QPainter*)")
 
-        if self.bUseV2Functionnalities:
+        if self.b_use_asynch:
             self.update_track_position_with_qtimers()
         else:
             self.update_track_position()
 
+    @staticmethod
     def filter_layer_for_tracking_position(layer):
         # set Attributes for Layer in DB
         # On récupère automatiquement le nombre de champs qui compose les features présentes dans ce layer
@@ -749,6 +724,7 @@ class interactive_map_tracking:
         # if layer_name == "":
         #     return
 
+        # noinspection PyBroadException
         try:
             layer_for_tp = imt_tools.find_layer_in_qgis_legend_interface(self.iface, layer_name)
             self.tp_layer = layer_for_tp  # set the layer for tracking position (plugin)
@@ -758,11 +734,11 @@ class interactive_map_tracking:
             self.tp_id_user_id = list_id_fields[0]
             self.tp_id_w_time = list_id_fields[1]
 
-            dataProvider = layer_for_tp.dataProvider()
+            data_provider = layer_for_tp.dataProvider()
 
             # Return a map of indexes with field names for this layer.
             # url: http://qgis.org/api/classQgsVectorDataProvider.html#a53f4e62cb05889ecf9897fc6a015c296
-            fields = dataProvider.fields()
+            fields = data_provider.fields()
 
             # set the fields
             # reset all fields in None
@@ -836,13 +812,16 @@ class interactive_map_tracking:
             #
             resultCommit = qgis_layer_tools.commitChangesAndRefresh(self.currentLayer, self.iface, QSettings())
             #
-            self.connectSignalForLayerModified(self.currentLayer)
+            self.connect_signal_layerModified(self.currentLayer)
         else:
-            self.disconnectSignalForLayerModified(self.currentLayer)
+            self.disconnect_signal_layerModified(self.currentLayer)
         #
         return resultCommit
 
     def stop_threads(self):
+        """
+
+        """
         if self.qtimer_tracking_position_rtt_to_memory.isActive():
             self.qtimer_tracking_position_rtt_to_memory.stop()
         if self.qtimer_tracking_position_memory_to_geom.isActive():
@@ -861,27 +840,34 @@ class interactive_map_tracking:
             #
             self.refreshComboBoxLayers()
             #
-            self.connectSignalForExtentsChanged()
+            self.connect_signal_extentsChanged()
+            #
+            self.signals_manager.add(self.qgsmaplayerregistry,
+                                     "layersWillBeRemoved( QStringList )",
+                                     self.slot_LayersWillBeRemoved,
+                                     "QGIS")
         else:
-            self.disconnectSignalForExtentsChanged()
-
+            self.disconnect_signal_extentsChanged()
+            #
             self.stop_threads()
+            #
+            self.signals_manager.disconnect(self.qgsmaplayerregistry, "layersWillBeRemoved( QStringList )")
 
-    def enableLogging(self):
+    def enable_logging(self):
         """ Action when the checkbox 'Enable LOGging' is clicked """
         #
         qgis_log_tools.setLogging(self.dlg.enableLogging.isChecked())
 
-    def enableUseMutexForTP(self):
+    def enable_use_asynch(self):
         """ Action when the checkbox 'Use Mutex (for TrackingPosition) [BETA]' is clicked
         - using Mutex to protect commitChange operation in multi-threads context (signals strategy)
         Beta test for:
         - using queuing requests from TrackPosition (we try to amortize the cost and effects on QGIS GUI)
 
         """
-        self.bUseV2Functionnalities = self.dlg.enableUseMutexForTP.isChecked()
+        self.b_use_asynch = self.dlg.enableUseMutexForTP.isChecked()
 
-        if not(self.dlg.enableUseMutexForTP.isChecked() and self.dlg.enableTrackPosition.isChecked()):
+        if not (self.dlg.enableUseMutexForTP.isChecked() and self.dlg.enableTrackPosition.isChecked()):
             self.stop_threads()
 
     def enabled_plugin(self):
@@ -907,30 +893,32 @@ class interactive_map_tracking:
             self.dlg.enableLogging.setEnabled(True)
             self.dlg.thresholdLabel.setEnabled(True)
             self.dlg.threshold_extent.setEnabled(True)
-            QObject.connect(self.dlg.threshold_extent, SIGNAL("editingFinished ()"), self.thresholdChanged)
             self.dlg.enableUseMutexForTP.setEnabled(True)
             #
-            self.connectSignalForLayerChanged()
+            self.signals_manager.add(self.dlg.threshold_extent, "editingFinished ()", self.thresholdChanged)
+            #
+            self.connect_signal_currentLayerChanged()
             if self.dlg.enableAutoSave.isChecked():
-                self.connectSignalForLayerModified(self.currentLayer)
+                self.connect_signal_layerModified(self.currentLayer)
                 resultCommit = qgis_layer_tools.commitChangesAndRefresh(self.currentLayer, self.iface, QSettings())
             if self.dlg.enableTrackPosition.isChecked():
                 self.refreshComboBoxLayers()
-                self.connectSignalForExtentsChanged()
+                self.connect_signal_extentsChanged()
         else:
             self.dlg.enableAutoSave.setDisabled(True)
             self.dlg.enableTrackPosition.setDisabled(True)
             self.dlg.enableLogging.setDisabled(True)
             self.dlg.thresholdLabel.setDisabled(True)
             self.dlg.threshold_extent.setDisabled(True)
-            QObject.disconnect(self.dlg.threshold_extent, SIGNAL("returnPressed ()"), self.thresholdChanged)
             self.dlg.enableUseMutexForTP.setDisabled(True)
             #
-            self.disconnectSignalForLayerChanged()
+            self.signals_manager.disconnect(self.dlg.threshold_extent, "returnPressed ()")
+            #
+            self.disconnect_signal_currentLayerChanged()
             if self.dlg.enableAutoSave.isChecked():
-                self.disconnectSignalForLayerModified(self.currentLayer)
+                self.disconnect_signal_layerModified(self.currentLayer)
             if self.dlg.enableTrackPosition.isChecked():
-                self.disconnectSignalForExtentsChanged()
+                self.disconnect_signal_extentsChanged()
 
                 self.stop_threads()
 
@@ -1004,7 +992,7 @@ class interactive_map_tracking:
         # just for visualisation purpose
         self.dlg.threshold_extent.setText("1:" + str(self.threshold))
 
-    def update_size_dlg_from_frame(self, dlg, frame, margin_width=60):
+    def compute_frame_size(self, frame, dlg=None, margin_width=60):
         """
 
         :param dlg:
@@ -1018,13 +1006,20 @@ class interactive_map_tracking:
         width += margin_width
         #
         width = max(1024, width)
-        height = min(768, max(height, width*4/3))
+        height = min(768, max(height, width * 4 / 3))
         #
-        dlg.resize(width, height)
+        if dlg:
+            dlg.resize(width, height)
         #
         return width, height
 
     def update_size_dlg_from_tuple(self, dlg, tuple):
+        """
+
+        :param dlg:
+        :param tuple:
+        :return:
+        """
         dlg.resize(tuple.width, tuple.height)
         return tuple.width, tuple.height
 
@@ -1046,11 +1041,12 @@ class interactive_map_tracking:
             qgis_log_tools.logMessageINFO("## WebView : OK")
 
             # update the QDiaglog sizes
-            width, height = self.update_size_dlg_from_frame(
-                self.dlg,
-                webview.page().currentFrame(),
-                self.webview_margin
-            )
+            dlg = None
+            if self.dlg.IMT_Window_Tabs.currentIndex() == self.webview_tab_index:
+                dlg = self.dlg
+            width, height = self.compute_frame_size(webview.page().currentFrame(),
+                                                    dlg,
+                                                    self.webview_margin)
             # update the tuple for this webview
             self.webview_dict[webview] = self.TP_NAMEDTUPLE_WEBVIEW(
                 'online',
@@ -1062,11 +1058,13 @@ class interactive_map_tracking:
             qgis_log_tools.logMessageINFO("### width : " + str(width) + " - height : " + str(height))
         else:
             if self.webview_dict[webview].state == 'online':
-                qgis_log_tools.logMessageINFO("## WebView : FAILED TO LOAD from " + str(self.webview_dict[webview].online_url))#online_url
-            else :
-                qgis_log_tools.logMessageINFO("## WebView : FAILED TO LOAD from " + str(self.webview_dict[webview].offline_url))
+                qgis_log_tools.logMessageINFO(
+                    "## WebView : FAILED TO LOAD from " + str(self.webview_dict[webview].online_url))  #online_url
+            else:
+                qgis_log_tools.logMessageINFO(
+                    "## WebView : FAILED TO LOAD from " + str(self.webview_dict[webview].offline_url))
             #
-            if  self.webview_dict[webview].state != 'offline': #regular case we failed, but we are going to try again
+            if self.webview_dict[webview].state != 'offline':  #regular case we failed, but we are going to try again
                 self.webview_dict[webview] = self.TP_NAMEDTUPLE_WEBVIEW(
                     'offline',
                     tuple_webview.width, tuple_webview.height,
@@ -1077,11 +1075,11 @@ class interactive_map_tracking:
                 # try to load the offline version (still in initial state)
                 # @FIXME : doesn't load the images in offline mode on XP...
                 webview.load(QUrl(tuple_webview.offline_url))
-                
-            else: # we already failed last, time, stopping to try
+
+            else:  # we already failed last, time, stopping to try
                 qgis_log_tools.logMessageINFO("## WebView : stopping to try to retrieve html")
 
-    def webview_load_page(self, webview, margin=60):
+    def webview_load_page(self, webview, index_tab=-1, margin=60):
         """
 
         :param webview:
@@ -1093,9 +1091,13 @@ class interactive_map_tracking:
 
         self.webview_margin = margin
         self.webview_current = webview
+        self.webview_tab_index = index_tab
 
         # signal : 'loadFinished(bool)'
-        QObject.connect(webview, SIGNAL("loadFinished (bool)"), self.webview_loadFinished)
+        self.signals_manager.add(webview,
+                                 "loadFinished (bool)",
+                                 self.webview_loadFinished,
+                                 "WEB")
 
         # reset/clear the web widget
         # url : http://qt-project.org/doc/qt-4.8/qwebview.html#settings
@@ -1109,26 +1111,29 @@ class interactive_map_tracking:
         # url: http://doc.qt.io/qt-4.8/qwebsettings.html#WebAttribute-enum
         globalsettings.setAttribute(QWebSettings.PluginsEnabled, True)
 
-        if tuple_webview.state == 'offline':    # offline
+        if tuple_webview.state == 'offline':  # offline
             webview.load(tuple_webview.offline_url)
-        else:   # 'init' or 'online'
+        else:  # 'init' or 'online'
             webview.load(tuple_webview.online_url)
 
     def QTabWidget_CurrentChanged(self, index):
         """
 
+        :type index: int
         :param index:
         :return:
         """
-        QObject.disconnect(self.dlg.webView_about, SIGNAL("loadFinished (bool)"), self.webview_loadFinished)
-        QObject.disconnect(self.dlg.webView_userdoc, SIGNAL("loadFinished (bool)"), self.webview_loadFinished)
-
+        #
+        # self.signals_manager.disconnect(self.dlg.webView_about, "loadFinished (bool)")
+        # self.signals_manager.disconnect(self.dlg.webView_userdoc, "loadFinished (bool)")
+        self.signals_manager.disconnect_group("WEB")
+        #
         if index == 3:
             qgis_log_tools.logMessageINFO("## Tab : User Doc")
-            self.webview_load_page(self.dlg.webView_userdoc, self.webview_margin)
+            self.webview_load_page(self.dlg.webView_userdoc, index, self.webview_margin)
         elif index == 4:
             qgis_log_tools.logMessageINFO("## Tab : About")
-            self.webview_load_page(self.dlg.webView_about, self.webview_margin)
+            self.webview_load_page(self.dlg.webView_about, index, self.webview_margin)
         else:
             self.dict_tabs_size[index] = self.dict_tabs_size.setdefault(index, self.dlg.minimumSize())
             self.dlg.resize(self.dict_tabs_size[index])
@@ -1137,6 +1142,7 @@ class interactive_map_tracking:
     def slot_LayersWillBeRemoved(self, theLayerIds):
         """
 
+        :type theLayerIds: QStringList
         :param theLayerIds:
         """
 
@@ -1148,12 +1154,17 @@ class interactive_map_tracking:
         for id_layer in theLayerIds:
             qgis_log_tools.logMessageINFO("id_layer: " + str(id_layer))
 
+        tp_dict_layers_to_commit_is_empty = True
+        tp_dict_key_l_values_et_is_empty = True
+        tp_dict_key_l_values_listfeatures_is_empty = True
+
         # with QWriteLocker(self.tp_mutex_on_layers):
-        self.tp_mutex_on_layers.lockForWrite()
+        self.tp_mutex_on_layers.lockForWrite()  # release this lock in 'slot_LayersRemoved' slot
         if True:
             # clean lists, dicts
 
-            qgis_log_tools.logMessageINFO("# self.tp_queue_rt_ntuples_let.qsize() : " + str(self.tp_queue_rt_ntuples_let.qsize()))
+            qgis_log_tools.logMessageINFO(
+                "# self.tp_queue_rt_ntuples_let.qsize() : " + str(self.tp_queue_rt_ntuples_let.qsize()))
 
             nb_tuples_let_removed = 0
             tp_queue_fifo_rt_ntuples_let = Queue.Queue()
@@ -1163,11 +1174,12 @@ class interactive_map_tracking:
                 tp_tuple = self.tp_queue_rt_ntuples_let.get()
                 #
                 for layer_id in theLayerIds:
-                    qgis_log_tools.logMessageINFO("layer_id: " + str(id_layer) + " - tp_tuple.id_layer: " + str(tp_tuple.id_layer))
+                    qgis_log_tools.logMessageINFO("layer_id: " + str(id_layer) +
+                                                  " - tp_tuple.id_layer: " + str(tp_tuple.id_layer))
                     if layer_id != tp_tuple.id_layer:
                         tp_queue_fifo_rt_ntuples_let.put(tp_tuple)
                     else:
-                        nb_tuples_let_removed = nb_tuples_let_removed + 1
+                        nb_tuples_let_removed += 1
                         qgis_log_tools.logMessageINFO("## tuple removed !")
             #
             # qgis_log_tools.logMessageINFO("## nb_tuples_let_removed : " + str(nb_tuples_let_removed))
@@ -1181,32 +1193,42 @@ class interactive_map_tracking:
 
             for layer_id in theLayerIds:
                 if layer_id in self.tp_dict_layers_to_commit:
-                    qgis_log_tools.logMessageINFO("delete key: " + str(layer_id) + "in dict: self.tp_dict_layers_to_commit")
+                    qgis_log_tools.logMessageINFO(
+                        "delete key: " + str(layer_id) + "in dict: self.tp_dict_layers_to_commit")
                     del self.tp_dict_layers_to_commit[layer_id]
 
                 if layer_id in self.tp_dict_key_l_values_et:
-                    qgis_log_tools.logMessageINFO("delete key: " + str(layer_id) + "in dict: self.tp_dict_key_l_values_et")
+                    qgis_log_tools.logMessageINFO(
+                        "delete key: " + str(layer_id) + "in dict: self.tp_dict_key_l_values_et")
                     del self.tp_dict_key_l_values_et[layer_id]
 
                 if layer_id in self.tp_dict_key_l_values_listfeatures:
-                    qgis_log_tools.logMessageINFO("delete key: " + str(layer_id) + "in dict: self.tp_dict_key_l_values_listfeatures")
+                    qgis_log_tools.logMessageINFO(
+                        "delete key: " + str(layer_id) + "in dict: self.tp_dict_key_l_values_listfeatures")
                     del self.tp_dict_key_l_values_listfeatures[layer_id]
 
-        if not(tp_dict_layers_to_commit_is_empty) and len(self.tp_dict_layers_to_commit.keys()) == 0:
+        if not tp_dict_layers_to_commit_is_empty and len(self.tp_dict_layers_to_commit.keys()) == 0:
             pass
-        if not(tp_dict_key_l_values_et_is_empty) and len(self.tp_dict_key_l_values_et.keys()) == 0:
+        if not tp_dict_key_l_values_et_is_empty and len(self.tp_dict_key_l_values_et.keys()) == 0:
             qgis_log_tools.logMessageINFO("Need to stop QTimer : qtimer_tracking_position_memory_to_geom ! ")
             self.qtimer_tracking_position_memory_to_geom.stop()
-        if not(tp_dict_key_l_values_listfeatures_is_empty) and len(self.tp_dict_key_l_values_listfeatures.keys()) == 0:
+        if not tp_dict_key_l_values_listfeatures_is_empty and len(self.tp_dict_key_l_values_listfeatures.keys()) == 0:
             qgis_log_tools.logMessageINFO("Need to stop QTimer : qtimer_tracking_position_geom_to_layer ! ")
             self.qtimer_tracking_position_geom_to_layer.stop()
-
         #
-        self.qgsmaplayerregistry.layersRemoved.connect(self.slot_LayersRemoved)
+        self.signals_manager.add(self.qgsmaplayerregistry,
+                                 "layersRemoved( QStringList )",
+                                 self.slot_LayersRemoved)
 
+    @pyqtSlot('QStringList')
     def slot_LayersRemoved(self, theLayerIds):
-        qgis_log_tools.logMessageINFO("# slot_LayersRemoved")
+        """
 
+        :param theLayerIds:
+
+        """
+        qgis_log_tools.logMessageINFO("# slot_LayersRemoved")
+        #
         for id_layer in theLayerIds:
             qgis_log_tools.logMessageINFO("id_layer: " + str(id_layer))
             try:
@@ -1215,13 +1237,13 @@ class interactive_map_tracking:
                     self.tp_layer = None
             except:
                 pass
-
+        #
         self.tp_layer = None
         self.refreshComboBoxLayers()
-
+        #
         self.tp_mutex_on_layers.unlock()
-
-        self.qgsmaplayerregistry.layersRemoved.disconnect(self.slot_LayersRemoved)
+        #
+        self.signals_manager.disconnect(self.qgsmaplayerregistry, "layersRemoved()")
 
     # TODO: optimize update_track_position because it's a (critical) real-time method !
     def update_track_position(self, bWithProjectionInCRSLayer=True, bUseEmptyFields=False):
@@ -1245,7 +1267,7 @@ class interactive_map_tracking:
         if self.tp_layer is None:
             return -1
 
-        mapCanvas = self.iface.mapCanvas()
+        mapCanvas = self.mapCanvas
         mapcanvas_extent = mapCanvas.extent()
 
         layer_for_polygon_extent = self.tp_layer
@@ -1330,18 +1352,19 @@ class interactive_map_tracking:
         :return:
         """
 
-        bIsTimeToUpdate = self.tp_timers.is_time_to_update("update_track_position_with_qtimers", "tp_threshold_time_for_realtime_tracking_position")
+        bIsTimeToUpdate = self.tp_timers.is_time_to_update("update_track_position_with_qtimers",
+                                                           "tp_threshold_time_for_realtime_tracking_position")
         if bIsTimeToUpdate:
             # Do we have a current layer activate for tracking position ?
             if self.tp_layer is None:
-            # if not, no need to go further
+                # if not, no need to go further
                 return -1
 
-            mapCanvas = self.iface.mapCanvas()
+            mapCanvas = self.mapCanvas
             mapcanvas_extent = mapCanvas.extent()
 
             # Add a filter to prevent to save the same extent (useful in regards to our 'dummy' approach to refresh map)
-            if imt_tools.extent_equal(self.tp_last_extent_saved, mapcanvas_extent, 0.01):   # 1.0 %
+            if imt_tools.extent_equal(self.tp_last_extent_saved, mapcanvas_extent, 0.01):  # 1.0 %
                 return -3
 
             # Filter on extent map scale (size)
@@ -1390,7 +1413,7 @@ class interactive_map_tracking:
 
         return 1
 
-    def tracking_position_qtimer_rttp_to_memory(self):
+    def slot_tp_rttp_to_memory(self):
         """ Action perform when the QTimer for Tracking Position is time out
         Enqueue requests from Tracking Position to amortize the cost&effect on QGIS GUI
 
@@ -1435,7 +1458,7 @@ class interactive_map_tracking:
         self.qtimer_tracking_position_memory_to_geom.start(interval)
         #####################
 
-    def tracking_position_qtimer_memory_to_geom(self):
+    def slot_memory_to_geom_tp(self):
         """ Action perform when the QTimer for Tracking Position is time out
         Enqueue requests from Tracking Position to amortize the cost&effect on QGIS GUI
 
@@ -1450,7 +1473,7 @@ class interactive_map_tracking:
         # bIsTimeToUpdate = self.tp_timers.is_time_to_update("tp_time_last_rttp_to_mem",
         #                                                    "tp_threshold_time_for_construct_geom")
 
-        mapCanvas = self.iface.mapCanvas()
+        mapCanvas = self.mapCanvas
 
         # url: http://qgis.org/api/classQgsMapCanvas.html#af0ffae7b5e5ec8b29764773fa6a74d58
         extent_src_crs = mapCanvas.mapSettings().destinationCrs()
@@ -1510,7 +1533,6 @@ class interactive_map_tracking:
                         "-- Pack " + str(len(tp_list_fets)) + " features in layer: " + layer.name())
 
         if append_in_dic:
-
             # update timer
             # self.tp_timers.update("tp_time_last_construct_geom")
 
@@ -1521,7 +1543,9 @@ class interactive_map_tracking:
             self.qtimer_tracking_position_memory_to_geom.stop()
             #
             interval = self.tp_timers.get_delay("tp_threshold_time_for_sending_geom_to_layer")
-            interval += CONVERT_S_TO_MS(max(0.0, (self.tp_timers.get_delay("delay_time_still_moving")-self.tp_timers.delta_with_current_time("still moving"))))
+            interval += CONVERT_S_TO_MS(max(0.0, (
+                self.tp_timers.get_delay("delay_time_still_moving") - self.tp_timers.delta_with_current_time(
+                    "still moving"))))
             self.qtimer_tracking_position_geom_to_layer.start(interval)
             #####################
 
@@ -1529,7 +1553,7 @@ class interactive_map_tracking:
             # qgis_log_tools.logMessage("=> still moving = " + str(max(0.0, self.tp_timers.get_delay("delay_time_still_moving")-self.tp_timers.delta_with_current_time("still moving"))))
             # qgis_log_tools.logMessage("delay= " + str(delay))
 
-    def tracking_position_qtimer_geom_to_layer(self):
+    def slot_geom_to_layer_tp(self):
         """ Action perform when the QTimer for Tracking Position is time out
         Enqueue requests from Tracking Position to amortize the cost&effect on QGIS GUI
 
@@ -1565,7 +1589,8 @@ class interactive_map_tracking:
                             layer.addFeatures(tp_list_fets, False)  # bool_makeSelected=False
 
                         qgis_log_tools.logMessageINFO(
-                            "++ Pack requests => " + str(len(tp_list_of_list_fets)) + " extents for layer: " + layer.name())
+                            "++ Pack requests => " + str(
+                                len(tp_list_of_list_fets)) + " extents for layer: " + layer.name())
                     except:
                         qgis_log_tools.logMessageWARNING("tracking_position_qtimer_geom_to_layer : exception here !")
                         pass
@@ -1586,7 +1611,8 @@ class interactive_map_tracking:
                 interval += CONVERT_S_TO_MS(
                     max(
                         0.0,
-                        self.tp_timers.get_delay("delay_time_still_moving") - self.tp_timers.delta_with_current_time("still moving")
+                        self.tp_timers.get_delay("delay_time_still_moving") - self.tp_timers.delta_with_current_time(
+                            "still moving")
                     )
                 )
                 self.qtimer_tracking_position_layers_to_commit.start(interval)
@@ -1594,9 +1620,10 @@ class interactive_map_tracking:
 
                 # qgis_log_tools.logMessageINFO("tp_threshold_time_for_sending_layer_to_dp= " + str(self.tp_timers.get_delay("tp_threshold_time_for_sending_layer_to_dp")))
         else:
-            self.qtimer_tracking_position_geom_to_layer.setInterval(self.tp_timers.get_delay("delay_time_still_moving")*1000)
+            self.qtimer_tracking_position_geom_to_layer.setInterval(
+                self.tp_timers.get_delay("delay_time_still_moving") * 1000)
 
-    def tracking_position_qtimer_layers_to_commit(self):
+    def slot_layers_to_commit_tp(self):
         """Action perform when the QTimer for Tracking Position is time out
          Enqueue requests from Tracking Position to amortize the cost&effect on QGIS GUI
 
