@@ -20,27 +20,23 @@
  *                                                                         *
  ***************************************************************************/
 """
-from PyQt4.QtCore import QSettings, QTranslator, qVersion, QCoreApplication
-from PyQt4.QtGui import QAction, QIcon
 # Initialize Qt resources from file resources.py
-import resources_rc
 # Import the code for the dialog
-from interactive_map_tracking_dialog import interactive_map_trackingDialog
 import os.path
+from qgis.gui import QgsMessageBar
+from qgis.core import *
 
 from PyQt4.QtCore import QSettings, QTranslator, qVersion, QCoreApplication
-from PyQt4.QtCore import QObject, SIGNAL, QUrl, QReadWriteLock, QReadLocker, QWriteLocker, pyqtSlot
+from PyQt4.QtCore import QUrl, QReadWriteLock, QReadLocker, pyqtSlot
 from PyQt4.QtGui import QAction, QIcon, QTabWidget
 from PyQt4.QtWebKit import QWebSettings
 
-from qgis.gui import QgsMessageBar
-
-from qgis.core import *
-
+from interactive_map_tracking_dialog import interactive_map_trackingDialog
 import qgis_layer_tools
 import qgis_log_tools
 import imt_tools
 from signalsmanager import SignalsManager
+
 
 #
 # for beta test purposes
@@ -110,7 +106,6 @@ class interactive_map_tracking:
         self.toolbar = self.iface.addToolBar(u'interactive_map_tracking')
         self.toolbar.setObjectName(u'interactive_map_tracking')
 
-        # self.selections = []
         self.qsettings_prefix_name = "imt/"
 
         self.signals_manager = SignalsManager.getInstance()
@@ -216,7 +211,6 @@ class interactive_map_tracking:
         self.webview_online_user_doc = "https://github.com/Remi-C/interactive_map_tracking/wiki/[User]-User-Guide"
         #
         self.webview_online_itown = "http://www.itowns.fr/api/testAPI.html"
-        # self.webview_online_about = self.webview_online_itown
 
         self.webview_dict = {}
         # url : http://qt-project.org/doc/qt-4.8/qurl.html
@@ -822,14 +816,7 @@ class interactive_map_tracking:
         """
 
         """
-        if self.qtimer_tracking_position_rtt_to_memory.isActive():
-            self.qtimer_tracking_position_rtt_to_memory.stop()
-        if self.qtimer_tracking_position_memory_to_geom.isActive():
-            self.qtimer_tracking_position_memory_to_geom.stop()
-        if self.qtimer_tracking_position_geom_to_layer.isActive():
-            self.qtimer_tracking_position_geom_to_layer.stop()
-        if self.qtimer_tracking_position_layers_to_commit.isActive():
-            self.qtimer_tracking_position_layers_to_commit.stop()
+        self.signals_manager.stop_group("QTIMER")
 
     def enabled_trackposition(self):
         """ Action when the checkbox 'Enable Tracking Position' is clicked """
@@ -1124,8 +1111,6 @@ class interactive_map_tracking:
         :return:
         """
         #
-        # self.signals_manager.disconnect(self.dlg.webView_about, "loadFinished (bool)")
-        # self.signals_manager.disconnect(self.dlg.webView_userdoc, "loadFinished (bool)")
         self.signals_manager.disconnect_group("WEB")
         #
         if index == 3:
@@ -1211,10 +1196,10 @@ class interactive_map_tracking:
             pass
         if not tp_dict_key_l_values_et_is_empty and len(self.tp_dict_key_l_values_et.keys()) == 0:
             qgis_log_tools.logMessageINFO("Need to stop QTimer : qtimer_tracking_position_memory_to_geom ! ")
-            self.qtimer_tracking_position_memory_to_geom.stop()
+            self.signals_manager.stop(self.qtimer_tracking_position_memory_to_geom)
         if not tp_dict_key_l_values_listfeatures_is_empty and len(self.tp_dict_key_l_values_listfeatures.keys()) == 0:
             qgis_log_tools.logMessageINFO("Need to stop QTimer : qtimer_tracking_position_geom_to_layer ! ")
-            self.qtimer_tracking_position_geom_to_layer.stop()
+            self.signals_manager.stop(self.qtimer_tracking_position_geom_to_layer)
         #
         self.signals_manager.add(self.qgsmaplayerregistry,
                                  "layersRemoved( QStringList )",
@@ -1406,7 +1391,7 @@ class interactive_map_tracking:
             self.tp_timers.update("update_track_position_with_qtimers")
 
             interval = self.tp_timers.get_delay("tp_threshold_time_for_tp_to_mem")
-            self.qtimer_tracking_position_rtt_to_memory.start(interval)
+            self.signals_manager.start(self.qtimer_tracking_position_rtt_to_memory, interval)
 
         # update timer for still moving here !
         self.tp_timers.update("still moving")
@@ -1452,10 +1437,10 @@ class interactive_map_tracking:
         #####################
         # Process Management
         #####################
-        self.qtimer_tracking_position_rtt_to_memory.stop()
+        self.signals_manager.stop(self.qtimer_tracking_position_rtt_to_memory)
         #
         interval = self.tp_timers.get_delay("tp_threshold_time_for_construct_geom")
-        self.qtimer_tracking_position_memory_to_geom.start(interval)
+        self.signals_manager.start(self.qtimer_tracking_position_memory_to_geom, interval)
         #####################
 
     def slot_memory_to_geom_tp(self):
@@ -1540,13 +1525,13 @@ class interactive_map_tracking:
             # Process Management
             #####################
             #
-            self.qtimer_tracking_position_memory_to_geom.stop()
+            self.signals_manager.stop(self.qtimer_tracking_position_memory_to_geom)
             #
             interval = self.tp_timers.get_delay("tp_threshold_time_for_sending_geom_to_layer")
             interval += CONVERT_S_TO_MS(max(0.0, (
                 self.tp_timers.get_delay("delay_time_still_moving") - self.tp_timers.delta_with_current_time(
                     "still moving"))))
-            self.qtimer_tracking_position_geom_to_layer.start(interval)
+            self.signals_manager.start(self.qtimer_tracking_position_geom_to_layer, interval)
             #####################
 
             # qgis_log_tools.logMessage("=> still moving = " + str(self.tp_timers.get_delay("delay_time_still_moving")-self.tp_timers.delta_with_current_time("still moving")))
@@ -1605,7 +1590,7 @@ class interactive_map_tracking:
                 #####################
                 # Process Management
                 #####################
-                self.qtimer_tracking_position_geom_to_layer.stop()
+                self.signals_manager.stop(self.qtimer_tracking_position_geom_to_layer)
                 #
                 interval = self.tp_timers.get_delay("tp_threshold_time_for_sending_layer_to_dp")
                 interval += CONVERT_S_TO_MS(
@@ -1615,7 +1600,7 @@ class interactive_map_tracking:
                             "still moving")
                     )
                 )
-                self.qtimer_tracking_position_layers_to_commit.start(interval)
+                self.signals_manager.start(self.qtimer_tracking_position_layers_to_commit, interval)
                 #####################
 
                 # qgis_log_tools.logMessageINFO("tp_threshold_time_for_sending_layer_to_dp= " + str(self.tp_timers.get_delay("tp_threshold_time_for_sending_layer_to_dp")))
@@ -1666,7 +1651,7 @@ class interactive_map_tracking:
             # Process Management
             #####################
             # last link of processes chain
-            self.qtimer_tracking_position_layers_to_commit.stop()
+            self.signals_manager.stop(self.qtimer_tracking_position_layers_to_commit)
             #####################
         else:
             #####################

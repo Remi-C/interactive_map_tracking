@@ -62,7 +62,7 @@ class Singleton(object):
 
     """
     __single = None     # the one, true Singleton
-    #
+
     def __new__(classtype, *args, **kwargs):
         # Check to see if a __single exists already for this class
         # Compare class types instead of just looking for None so
@@ -70,10 +70,10 @@ class Singleton(object):
         if classtype != type(classtype.__single):
             classtype.__single = object.__new__(classtype, *args, **kwargs)
         return classtype.__single
-    #
+
     def __init__(self, name=None):
         self.name = name
-    #
+
     def display(self):
         print self.name, id(self), type(self)
 
@@ -81,27 +81,34 @@ class Singleton(object):
 import thread
 
 
-class MySingletonClass_with_Inheritance_support(object):
-    '''Implement Pattern: SINGLETON'''
+class SingletonClassWithInheritanceSupport(object):
+    """
+    Implement Pattern: SINGLETON
+
+    """
     __lockObj = thread.allocate_lock()  # lock object
     __instance = None  # the unique instance
-    #
-    # def __new__(cls, *args, **kargs):
+
     def __new__(cls):
         # return cls.getInstance(cls, *args, **kargs)
-        return cls.getInstance(cls)
-    #
+        return cls.instance(cls)
+
     def __init__(self):
         pass
-    #
+
     @staticmethod
     def _initialize_():
-        print "_initialize_ from 'MySingletonClass_with_Inheritance_support'"
-    #
+        # print "_initialize_ from 'SingletonClassWithInheritanceSupport'"
+        pass
+
     @classmethod
-    # def getInstance(cls, *args, **kargs):
-    def getInstance(cls):
-        '''Static method to have a reference to **THE UNIQUE** instance'''
+    def instance(cls):
+        """
+        Static method to have a reference to **THE UNIQUE** instance
+
+        :return:
+
+        """
         # Critical section start
         cls.__lockObj.acquire()
         try:
@@ -125,10 +132,6 @@ class MySingletonClass_with_Inheritance_support(object):
 
 
 class Singleton: pass
-Singleton = MySingletonClass_with_Inheritance_support
 
 
-class SubSingleton(Singleton):
-    @staticmethod
-    def _initialize_():
-        print "_initialize_ from 'SubSingleton'"
+Singleton = SingletonClassWithInheritanceSupport
