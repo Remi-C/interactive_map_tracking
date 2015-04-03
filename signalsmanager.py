@@ -1,77 +1,15 @@
 __author__ = 'latty'
 
+from collections import namedtuple
+import itertools
+
 from PyQt4.QtCore import QObject, SIGNAL
 
-###################################################################################################
-from singletons import SingletonDecorator
-
-
-class SignalsManager_with_Decorator_Pattern(object):
-    """
-
-    """
-    def __init__(self):
-        pass
-
-SignalsManager_with_Decorator_Pattern = SingletonDecorator(SignalsManager_with_Decorator_Pattern)
-
-###################################################################################################
-from singletons import Borg
-
-
-class SignalsManager_with_Borg_Pattern(object, Borg):
-    """
-
-    """
-    # def __init__(self):
-    #     #
-    #     self.dict_signals = {}
-    #
-    def add_signal(self, qobject, signal_signature, slot, b_connect_signal=True):
-        """
-
-        :param qobject:
-        :param signal_signature:
-        :param slot:
-
-        """
-        #
-        if qobject in self.dict_signals:
-            return -1
-        #
-        if b_connect_signal:
-            QObject.connect(qobject, SIGNAL(signal_signature), slot)
-        #
-        # self.dict_signals[qobject] = [signal_signature, slot, b_connect_signal]
-
-###################################################################################################
-from singletons import Unique
-
-
-class SignalsManager_with_Unique_Pattern(Unique):
-    def __init__(self):
-        self.dict_signals = {}
-    def add_signal(self, qobject, signal_signature, slot, b_connect_signal=True):
-        """
-
-        :param qobject:
-        :param signal_signature:
-        :param slot:
-
-        """
-        #
-        if qobject in self.dict_signals:
-            return -1
-        #
-        if b_connect_signal:
-            QObject.connect(qobject, SIGNAL(signal_signature), slot)
-        #
-        self.dict_signals[qobject] = [signal_signature, slot, b_connect_signal]
-#
-
-###################################################################################################
 from singletons import Singleton
-from collections import namedtuple
+
+
+def union_dicts(*dicts):
+    return dict(itertools.chain(*map(lambda dct: list(dct.items()), dicts)))
 
 
 class AbstractSignalsManagerWithSingletonPattern(Singleton):
@@ -104,7 +42,7 @@ class AbstractSignalsManagerWithSingletonPattern(Singleton):
         return super(AbstractSignalsManagerWithSingletonPattern, cls).instance()
 
     @staticmethod
-    def build_key(qobject, signal_signature):
+    def _build_key_(qobject, signal_signature):
         """
 
         :param qobject:
@@ -115,15 +53,15 @@ class AbstractSignalsManagerWithSingletonPattern(Singleton):
         return AbstractSignalsManagerWithSingletonPattern.NAMEDTUPLE_QOBJECT_SIGNAL(qobject, signal_signature)
 
     @staticmethod
-    def _helper_qobject_params_(func, key, dict_params):
+    def _apply_func_on_qobject_(func, tuple_qobject_signature, dict_params):
         """
 
         :param func:
         :param dict_params:
         """
-        return func(key.qobject, dict_params['Signal'], dict_params['Slot'])
+        return func(tuple_qobject_signature.qobject, dict_params['Signal'], dict_params['Slot'])
 
-    def action_with_key_test(self, dict_params):
+    def _action_with_test_(self, dict_params):
         """
 
         :param dict_params:
@@ -133,7 +71,8 @@ class AbstractSignalsManagerWithSingletonPattern(Singleton):
         return_state = 1
         #
         if dict_params['key'] in self.dict_signals.keys():
-            dict_params['dict_values'] = self.dict_signals[dict_params['key']]
+            key = dict_params['key']  # key build with qobject + signature
+            dict_params['dict_values'] = self.dict_signals[key]
             #
             if dict_params['func_test_action'](self, dict_params):
                 # already connected
@@ -147,7 +86,7 @@ class AbstractSignalsManagerWithSingletonPattern(Singleton):
         #
         return return_state
 
-    def action_with_key(self, dict_params):
+    def _action_with_key_(self, dict_params):
         """
 
         :param dict_params:
@@ -156,8 +95,9 @@ class AbstractSignalsManagerWithSingletonPattern(Singleton):
         #
         return_state = 1
         #
-        if dict_params['key'] in self.dict_signals.keys():
-            dict_params['dict_values'] = self.dict_signals[dict_params['key']]
+        key = dict_params['key']
+        if key in self.dict_signals.keys():
+            dict_params['dict_values'] = self.dict_signals[key]
             #
             dict_params['func_perform_action'](self, dict_params)
         else:
@@ -166,20 +106,23 @@ class AbstractSignalsManagerWithSingletonPattern(Singleton):
         #
         return return_state
 
-    def action_for_all(self, dict_params):
+    def _action_for_all_(self, dict_params):
         """
 
         :param action:
         :return:
         """
+        # print 'action for all'
         action = dict_params['action_for_all']
+        # print 'action: ', action
         for key in self.dict_signals.keys():
+            # print 'key:', key
             action(key)
 
-    def action_for_group_with_test(self, dict_params):
+    def _action_for_group_with_test_(self, dict_params):
         """
 
-        :param s_group:
+        :param dict_params:
         :return:
         """
         #
@@ -197,20 +140,22 @@ class AbstractSignalsManagerWithSingletonPattern(Singleton):
                     if key in self.dict_groups[s_group]:
                         action_with_key_test(dict_params)
             except:
-                print s_group
+                # print s_group
                 return_state = -1
         #
         return return_state
 
-    def action_for_group(self, dict_params):
+    def _action_for_group_(self, dict_params):
         """
+
+        :param dict_params:
+        :return:
         """
-        #
         return_state = 1
         #
         s_group = dict_params.setdefault('s_group', "all")
         if s_group == "all":
-            self.action_for_all()
+            self._action_for_all_()
         else:
             # noinspection PyBroadException
             try:
@@ -232,35 +177,39 @@ class SignalsManagerActionConnectImp(AbstractSignalsManagerWithSingletonPattern)
 
     """
 
-    def action_connect_test_reject(self, dict_params):
+    def _action_connect_test_reject_(self, dict_params):
         """
 
         :param dict_params:
         :return:
+
         """
         dict_values = dict_params['dict_values']
         return dict_values['Signal_is_connected']
 
-    def action_connect_perform(self, dict_params):
+    def _action_connect_perform_(self, dict_params):
         """
 
         :param key:
         :param dict_params:
         :return:
+
         """
-        key = dict_params['key']
         dict_values = dict_params['dict_values']
-        #
-        self._helper_qobject_params_(QObject.connect, key, dict_values)
+        self._apply_func_on_qobject_(QObject.connect, dict_params['key'], dict_values)
         #
         dict_values['Signal_is_connected'] = True
 
     AbstractSignalsManagerWithSingletonPattern.dict_actions['connect'] = {
-        'func_test_action': action_connect_test_reject,
-        'func_perform_action': action_connect_perform}
+        'func_test_action': _action_connect_test_reject_,
+        'func_perform_action': _action_connect_perform_
+    }
 
 
 class ISignalsManagerActionConnect(SignalsManagerActionConnectImp):
+    """
+
+    """
     # ###############################################
     def connect_with_key_test(self, key):
         """
@@ -269,9 +218,9 @@ class ISignalsManagerActionConnect(SignalsManagerActionConnectImp):
         :return:
         """
         action_connect = self.dict_actions['connect']
-        return self.action_with_key_test({'key': key,
-                                          'func_test_action': action_connect['func_test_action'],
-                                          'func_perform_action': action_connect['func_perform_action']})
+        return self._action_with_test_({'key': key,
+                                        'func_test_action': action_connect['func_test_action'],
+                                        'func_perform_action': action_connect['func_perform_action']})
 
     def connect(self, qobject, signal_signature):
         """
@@ -280,14 +229,14 @@ class ISignalsManagerActionConnect(SignalsManagerActionConnectImp):
         :param signal_signature:
         :return:
         """
-        return self.connect_with_key_test(self.build_key(qobject, signal_signature))
+        return self.connect_with_key_test(self._build_key_(qobject, signal_signature))
 
     def connect_all(self):
         """
 
         :return:
         """
-        self.action_for_all({'action_for_all': self.connect_with_key_test})
+        self._action_for_all_({'action_for_all': self.connect_with_key_test})
 
     def connect_group(self, s_group="all"):
         """
@@ -295,9 +244,9 @@ class ISignalsManagerActionConnect(SignalsManagerActionConnectImp):
         :param s_group:
         :return:
         """
-        return self.action_for_group_with_test({'action_for_all': self.connect_all,
-                                                'action_with_key_test': self.connect_with_key_test,
-                                                's_group': s_group})
+        return self._action_for_group_with_test_({'action_for_all': self.connect_all,
+                                                  'action_with_key_test': self.connect_with_key_test,
+                                                  's_group': s_group})
 
 
 class SignalsManagerActionDisconnectImp(AbstractSignalsManagerWithSingletonPattern):
@@ -321,10 +270,8 @@ class SignalsManagerActionDisconnectImp(AbstractSignalsManagerWithSingletonPatte
         :param dict_params:
         :return:
         """
-        key = dict_params['key']
         dict_values = dict_params['dict_values']
-        #
-        self._helper_qobject_params_(QObject.disconnect, key, dict_values)
+        self._apply_func_on_qobject_(QObject.disconnect, dict_params['key'], dict_values)
         #
         dict_values['Signal_is_connected'] = False
 
@@ -342,10 +289,10 @@ class ISignalsManagerActionDisconnect(SignalsManagerActionDisconnectImp):
         :param key:
         :return:
         """
-        action_connect = self.dict_actions['disconnect']
-        return self.action_with_key_test({'key': key,
-                                          'func_test_action': action_connect['func_test_action'],
-                                          'func_perform_action': action_connect['func_perform_action']})
+        action_disconnect = self.dict_actions['disconnect']
+        return self._action_with_test_({'key': key,
+                                        'func_test_action': action_disconnect['func_test_action'],
+                                        'func_perform_action': action_disconnect['func_perform_action']})
 
     def disconnect(self, qobject, signal_signature):
         """
@@ -354,7 +301,7 @@ class ISignalsManagerActionDisconnect(SignalsManagerActionDisconnectImp):
         :param signal_signature:
         :return:
         """
-        return self.disconnect_with_key_test(self.build_key(qobject, signal_signature))
+        return self.disconnect_with_key_test(self._build_key_(qobject, signal_signature))
 
     def disconnect_all(self):
         """
@@ -362,7 +309,7 @@ class ISignalsManagerActionDisconnect(SignalsManagerActionDisconnectImp):
         :return:
         """
         #
-        self.action_for_all({'action_for_all': self.disconnect_with_key_test})
+        self._action_for_all_({'action_for_all': self.disconnect_with_key_test})
 
     def disconnect_group(self, s_group="all"):
         """
@@ -370,7 +317,7 @@ class ISignalsManagerActionDisconnect(SignalsManagerActionDisconnectImp):
         :param s_group:
         :return:
         """
-        return self.action_for_group_with_test({'action_for_all': self.disconnect_all,
+        return self._action_for_group_with_test_({'action_for_all': self.disconnect_all,
                                                 'action_with_key_test': self.disconnect_with_key_test,
                                                 's_group': s_group})
 
@@ -417,7 +364,7 @@ class ISignalsManagerActionStart(SignalsManagerActionStartImp):
         """
         action = self.dict_actions['start']
         # return self.action_with_key_test(key, action['func_test_action'], action['func_perform_action'])
-        return self.action_with_key_test({'key': key,
+        return self._action_with_test_({'key': key,
                                           'func_test_action': action['func_test_action'],
                                           'func_perform_action': action['func_perform_action'],
                                           'interval': interval})
@@ -429,7 +376,7 @@ class ISignalsManagerActionStart(SignalsManagerActionStartImp):
         :param signal_signature:
         :return:
         """
-        return self.start_with_key(self.build_key(qobject, 'timeout ()'), interval)
+        return self.start_with_key(self._build_key_(qobject, 'timeout ()'), interval)
 
     def start_all(self, interval=0.0):
         """
@@ -437,7 +384,7 @@ class ISignalsManagerActionStart(SignalsManagerActionStartImp):
         :return:
         """
         #
-        self.action_for_all({'action_for_all': self.start_with_key,
+        self._action_for_all_({'action_for_all': self.start_with_key,
                              'interval': interval})
 
     def start_group(self, interval=0.0, s_group="all"):
@@ -446,7 +393,7 @@ class ISignalsManagerActionStart(SignalsManagerActionStartImp):
         :param s_group:
         :return:
         """
-        return self.action_for_group_with_test({'action_for_all': self.start_all,
+        return self._action_for_group_with_test_({'action_for_all': self.start_all,
                                                 'action_with_key_test': self.start_with_key_test,
                                                 's_group': s_group,
                                                 'interval': interval})
@@ -492,7 +439,7 @@ class ISignalsManagerActionStop(SignalsManagerActionStopImp):
         :return:
         """
         action = self.dict_actions['stop']
-        return self.action_with_key_test({'key': key,
+        return self._action_with_test_({'key': key,
                                           'func_test_action': action['func_test_action'],
                                           'func_perform_action': action['func_perform_action']})
 
@@ -503,7 +450,7 @@ class ISignalsManagerActionStop(SignalsManagerActionStopImp):
         :param signal_signature:
         :return:
         """
-        return self.stop_with_key_test(self.build_key(qobject, 'timeout ()'))
+        return self.stop_with_key_test(self._build_key_(qobject, 'timeout ()'))
 
     def stop_all(self):
         """
@@ -511,7 +458,7 @@ class ISignalsManagerActionStop(SignalsManagerActionStopImp):
         :return:
         """
         #
-        self.action_for_all({'action_for_all': self.stop_with_key_test})
+        self._action_for_all_({'action_for_all': self.stop_with_key_test})
 
     def stop_group(self, s_group="all"):
         """
@@ -519,7 +466,7 @@ class ISignalsManagerActionStop(SignalsManagerActionStopImp):
         :param s_group:
         :return:
         """
-        return self.action_for_group_with_test({'action_for_all': self.stop_all,
+        return self._action_for_group_with_test_({'action_for_all': self.stop_all,
                                                 'action_with_key_test': self.stop_with_key_test,
                                                 's_group': s_group})
 
@@ -544,7 +491,7 @@ class ISignalsManager(ISignalsManagerActionConnect,
         """
         return_state = 1
         #
-        key = self.build_key(qobject, signal_signature)
+        key = self._build_key_(qobject, signal_signature)
         #
         if key in self.dict_signals.keys():
             if b_connect_signal:

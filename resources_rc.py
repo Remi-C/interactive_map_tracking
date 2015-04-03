@@ -2,8 +2,8 @@
 
 # Resource object code
 #
-# Created: mer. mars 4 11:58:54 2015
-#      by: The Resource Compiler for PyQt (Qt v4.8.6)
+# Created: Fri Apr 3 17:00:30 2015
+# by: The Resource Compiler for PyQt (Qt v4.8.6)
 #
 # WARNING! All changes made in this file will be lost!
 
@@ -106,10 +106,13 @@ qt_resource_struct = "\
 \x00\x00\x00\x4a\x00\x00\x00\x00\x00\x01\x00\x00\x00\x00\
 "
 
+
 def qInitResources():
     QtCore.qRegisterResourceData(0x01, qt_resource_struct, qt_resource_name, qt_resource_data)
 
+
 def qCleanupResources():
     QtCore.qUnregisterResourceData(0x01, qt_resource_struct, qt_resource_name, qt_resource_data)
+
 
 qInitResources()
