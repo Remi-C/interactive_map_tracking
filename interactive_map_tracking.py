@@ -38,6 +38,7 @@ import imt_tools
 from signalsmanager import SignalsManager
 
 
+
 #
 # for beta test purposes
 #
@@ -383,6 +384,9 @@ class interactive_map_tracking:
             self.iface.removeToolBarIcon(action)
         #
         self.signals_manager.disconnect_all()
+        # TODO: use a manager for mutex too !
+        # can be useful at the end (QGIS closes), to avoid dead-lock
+        self.tp_mutex_on_layers.unlock()
 
     def onResizeEvent(self, event):
         # url: http://openclassrooms.com/forum/sujet/dimensionnement-automatique-d-une-qtabwidget
