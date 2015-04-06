@@ -17,25 +17,25 @@ class IAutoSave(AutoSaveImp):
         """
 
         """
-        self.init_signals()
+        self._init_signals_()
 
     def update(self):
         """
 
         """
-        self.update_current_layer()
+        self._update_current_layer_()
 
     def enable(self):
         """
 
         """
-        self.enable_autosave()
+        self._enable_autosave_()
 
     def disable(self):
         """
 
         """
-        self.disable_autosave()
+        self._disable_autosave_()
 
 
 class AutoSave:

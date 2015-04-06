@@ -387,6 +387,8 @@ class interactive_map_tracking:
         # TODO: use a manager for mutex too !
         # can be useful at the end (QGIS closes), to avoid dead-lock
         self.tp_mutex_on_layers.unlock()
+        #
+        self.autosave.disable()
 
     def onResizeEvent(self, event):
         # url: http://openclassrooms.com/forum/sujet/dimensionnement-automatique-d-une-qtabwidget
@@ -465,7 +467,6 @@ class interactive_map_tracking:
         self.slot_enable_logging()
         self.slot_enable_asynch()
         #
-        # self.update_current_layer()
         self.autosave.update()
 
     def init_signals(self):
