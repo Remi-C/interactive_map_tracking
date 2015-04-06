@@ -30,7 +30,7 @@ import qgis_log_tools
 from qgis.gui import QgsMessageBar
 
 
-def commitChanges(layer, iface, s, bShowCommitError=True):
+def commit_changes(layer, iface, s, bShowCommitError=True):
     """Try to commitChange (saving) a QGIS Layer.
 
     :param layer: QGIS layer to commit
@@ -50,7 +50,7 @@ def commitChanges(layer, iface, s, bShowCommitError=True):
     :rtype: bool
     """
 
-    resultCommit = False
+    result_commit = False
 
     # no layer selected (i.e. empty project)
     if layer is None:
@@ -68,14 +68,14 @@ def commitChanges(layer, iface, s, bShowCommitError=True):
         try:
             qgis_log_tools.logMessageINFO("Try to commitChanges the layer: " + layer.name())
             # send request to DB
-            resultCommit = layer.commitChanges()
+            result_commit = layer.commitChanges()
 
         except Exception, e:
             qgis_log_tools.logMessageCRITICAL("Exception captured= ", e)
             #
-            resultCommit = False
+            result_commit = False
 
-        if resultCommit == True:
+        if result_commit == True:
             # restore state
             layer.startEditing()
 
@@ -87,26 +87,22 @@ def commitChanges(layer, iface, s, bShowCommitError=True):
         else:
             qgis_log_tools.logMessageCRITICAL("Can't commitChanges the layer: " + layer.name())
 
-            commitErrorString = layer.commitErrors()[2]
-            qgis_log_tools.logMessageCRITICAL(">>> " + commitErrorString)
+            commit_error_string = layer.commitErrors()[2]
+            qgis_log_tools.logMessageCRITICAL(">>> " + commit_error_string)
 
             if bShowCommitError:
                 # url : http://www.tutorialspoint.com/python/python_strings.htm
-                commitErrorStringShort = commitErrorString[commitErrorString.rfind(":")+2:len(commitErrorString)]   # +2 to skip ': ' prefix of commitError msg
-
-                # TODO : provoque un segfault ... suremnent un probleme de threading car aucun soucy avec les donnees utlisees ou la methode (normalement safe ...)
-                # if not(iface.mainWindow() is None):
-                    # QMessageBox.critical(iface.mainWindow(), "Interactive Map Tracking - CommitChanges Errors", commitErrorStringShort + "\nPleaase check the log for more informations !")
+                commitErrorStringShort = commit_error_string[commit_error_string.rfind(":")+2:]   # +2 to skip ': ' prefix of commitError msg
 
                 # fonctionne sans probleme car integree directement dans QGIS (interne au mecanisme d'info/warning)
                 iface.messageBar().pushMessage("IMT. ERROR : " + "\"" + commitErrorStringShort + "\"",
                                                "",
                                                QgsMessageBar.CRITICAL, 0)
     #
-    return resultCommit
+    return result_commit
 
 
-def commitChangesAndRefresh(layer, iface, s):
+def commit_changes_and_refresh(layer, iface, s):
     """Try to commitChange (saving) a QGIS Layer and refresh the QGIS MapCanvas (screen).
 
     :param layer: QGIS layer to commit
@@ -121,7 +117,7 @@ def commitChangesAndRefresh(layer, iface, s):
     :return: Result of the commit
     :rtype: bool
     """
-    bResultCommit = commitChanges(layer, iface, s)
+    bResultCommit = commit_changes(layer, iface, s)
     if bResultCommit:
         qgis_mapcanvas_tools.refreshMapCanvas(iface)    # use a trick here
         # qgis_mapcanvas_tools.refreshLayer(layer, iface)   # don't work ... but we don't know why :'(
@@ -192,7 +188,8 @@ def filter_layer_vectorlayer(layer, layertype=0):
 
 
 #
-def filter_layer_for_imt(layer):
+def filter_layer_for_imt(layer,
+                         list_filters=[filter_layer_vectorlayer, filter_layer_postgis]):
     """ Helper to decided if 'layer' is acceptable for IMT (AutoSave&Refresh)
     i.e. 'layer' is a QGIS Vector Layer and 'layer' is provide by PostGres with PostGis extension
 
@@ -202,8 +199,12 @@ def filter_layer_for_imt(layer):
     :return: Result of the filter
     :rtype: bool
     """
-    return filter_layer_vectorlayer(layer) and filter_layer_postgis(layer)
-
+    for filter in list_filters:
+        if not filter(layer):
+            return False
+    return True
+    # return filter_layer_vectorlayer(layer) and filter_layer_postgis(layer)
+    # return filter_layer_vectorlayer(layer)
 
 def filter_layer_trackingposition_required_fields(layer, list_fields=["user_id", "w_time"]):
     """ Helper to decided if 'layer' has at least 2 fields :
