@@ -46,7 +46,12 @@ SOURCES = \
 	qgis_log_tools.py \
 	imt_tools.py \
 	singletons.py \
-	signalsmanager.py
+	signalsmanager.py \
+	signalsmanager.py \
+	signalsmanagerAbstract.py \
+	signalsmanagerImp.py \
+	autosave.py \
+	autosaveImp.py
 
 PLUGINNAME = interactive_map_tracking
 
@@ -60,6 +65,10 @@ PY_FILES = \
 	imt_tools.py \
 	singletons.py \
 	signalsmanager.py \
+	signalsmanagerAbstract.py \
+	signalsmanagerImp.py \
+	autosave.py \
+	autosaveImp.py \
 	__init__.py
 
 UI_FILES = interactive_map_tracking_dialog_base.ui
