@@ -37,6 +37,7 @@ class Borg:
     __shared_state = {}
     # init internal state variables here
     __register = {}
+
     def __init__(self):
         """
 
@@ -46,10 +47,11 @@ class Borg:
             self._init_default_register()
 
 
-#Unique Pattern
+# Unique Pattern
 class Unique:
     #Define some static variables here
     x = 1
+
     @classmethod
     def init(cls):
         #Define any computation performed when assigning to a "new" object
@@ -61,7 +63,7 @@ class Singleton(object):
     url: http://code.activestate.com/recipes/52558-the-singleton-pattern-implemented-with-python/
 
     """
-    __single = None     # the one, true Singleton
+    __single = None  # the one, true Singleton
 
     def __new__(classtype, *args, **kwargs):
         # Check to see if a __single exists already for this class
@@ -90,7 +92,6 @@ class SingletonClassWithInheritanceSupport(object):
     __instance = None  # the unique instance
 
     def __new__(cls):
-        # return cls.getInstance(cls, *args, **kargs)
         return cls.instance(cls)
 
     def __init__(self):
@@ -115,11 +116,9 @@ class SingletonClassWithInheritanceSupport(object):
             # Check to see if a __instance exists already for this class
             # Compare class types instead of just looking for None so
             # that subclasses will create their own __instance objects
-            #if cls.__instance is None:
             if cls != type(cls.__instance):
                 # (Some exception may be thrown...)
                 # Initialize **the unique** instance
-                # cls.__instance = object.__new__(cls, *args, **kargs)
                 cls.__instance = object.__new__(cls)
                 '''Initialize object **here**, as you would do in __init__()...'''
                 cls._initialize_()

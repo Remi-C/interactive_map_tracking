@@ -47,7 +47,7 @@ SOURCES = \
 	imt_tools.py \
 	singletons.py \
 	signalsmanager.py \
-	signalsmanager.py \
+	signalsmanager_actions.py \
 	signalsmanagerAbstract.py \
 	signalsmanagerImp.py \
 	autosave.py \
@@ -65,6 +65,7 @@ PY_FILES = \
 	imt_tools.py \
 	singletons.py \
 	signalsmanager.py \
+	signalsmanager_actions.py \
 	signalsmanagerAbstract.py \
 	signalsmanagerImp.py \
 	autosave.py \

@@ -39,11 +39,14 @@ from signalsmanager import SignalsManager
 from autosave import AutoSave
 
 
+
 #
 # for beta test purposes
 #
 from PyQt4.QtCore import QTimer
 import Queue
+import time
+from PyQt4.QtNetwork import QNetworkProxy
 
 from collections import namedtuple
 
@@ -70,10 +73,6 @@ class interactive_map_tracking:
             application at run time.
         :type iface: QgsInterface
         """
-
-        import time
-        from PyQt4.QtNetwork import QNetworkProxy
-
         current_time = time.time()
 
         self.currentLayer = None
@@ -231,7 +230,27 @@ class interactive_map_tracking:
         self.webview_margin = 60
         self.webview_tab_index = -1
 
-        #getting proxy 
+        # getting proxy
+        self._set_proxy_()
+
+        self.dict_tabs_size = {}
+
+        self.tp_last_extent_saved = QgsRectangle()
+
+        # LOCKER for protecting layers (ptr) from QGIS
+        # used by our asynchronous tracking method
+        # -> to ensure protection when/if user want to delete the tracking layer
+        self.tp_mutex_on_layers = QReadWriteLock()
+
+        self.qgsmap_layer_registry = QgsMapLayerRegistry.instance()
+        #
+        self.mapCanvas = self.iface.mapCanvas()
+
+    def _set_proxy_(self):
+        """
+
+        :return:
+        """
         s = QSettings()  #getting proxy from qgis options settings
         proxyEnabled = s.value("proxy/proxyEnabled", "")
         proxyType = s.value("proxy/proxyType", "")
@@ -256,19 +275,6 @@ class interactive_map_tracking:
             proxy.setUser(proxyUser)
             proxy.setPassword(proxyPassword)
             QNetworkProxy.setApplicationProxy(proxy)
-
-        self.dict_tabs_size = {}
-
-        self.tp_last_extent_saved = QgsRectangle()
-
-        # LOCKER for protecting layers (ptr) from QGIS
-        # used by our asynchronous tracking method
-        # -> to ensure protection when/if user want to delete the tracking layer
-        self.tp_mutex_on_layers = QReadWriteLock()
-
-        self.qgsmap_layer_registry = QgsMapLayerRegistry.instance()
-        #
-        self.mapCanvas = self.iface.mapCanvas()
 
     # noinspection PyMethodMayBeStatic
     def tr(self, message):
@@ -814,8 +820,6 @@ class interactive_map_tracking:
             self.autosave.enable()
 
             if self.dlg.enableTrackPosition.isChecked():
-                # self.slot_refreshComboBoxLayers()
-                # self.connect_signal_extentsChanged()
                 self.slot_enabled_trackposition()
         else:
             self.dlg.enableAutoSave.setDisabled(True)
@@ -868,16 +872,16 @@ class interactive_map_tracking:
         self.update_setting(_s, "enablesTrackPosition", dlg.enableTrackPosition)
 
     def slot_hide_plugin(self):
-        """ Hide the plugin.
+        """ [SLOT] Hide the plugin.
         Don't change the state of the plugin
 
         """
-        # @FIXME there is a mistake here, this function is also called before init. Because QSettings is a singleton, variable are inited before end of init !
+        #
         self.update_settings(QSettings())
         self.dlg.hide()
 
     def slot_returnPressed_threshold(self):
-        """
+        """ [SLOT]
         QT Line edit changed, we get/interpret the new value (if valid)
         Format for threshold scale : 'a'[int]:'b'[int]
         We just used 'b' for scale => threshold_scale = 'b'

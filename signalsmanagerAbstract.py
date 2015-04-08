@@ -1,7 +1,8 @@
 __author__ = 'atty'
 
-from singletons import Singleton
 from collections import namedtuple
+
+from singletons import Singleton
 
 
 class AbstractSignalsManagerWithSingletonPattern(Singleton):
@@ -66,13 +67,11 @@ class AbstractSignalsManagerWithSingletonPattern(Singleton):
             key = dict_params['key']  # key build with qobject + signature
             dict_params['dict_values'] = self.dict_signals[key]
             #
-            # if dict_params['func_test_action'](self, dict_params):
             if dict_params['func_test_action'](dict_params):
                 # already connected
                 return_state = -2
             else:
-                #
-                # dict_params['func_perform_action'](self, dict_params)
+                # perform connection
                 dict_params['func_perform_action'](dict_params)
         else:
             # signal doesn't exist
@@ -92,8 +91,8 @@ class AbstractSignalsManagerWithSingletonPattern(Singleton):
         key = dict_params['key']
         if key in self.dict_signals.keys():
             dict_params['dict_values'] = self.dict_signals[key]
-            #
-            dict_params['func_perform_action'](self, dict_params)
+            # perform action
+            dict_params['func_perform_action'](dict_params)
         else:
             # signal doesn't exist
             return_state = -1
@@ -125,7 +124,6 @@ class AbstractSignalsManagerWithSingletonPattern(Singleton):
         else:
             # noinspection PyBroadException
             try:
-                #
                 action_with_key_test = dict_params['action_with_key_test']
                 for key in self.dict_signals.keys():
                     if key in self.dict_groups[s_group]:
@@ -133,7 +131,6 @@ class AbstractSignalsManagerWithSingletonPattern(Singleton):
             except:
                 # print s_group
                 return_state = -1
-        #
         return return_state
 
     def _action_for_group_(self, dict_params):
