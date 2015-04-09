@@ -41,6 +41,7 @@ from decorators import DecoratorsForQt
 
 
 
+
 #
 # for beta test purposes
 #
@@ -458,27 +459,10 @@ class interactive_map_tracking:
         # read settings
         self.update_checkbox(s, "slot_enabled_plugin", self.dlg.enablePlugin)
 
-        # retrieve default states from Qt Creator GUI design
-        # self.update_setting(s, "enabledPlugin", self.dlg.enablePlugin)
-        # self.update_setting(s, "enabledAutoSave", self.dlg.enableAutoSave)
-        # self.update_setting(s, "enabledTrackPosition", self.dlg.enableTrackPosition)
-        # self.update_setting(s, "enabledLogging", self.dlg.enableLogging)
-        # self.update_setting(s, "enableV2", self.dlg.enableUseMutexForTP)
-        # self.slot_returnPressed_threshold()
-        # s.setValue(self.qsettings_prefix_name + "threshold", str(self.threshold))
-
-        # if s.value(self.qsettings_prefix_name + "enabledPlugin", "") == "true":
-        # if bool(eval(s.value(self.qsettings_prefix_name + "slot_enabled_plugin", ""))):
         if self.dlg.enablePlugin.isChecked():
             self.slot_enabled_plugin()
-            #
         else:
-            self.dlg.enableAutoSave.setDisabled(True)
-            self.dlg.enableTrackPosition.setDisabled(True)
-            self.dlg.enableLogging.setDisabled(True)
-            self.dlg.enableUseMutexForTP.setDisabled(True)
-            self.dlg.thresholdLabel.setDisabled(True)
-            self.dlg.threshold_extent.setDisabled(True)
+            self.disabled_plugin()
         #
         self.update_checkbox(s, "_slot_clicked_checkbox_autosave_", self.dlg.enableAutoSave)
         self.update_checkbox(s, "slot_enabled_trackposition", self.dlg.enableTrackPosition)
@@ -493,10 +477,12 @@ class interactive_map_tracking:
         self.slot_refreshComboBoxLayers()
         self.slot_returnPressed_threshold()
         #
-        # self.slot_enable_logging()
-        # self.slot_enable_asynch()
-        #
         self.autosave.update()
+        #
+        # @TODO: synchronize GUI and application
+        # we load and restore GUI states, but the application has no information about GUI states
+        # we need to synchronize the GUI and the application (modules, components (like: autosave, trackposition, ...)
+        # maybe a good way to do this can be to use signal to activate/desactivate our modules ... need to investigate
 
     def init_signals(self):
         """
@@ -866,6 +852,17 @@ class interactive_map_tracking:
                 self.stop_threads()
 
         return result_commit
+
+    def disabled_plugin(self):
+        """
+
+        """
+        self.dlg.enableAutoSave.setDisabled(True)
+        self.dlg.enableTrackPosition.setDisabled(True)
+        self.dlg.enableLogging.setDisabled(True)
+        self.dlg.enableUseMutexForTP.setDisabled(True)
+        self.dlg.thresholdLabel.setDisabled(True)
+        self.dlg.threshold_extent.setDisabled(True)
 
     # def update_setting(self, _s, _name_in_setting, _checkbox):
     # """ Update the value store in settings (Qt settings) according to checkbox (Qt) status
