@@ -48,9 +48,8 @@ class ISignalsManager(ISignalsManagerActionConnect,
             self.dict_groups.setdefault(s_group, []).append(tupple_signal_slot)
             #
             if b_connect_signal:
-                self._connect_with_key_(tupple_signal_slot)
-                #
-                return_state = 2
+                if self._connect_with_key_(tupple_signal_slot):
+                    return_state = 2
         #
         return return_state, tupple_signal_slot  # return a tuple
 

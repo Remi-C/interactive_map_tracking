@@ -37,6 +37,7 @@ import qgis_log_tools
 import imt_tools
 from signalsmanager import SignalsManager
 from autosave import AutoSave
+from decorators import DecoratorsForQt
 
 
 
@@ -55,13 +56,6 @@ def CONVERT_S_TO_MS(s):
     return s * 1000
 
 
-# with Qt resources files
-# gui_doc_about = ":/plugins/interactive_map_tracking/gui_doc/About.htm"
-# gui_doc_user_doc = ":/plugins/interactive_map_tracking/gui_doc/Simplified_User_Guide.htm"
-
-# with absolute (os) path
-
-
 class interactive_map_tracking:
     """QGIS Plugin Implementation."""
 
@@ -74,6 +68,18 @@ class interactive_map_tracking:
         :type iface: QgsInterface
         """
         current_time = time.time()
+
+        # Clean QSettings
+        settings = QSettings()
+        # settings.beginGroup("interactive_map_tracking_plugin")
+        # settings.remove("")
+        # settings.endGroup()
+        # settings.beginGroup("imt")
+        # settings.remove("")
+        # settings.endGroup()
+        keys = [x for x in settings.allKeys() if 'IMT' in x]
+        for key in keys:
+            print key, str(settings.value(key))
 
         self.currentLayer = None
 
@@ -105,9 +111,9 @@ class interactive_map_tracking:
         self.toolbar = self.iface.addToolBar(u'interactive_map_tracking')
         self.toolbar.setObjectName(u'interactive_map_tracking')
 
-        self.qsettings_prefix_name = "imt/"
+        self.qsettings_prefix_name = "IMT/"
 
-        self.signals_manager = SignalsManager.getInstance()
+        self.signals_manager = SignalsManager.instance()
         self.autosave = AutoSave(self.iface, self.dlg.enableAutoSave)
         self.tp_layer = None
 
@@ -245,6 +251,13 @@ class interactive_map_tracking:
         self.qgsmap_layer_registry = QgsMapLayerRegistry.instance()
         #
         self.mapCanvas = self.iface.mapCanvas()
+
+    def get_dlg(self):
+        """
+        For decorator
+        :return:
+        """
+        return self.dlg
 
     def _set_proxy_(self):
         """
@@ -422,7 +435,7 @@ class interactive_map_tracking:
         self.dlg.show()
 
         #
-        self.slot_enabled_plugin()
+        # self.slot_enabled_plugin()
 
         # Run the dialog event loop
         self.dlg.exec_()
@@ -437,29 +450,29 @@ class interactive_map_tracking:
         """
 
         qgis_log_tools.logMessageINFO("Launch 'init_plugin(...)' ...")
+
+        self.dlg.enablePlugin.setEnabled(True)
+
         s = QSettings()
 
-        # retrieve default states from Qt Creator GUI design
-        self.update_setting(s, "enabledPlugin", self.dlg.enablePlugin)
-        self.update_setting(s, "enabledAutoSave", self.dlg.enableAutoSave)
-        self.update_setting(s, "enabledTrackPosition", self.dlg.enableTrackPosition)
-        self.update_setting(s, "enabledLogging", self.dlg.enableLogging)
-        self.update_setting(s, "enableV2", self.dlg.enableUseMutexForTP)
-        self.slot_returnPressed_threshold()
-        s.setValue(self.qsettings_prefix_name + "threshold", str(self.threshold))
+        # read settings
+        self.update_checkbox(s, "slot_enabled_plugin", self.dlg.enablePlugin)
 
-        if s.value(self.qsettings_prefix_name + "enabledPlugin", "") == "true":
-            self.update_checkbox(s, "enableAutoSave", self.dlg.enableAutoSave)
-            self.update_checkbox(s, "enableTrackPosition", self.dlg.enableTrackPosition)
-            self.update_checkbox(s, "enableLogging", self.dlg.enableLogging)
-            self.update_checkbox(s, "enableV2", self.dlg.enableUseMutexForTP)
+        # retrieve default states from Qt Creator GUI design
+        # self.update_setting(s, "enabledPlugin", self.dlg.enablePlugin)
+        # self.update_setting(s, "enabledAutoSave", self.dlg.enableAutoSave)
+        # self.update_setting(s, "enabledTrackPosition", self.dlg.enableTrackPosition)
+        # self.update_setting(s, "enabledLogging", self.dlg.enableLogging)
+        # self.update_setting(s, "enableV2", self.dlg.enableUseMutexForTP)
+        # self.slot_returnPressed_threshold()
+        # s.setValue(self.qsettings_prefix_name + "threshold", str(self.threshold))
+
+        # if s.value(self.qsettings_prefix_name + "enabledPlugin", "") == "true":
+        # if bool(eval(s.value(self.qsettings_prefix_name + "slot_enabled_plugin", ""))):
+        if self.dlg.enablePlugin.isChecked():
+            self.slot_enabled_plugin()
             #
-            self.dlg.thresholdLabel.setEnabled(True)
-            self.dlg.threshold_extent.setEnabled(True)
-            #
-            self.slot_returnPressed_threshold()
         else:
-            #
             self.dlg.enableAutoSave.setDisabled(True)
             self.dlg.enableTrackPosition.setDisabled(True)
             self.dlg.enableLogging.setDisabled(True)
@@ -467,11 +480,21 @@ class interactive_map_tracking:
             self.dlg.thresholdLabel.setDisabled(True)
             self.dlg.threshold_extent.setDisabled(True)
         #
+        self.update_checkbox(s, "_slot_clicked_checkbox_autosave_", self.dlg.enableAutoSave)
+        self.update_checkbox(s, "slot_enabled_trackposition", self.dlg.enableTrackPosition)
+        self.update_checkbox(s, "slot_enable_logging", self.dlg.enableLogging)
+        self.update_checkbox(s, "slot_enable_asynch", self.dlg.enableUseMutexForTP)
+        #
+        self.dlg.thresholdLabel.setEnabled(True)
+        self.dlg.threshold_extent.setEnabled(True)
+        #
+        self.slot_returnPressed_threshold()
+        #
         self.slot_refreshComboBoxLayers()
         self.slot_returnPressed_threshold()
         #
-        self.slot_enable_logging()
-        self.slot_enable_asynch()
+        # self.slot_enable_logging()
+        # self.slot_enable_asynch()
         #
         self.autosave.update()
 
@@ -535,12 +558,13 @@ class interactive_map_tracking:
         :type _checkbox: QCheckBox
 
         """
-        if _settings.value(self.qsettings_prefix_name + _name_in_setting, "") == "true":
-            _checkbox.setDisabled(False)
+        print "update_checkbox - ", self.qsettings_prefix_name + _name_in_setting, \
+            QSettings().value(self.qsettings_prefix_name + _name_in_setting, _checkbox.isChecked())
+
+        if _settings.value(self.qsettings_prefix_name + _name_in_setting, _checkbox.isChecked()) == "True":
             _checkbox.setChecked(True)
         else:
             _checkbox.setChecked(False)
-            _checkbox.setDisabled(True)
 
     def disconnect_signal_extentsChanged(self):
         """ Disconnect the signal: 'Canvas Extents Changed' of the QGIS MapCanvas """
@@ -692,7 +716,7 @@ class interactive_map_tracking:
         """ Action when the Combo Box attached to refreshing layers for tracking position is clicked """
         #
         qgis_log_tools.logMessageINFO("Launch 'refreshComboBoxLayers(...)' ...")
-
+        #
         defaultSearchLayer = self.dlg.trackingPositionLayerCombo.currentText()
         # qgis_log_tools.logMessageINFO("++++ defaultSearchLayer: " + defaultSearchLayer)
 
@@ -767,9 +791,9 @@ class interactive_map_tracking:
         #
         self.signals_manager.disconnect(self.qgsmap_layer_registry, "layersWillBeRemoved( QStringList )")
 
+    @DecoratorsForQt.save_checked_state("IMT")
     def slot_enabled_trackposition(self):
         """ Action when the checkbox 'Enable Tracking Position' is clicked """
-        #
         qgis_log_tools.logMessageINFO("Launch 'enable_trackposition(...)' ...")
 
         if self.dlg.enableTrackPosition.isChecked():
@@ -777,11 +801,13 @@ class interactive_map_tracking:
         else:
             self.disable_trackposition()
 
+    @DecoratorsForQt.save_checked_state("IMT")
     def slot_enable_logging(self):
         """ Action when the checkbox 'Enable LOGging' is clicked """
         #
         qgis_log_tools.setLogging(self.dlg.enableLogging.isChecked())
 
+    @DecoratorsForQt.save_checked_state("IMT")
     def slot_enable_asynch(self):
         """ Action when the checkbox 'Use Mutex (for TrackingPosition) [BETA]' is clicked
         - using Mutex to protect commitChange operation in multi-threads context (signals strategy)
@@ -794,6 +820,7 @@ class interactive_map_tracking:
         if not (self.dlg.enableUseMutexForTP.isChecked() and self.dlg.enableTrackPosition.isChecked()):
             self.stop_threads()
 
+    @DecoratorsForQt.save_checked_state("IMT")
     def slot_enabled_plugin(self):
         """ Action when the checkbox 'Enable SteetGen3 Plugin' is clicked
         Activate/desactivate all options/capabilities of IMT plugin: AutoSave&Refresh, TrackPosition
@@ -840,36 +867,36 @@ class interactive_map_tracking:
 
         return result_commit
 
-    def update_setting(self, _s, _name_in_setting, _checkbox):
-        """ Update the value store in settings (Qt settings) according to checkbox (Qt) status
+    # def update_setting(self, _s, _name_in_setting, _checkbox):
+    # """ Update the value store in settings (Qt settings) according to checkbox (Qt) status
+    #
+    #     :param _s: Qt Settings
+    #     :type _s: QSettings
+    #
+    #     :param _name_in_setting: Name of the setting in QSetting
+    #     :type _name_in_setting: QString
+    #
+    #     :param _checkbox: CheckBox link to this setting
+    #     :type _checkbox: QCheckBox
+    #
+    #     """
+    #     if _checkbox.isChecked():
+    #         _s.setValue(self.qsettings_prefix_name + _name_in_setting, "true")
+    #     else:
+    #         _s.setValue(self.qsettings_prefix_name + _name_in_setting, "false")
 
-        :param _s: Qt Settings
-        :type _s: QSettings
-
-        :param _name_in_setting: Name of the setting in QSetting
-        :type _name_in_setting: QString
-
-        :param _checkbox: CheckBox link to this setting
-        :type _checkbox: QCheckBox
-
-        """
-        if _checkbox.isChecked():
-            _s.setValue(self.qsettings_prefix_name + _name_in_setting, "true")
-        else:
-            _s.setValue(self.qsettings_prefix_name + _name_in_setting, "false")
-
-    def update_settings(self, _s):
-        """ Update all settings
-
-        :param _s: Qt Settings
-        :type _s: QSettings
-
-        """
-        dlg = self.dlg
-        # Update (Qt) settings according to the GUI IMT plugin
-        self.update_setting(_s, "enabledPlugin", dlg.enablePlugin)
-        self.update_setting(_s, "enablesAutoSave", dlg.enableAutoSave)
-        self.update_setting(_s, "enablesTrackPosition", dlg.enableTrackPosition)
+    # def update_settings(self, _s):
+    # """ Update all settings
+    #
+    #     :param _s: Qt Settings
+    #     :type _s: QSettings
+    #
+    #     """
+    #     dlg = self.dlg
+    #     # Update (Qt) settings according to the GUI IMT plugin
+    #     self.update_setting(_s, "enabledPlugin", dlg.enablePlugin)
+    #     self.update_setting(_s, "enablesAutoSave", dlg.enableAutoSave)
+    #     self.update_setting(_s, "enablesTrackPosition", dlg.enableTrackPosition)
 
     def slot_hide_plugin(self):
         """ [SLOT] Hide the plugin.
@@ -877,7 +904,7 @@ class interactive_map_tracking:
 
         """
         #
-        self.update_settings(QSettings())
+        # self.update_settings(QSettings())
         self.dlg.hide()
 
     def slot_returnPressed_threshold(self):
@@ -887,7 +914,7 @@ class interactive_map_tracking:
         We just used 'b' for scale => threshold_scale = 'b'
         """
         import re
-        
+
         valid_format = True
 
         threshold_string = self.dlg.threshold_extent.text()
@@ -912,6 +939,8 @@ class interactive_map_tracking:
 
         # just for visualisation purpose
         self.dlg.threshold_extent.setText("1:" + str(self.threshold))
+
+        return self.threshold
 
     @staticmethod
     def compute_frame_size(frame, dlg=None, margin_width=60):

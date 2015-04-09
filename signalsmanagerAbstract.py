@@ -13,26 +13,10 @@ class AbstractSignalsManagerWithSingletonPattern(Singleton):
     dict_signals = {}
     dict_groups = {}
     #
-    NAMEDTUPLE_QOBJECT_SIGNAL = namedtuple('TP_NAMEDTUPLE_QOBJECT_SIGNAL', ['qobject', 'signal_signature'])
+    NAMEDTUPLE_QOBJECT_SIGNAL = namedtuple('TP_NAMEDTUPLE_QOBJECT_SIGNAL',
+                                           ['qobject', 'signal_signature'])
     #
     dict_actions = {}
-
-    @staticmethod
-    def _initialize_():
-        """
-
-        """
-        pass
-
-    @classmethod
-    def getInstance(cls):
-        """
-
-        :param args:
-        :param kargs:
-        :return:
-        """
-        return super(AbstractSignalsManagerWithSingletonPattern, cls).instance()
 
     @staticmethod
     def _build_key_(qobject, signal_signature):
@@ -44,15 +28,6 @@ class AbstractSignalsManagerWithSingletonPattern(Singleton):
 
         """
         return AbstractSignalsManagerWithSingletonPattern.NAMEDTUPLE_QOBJECT_SIGNAL(qobject, signal_signature)
-
-    @staticmethod
-    def _apply_func_on_qobject_(func, tuple_qobject_signature, dict_params):
-        """
-
-        :param func:
-        :param dict_params:
-        """
-        return func(tuple_qobject_signature.qobject, dict_params['Signal'], dict_params['Slot'])
 
     def _action_with_test_(self, dict_params):
         """

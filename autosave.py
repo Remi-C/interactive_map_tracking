@@ -37,6 +37,21 @@ class IAutoSave(AutoSaveImp):
         """
         self._disable_autosave_()
 
+    def get_dlg(self):
+        """
+
+        :return:
+
+        """
+        return self._dlg_
+
+    @staticmethod
+    def get_name_slot():
+        """
+
+        :return:
+        """
+        return AutoSaveImp._slot_clicked_checkbox_autosave_.__name__
 
 class AutoSave:
     pass

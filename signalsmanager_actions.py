@@ -36,6 +36,10 @@ class ISignalsManagerActionConnect(SignalsManagerActionConnectImp):
 
 
 class ISignalsManagerActionDisconnect(SignalsManagerActionDisconnectImp):
+    """
+
+    """
+
     def disconnect(self, qobject, signal_signature):
         """
 
@@ -65,6 +69,10 @@ class ISignalsManagerActionDisconnect(SignalsManagerActionDisconnectImp):
 
 
 class ISignalsManagerActionStart(SignalsManagerActionStartImp):
+    """
+
+    """
+
     def start(self, qobject, interval=0.0):
         """
 

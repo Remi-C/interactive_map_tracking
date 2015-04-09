@@ -1,9 +1,12 @@
 __author__ = 'atty'
 
+from PyQt4.QtCore import QSettings
+
 import qgis_layer_tools
 import qgis_log_tools
-from PyQt4.QtCore import QSettings
 from signalsmanager import SignalsManager
+from decorators import DecoratorsForQt
+
 
 
 # super() fails with error: TypeError "argument 1 must be type, not classobj"
@@ -19,7 +22,8 @@ class AutoSaveImp(object):
         self._iface_ = iface
         self._dlg_ = dlg
         self._mapCanvas_ = self._iface_.mapCanvas()
-        self._signals_manager_ = SignalsManager.getInstance()
+        # self._signals_manager_ = SignalsManager.getInstance()
+        self._signals_manager_ = SignalsManager.instance()
         self._active_layer_ = None
 
     def _init_signals_(self):
@@ -47,6 +51,7 @@ class AutoSaveImp(object):
         if self._active_layer_ is not None:
             self._disconnect_signal_layerModified_(self._active_layer_)
 
+    @DecoratorsForQt.save_checked_state("IMT")
     def _slot_clicked_checkbox_autosave_(self):
         """ Action when the checkbox 'Enable Auto-Save and Refresh' is clicked """
         #
