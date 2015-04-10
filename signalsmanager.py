@@ -75,6 +75,19 @@ class ISignalsManager(ISignalsManagerActionConnect,
         """
         return self.add(qobject, "timeout ()", slot, s_group, True)
 
+    def get_slot(self, qobject, signal_signature):
+        """
+
+        :param qobject:
+        :param signal_signature:
+        :return:
+        """
+        return_slot = None
+        tupple_signal_slot = self._build_key_(qobject, signal_signature)
+        if tupple_signal_slot in self.dict_signals.keys():
+            return_slot = self.dict_signals[tupple_signal_slot]['Slot']
+        return return_slot
+
 
 ###################################################################################################
 

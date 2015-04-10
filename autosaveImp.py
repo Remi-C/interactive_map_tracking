@@ -30,7 +30,7 @@ class AutoSaveImp(object):
         """
 
         """
-        self._signals_manager_.add_clicked(self._dlg_, self._slot_clicked_checkbox_autosave_, "GUI")
+        self._signals_manager_.add_clicked(self._dlg_, self.slot_clicked_checkbox_autosave, "GUI")
         #
         self._connect_signal_currentLayerChanged_()
 
@@ -40,7 +40,7 @@ class AutoSaveImp(object):
         """
         self._connect_signal_currentLayerChanged_()
         #
-        self._slot_clicked_checkbox_autosave_()
+        self.slot_clicked_checkbox_autosave()
 
     def _disable_autosave_(self):
         """
@@ -52,7 +52,7 @@ class AutoSaveImp(object):
             self._disconnect_signal_layerModified_(self._active_layer_)
 
     @DecoratorsForQt.save_checked_state("IMT")
-    def _slot_clicked_checkbox_autosave_(self):
+    def slot_clicked_checkbox_autosave(self):
         """ Action when the checkbox 'Enable Auto-Save and Refresh' is clicked """
         #
         qgis_log_tools.logMessageINFO("Launch 'enable_autosave(...)' ...")

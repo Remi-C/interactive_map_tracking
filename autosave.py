@@ -51,7 +51,7 @@ class IAutoSave(AutoSaveImp):
 
         :return:
         """
-        return AutoSaveImp._slot_clicked_checkbox_autosave_.__name__
+        return AutoSaveImp.slot_clicked_checkbox_autosave.__name__
 
 class AutoSave:
     pass
