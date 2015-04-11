@@ -27,7 +27,11 @@ from qgis.core import *
 
 import os
 import socket
-
+from PyQt4.QtCore import QSettings
+try:
+    import cPickle as pickle
+except:
+    import pickle
 
 defaultQtDateFormatString = "yyyy-MM-ddThh:mm:ss.zzz"
 
@@ -274,3 +278,144 @@ def extent_equal(r1, r2, epsilon=DEFAULT_SEGMENT_EPSILON):
            abs(r1.yMaximum() - r2.yMaximum()) <= epsilon and \
            abs(r1.xMinimum() - r2.xMinimum()) <= epsilon and \
            abs(r1.yMinimum() - r2.yMinimum()) <= epsilon
+
+
+def save_gui_states_in_qsettings(dict_qobject_slot):
+    """
+
+    :param dict_qobject_slot:
+    """
+    s = QSettings()
+    #
+    for qobject in dict_qobject_slot.keys():
+        slot = dict_qobject_slot[qobject]
+        id_string = slot.__name__
+        s.setValue(id_string, str(qobject.isChecked()))
+
+
+def serialize_checkbox(qt_dlg):
+    """
+
+    :param qt_dlg:
+    :return:
+    """
+    return {
+        'isEnabled': qt_dlg.isEnabled(),
+        'isChecked': qt_dlg.isChecked()
+    }
+
+
+def serialize_list_checkbox(list_tuples_dlg_id):
+    """
+
+    :return:
+    """
+    return_dict = {}
+    for tuple_id_checkbox in list_tuples_dlg_id:
+        dict_dlg_id = {
+            tuple_id_checkbox[1]: serialize_checkbox(tuple_id_checkbox[0])
+        }
+        return_dict.update(dict_dlg_id)
+    return return_dict
+
+
+def update_checkbox_from_serialization(state, qobject, id_qobject):
+    """
+
+    :param state:
+    :param qobject:
+    :param id_qobject:
+    :return:
+    """
+    qobject.setEnabled(state['dlg']['list_checkbox'][id_qobject].setdefault('isEnabled', True))
+    qobject.setChecked(state['dlg']['list_checkbox'][id_qobject].setdefault('isChecked', False))
+    #
+    print state['dlg']['list_checkbox'][id_qobject], ' * ', \
+        id_qobject, ' * ', \
+        state['dlg']['list_checkbox'][id_qobject].setdefault('isChecked', False)
+
+
+def update_list_checkbox_from_serialization(pickle_state, list_tuples_dlg_id):
+    """
+
+    :param pickle_state:
+    :return:
+    """
+    for tuple_dlg_id in list_tuples_dlg_id:
+        update_checkbox_from_serialization(pickle_state, tuple_dlg_id[0], tuple_dlg_id[1])
+
+
+def saves_states_in_qsettings_pickle(imt, pickle_name_in_qsettings="pickle"):
+    """
+
+    :param imt:
+    """
+    imt.qsettings.beginGroup(imt.qsettings_group_name)
+    imt.qsettings.setValue(pickle_name_in_qsettings, pickle.dumps(imt))
+    imt.qsettings.endGroup()
+
+def restore_states_from_pickle(imt, pickle_name_in_qsettings="pickle"):
+    """
+
+    :return:
+    """
+    s = imt.qsettings
+    s.beginGroup(imt.qsettings_group_name)
+    qsettings_pickle = s.value(pickle_name_in_qsettings)
+    s.endGroup()
+    print "in QSettings - pickle: ", qsettings_pickle
+    if qsettings_pickle:
+        imt_for_states = pickle.loads(str(qsettings_pickle))
+        state = imt_for_states.getState()
+        imt.restoreState(state)
+    else:
+        update_list_checkbox_from_qsettings(imt)
+
+
+def update_list_checkbox_from_qsettings(imt):
+    """
+    CONDITION: init_signals need to be call before init_plugin
+    otherwise signals_manager have no information about signals
+    and we can't rely slot signature with qobject
+    :return:
+    """
+    s = imt.qsettings
+    s.beginGroup(imt.qsettings_group_name)
+    restore_gui_states_from_qsettings(imt)
+    s.endGroup()
+
+
+def restore_gui_states_from_qsettings(imt, b_launch_slot=True):
+    """
+
+    :param list_dlg_id_slot:
+    """
+    s = imt.qsettings
+    for tuple_dlg_id_slot in imt.list_tuples_dlg_id_slot:
+        # print qobject, type(qobject )
+        qobject = tuple_dlg_id_slot[0]
+        id_slot = tuple_dlg_id_slot[2]
+        id_in_qsetting = id_slot
+        qobject_is_checked = eval(s.value(id_in_qsetting, "False"))
+        qobject.setChecked(qobject_is_checked)
+        #
+        if b_launch_slot:
+            slot = imt.signals_manager.get_slot(qobject, id_slot)
+            if slot:
+                slot()
+                #
+                # print "id_in_qsetting: ", id_in_qsetting, " - value: ", s.value(id_in_qsetting, "False")
+
+
+def print_group_name_values_in_qsettings(group_name=""):
+    """
+
+    :param group_name:
+    :return:
+    """
+    qsettings = QSettings()
+    keys = [x for x in qsettings.allKeys() if group_name in x]
+    for key in keys:
+        print key, str(qsettings.value(key))
+        # import qgis_log_tools
+        # qgis_log_tools.logMessageINFO(str(key)+": "+str(qsettings.value(key)))

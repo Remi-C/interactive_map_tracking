@@ -39,10 +39,6 @@ from signalsmanager import SignalsManager
 from autosave import AutoSave
 from decorators import DecoratorsForQt
 
-
-
-
-
 #
 # for beta test purposes
 #
@@ -61,6 +57,8 @@ def CONVERT_S_TO_MS(s):
 class interactive_map_tracking:
     """QGIS Plugin Implementation."""
 
+    qsettings_group_name = "IMT"
+    
     def __init__(self, iface):
         """Constructor.
 
@@ -73,10 +71,9 @@ class interactive_map_tracking:
 
         # Clean QSettings
         self.qsettings = QSettings()
+
         # self.clean_qsettings()
-        keys = [x for x in self.qsettings.allKeys() if 'IMT' in x]
-        for key in keys:
-            print key, str(self.qsettings.value(key))
+        imt_tools.print_group_name_values_in_qsettings(self.qsettings_group_name)
 
         self.currentLayer = None
 
@@ -110,8 +107,6 @@ class interactive_map_tracking:
         # TODO: We are going to let the user set this up in a future iteration
         self.toolbar = self.iface.addToolBar(u'interactive_map_tracking')
         self.toolbar.setObjectName(u'interactive_map_tracking')
-
-        self.qsettings_prefix_name = "IMT/"
 
         self.signals_manager = SignalsManager.instance()
         self.autosave = AutoSave(self.iface, self.dlg.enableAutoSave)
@@ -252,6 +247,27 @@ class interactive_map_tracking:
         #
         self.mapCanvas = self.iface.mapCanvas()
 
+        from qgis.core import QgsProject
+        self.connect_signal_qgis(QgsProject.instance(), "readProject(const QDomDocument & )", self.slot_readProject)
+
+        self.list_tuples_dlg_id_slot = [
+            (self.dlg.enablePlugin, 'enablePlugin', interactive_map_tracking.slot_enabled_plugin.__name__),
+            (self.dlg.enableAutoSave, 'enableAutoSave', AutoSave.slot_clicked_checkbox_autosave.__name__),
+            (self.dlg.enableTrackPosition, 'enableTrackPosition',
+             interactive_map_tracking.slot_enabled_trackposition.__name__),
+            (self.dlg.enableLogging, 'enableLogging', interactive_map_tracking.slot_enable_logging.__name__),
+            (self.dlg.enableUseMutexForTP, 'enableUseMutexForTP', interactive_map_tracking.slot_enable_asynch.__name__)
+        ]
+
+
+    def slot_readProject(self):
+        """
+
+        :return:
+        """
+        qgis_log_tools.logMessageINFO("")
+        self.enabled_pluging()
+
     def clean_qsettings(self):
         """
 
@@ -260,7 +276,7 @@ class interactive_map_tracking:
         self.qsettings.beginGroup("interactive_map_tracking_plugin")
         self.qsettings.remove("")
         self.qsettings.endGroup()
-        self.qsettings.beginGroup("imt")
+        self.qsettings.beginGroup(self.qsettings_group_name)
         self.qsettings.remove("")
         self.qsettings.endGroup()
 
@@ -453,136 +469,53 @@ class interactive_map_tracking:
         self.signals_manager.disconnect_group("GUI")
         self.signals_manager.disconnect_group("WEB")
 
-        import pickle
+        # save GUI state in QSettings with pickle serialize module
+        imt_tools.saves_states_in_qsettings_pickle(self)
 
-        self.qsettings.beginGroup("IMT")
-        self.qsettings.setValue("pickle", pickle.dumps(self))
-        self.qsettings.endGroup()
-
-    def restore_gui_states_from_qsettings(self, dict_qobject_slot, b_launch_slot=True):
+    def saveState(self):
         """
 
-        :param dict_qobject_slot:
-        """
-        s = self.qsettings
-        for qobject in dict_qobject_slot.keys():
-            # print qobject, type(qobject )
-            id_slot = dict_qobject_slot[qobject]
-            id_in_qsetting = id_slot
-            qobject_is_checked = eval(s.value(id_in_qsetting, "False"))
-            qobject.setChecked(qobject_is_checked)
-            #
-            if b_launch_slot:
-                slot = self.signals_manager.get_slot(qobject, id_slot)
-                if slot:
-                    slot()
-                    #
-                    # print "id_in_qsetting: ", id_in_qsetting, " - value: ", s.value(id_in_qsetting, "False")
-
-    def save_gui_states_in_qsettings(self, dict_qobject_slot):
-        """
-
-        :param dict_qobject_slot:
-        """
-        s = self.qsettings
-        for qobject in dict_qobject_slot.keys():
-            slot = dict_qobject_slot[qobject]
-            id_string = slot.__name__
-            s.setValue(id_string, str(qobject.isChecked()))
-
-    @staticmethod
-    def _serialize_in_dict_checkbox(qt_dlg):
-        """
-
-        :param qt_dlg:
         :return:
         """
-        return {
-            'isEnabled': qt_dlg.isEnabled(),
-            'isChecked': qt_dlg.isChecked()
+        dict_state = {
+            'dlg': {
+                'list_checkbox': imt_tools.serialize_list_checkbox(self.list_tuples_dlg_id_slot)
+            }
         }
+        return dict_state
 
-    def _serialize_in_dict_list_checkbox_(self):
+    def restoreState(self, state, b_synchro=True):
         """
 
+        :param state:
         :return:
         """
-        return {
-            'enablePlugin': self._serialize_in_dict_checkbox(self.dlg.enablePlugin),
-            'enableAutoSave': self._serialize_in_dict_checkbox(self.dlg.enableAutoSave),
-            'enableTrackPosition': self._serialize_in_dict_checkbox(self.dlg.enableTrackPosition),
-            'enableLogging': self._serialize_in_dict_checkbox(self.dlg.enableLogging),
-            'enableUseMutexForTP': self._serialize_in_dict_checkbox(self.dlg.enableUseMutexForTP)
-        }
-
-    @staticmethod
-    def _update_checkbox_from_serialization_(state, qobject, id_qobject):
-        """
-
-        :param qobject:
-        :param id:
-        :return:
-        """
-        qobject.setEnabled(state['dlg']['list_checkbox'][id_qobject].setdefault('isEnabled', True))
-        qobject.setChecked(state['dlg']['list_checkbox'][id_qobject].setdefault('isChecked', False))
+        imt_tools.update_list_checkbox_from_serialization(state, self.list_tuples_dlg_id_slot)
         #
-        print state['dlg']['list_checkbox'][id_qobject], ' * ', \
-            id_qobject, ' * ', \
-            state['dlg']['list_checkbox'][id_qobject].setdefault('isChecked', False)
+        if b_synchro:
+            self._synchronize_gui_and_plugin()
 
-    def _update_list_checkbox_from_serialization_(self, pickle_state):
+    def getState(self):
         """
 
-        :param pickle_state:
         :return:
         """
-        self._update_checkbox_from_serialization_(pickle_state, self.dlg.enablePlugin, 'enablePlugin')
-        self._update_checkbox_from_serialization_(pickle_state, self.dlg.enableAutoSave, 'enableAutoSave')
-        self._update_checkbox_from_serialization_(pickle_state, self.dlg.enableTrackPosition, 'enableTrackPosition')
-        self._update_checkbox_from_serialization_(pickle_state, self.dlg.enableLogging, 'enableLogging')
-        self._update_checkbox_from_serialization_(pickle_state, self.dlg.enableUseMutexForTP, 'enableUseMutexForTP')
+        return self.states
 
     def __getstate__(self):
         """
 
         :return:
         """
-        dict_pickle = {
-            'dlg': {
-                'list_checkbox': self._serialize_in_dict_list_checkbox_()
-            }
-        }
+        return self.saveState()
 
-        return dict_pickle
-
-    def __setstate__(self, state):
+    def __setstate__(self, states):
         """
 
-        :param state:
+        :param states:
         :return:
         """
-        self.state = state
-
-    def _update_list_checkbox_from_qsettings(self):
-        """
-
-        :return:
-        """
-        dict_qobject_signal = {
-            self.dlg.enablePlugin: "slot_enabled_plugin",
-            self.dlg.enableAutoSave: "slot_clicked_checkbox_autosave",
-            self.dlg.enableTrackPosition: "slot_enabled_trackposition",
-            self.dlg.enableLogging: "slot_enable_logging",
-            self.dlg.enableUseMutexForTP: "slot_enable_asynch"
-        }
-        #
-        s = self.qsettings
-        s.beginGroup("IMT")
-        # CONDITION: init_signals need to be call before init_plugin
-        # otherwise signals_manager have no information about signals
-        # and we can't rely slot signature with qobject
-        self.restore_gui_states_from_qsettings(dict_qobject_signal)
-        s.endGroup()
+        self.states = states
 
     def _synchronize_gui_and_plugin(self):
         """
@@ -590,7 +523,6 @@ class interactive_map_tracking:
         :return:
         """
         self.slot_enabled_plugin()
-
 
     def init_plugin(self):
         """ Init the plugin
@@ -601,20 +533,8 @@ class interactive_map_tracking:
 
         self.dlg.enablePlugin.setEnabled(True)
 
-        s = self.qsettings
-
-        import pickle
-
-        s.beginGroup("IMT")
-        pickle_string = s.value("pickle")
-        s.endGroup()
-        print "in QSettings - pickle: ", pickle_string
-        if pickle_string:
-            new_imt = pickle.loads(pickle_string)
-            self._update_list_checkbox_from_serialization_(new_imt.state)
-            self._synchronize_gui_and_plugin()
-        else:
-            self._update_list_checkbox_from_qsettings()
+        # load GUI state in QSettings with pickle serialize module
+        imt_tools.restore_states_from_pickle(self)
 
         self.slot_returnPressed_threshold()
         #
@@ -627,8 +547,6 @@ class interactive_map_tracking:
 
         :return:
         """
-        print "init signals"
-
         self.init_signals_gui()
 
     def init_signals_gui(self):
@@ -670,27 +588,6 @@ class interactive_map_tracking:
                                  "returnPressed ()",
                                  self.slot_returnPressed_threshold,
                                  "GUI")
-
-    def update_checkbox(self, _settings, _name_in_setting, _checkbox):
-        """ According to values stores in QSetting, update the state of a checkbox
-
-        :param _settings: (local) Setting from Qt
-        :type _settings: QSettings
-
-        :param _name_in_setting: setting's name for the _checkbox in QSettings
-        :type _name_in_setting: QString
-
-        :param _checkbox: CheckBox to update state
-        :type _checkbox: QCheckBox
-
-        """
-        print "update_checkbox - ", self.qsettings_prefix_name + _name_in_setting, \
-            self.qsettings.value(self.qsettings_prefix_name + _name_in_setting, _checkbox.isChecked())
-
-        if _settings.value(self.qsettings_prefix_name + _name_in_setting, _checkbox.isChecked()) == "True":
-            _checkbox.setChecked(True)
-        else:
-            _checkbox.setChecked(False)
 
     def disconnect_signal_extentsChanged(self):
         """ Disconnect the signal: 'Canvas Extents Changed' of the QGIS MapCanvas """
@@ -917,9 +814,15 @@ class interactive_map_tracking:
         #
         self.signals_manager.disconnect(self.qgsmap_layer_registry, "layersWillBeRemoved( QStringList )")
 
-    @DecoratorsForQt.save_checked_state("IMT")
+    @DecoratorsForQt.save_checked_state(qsettings_group_name)
     def slot_enabled_trackposition(self):
         """ Action when the checkbox 'Enable Tracking Position' is clicked """
+        self.enabled_trackposition()
+
+    def enabled_trackposition(self):
+        """
+
+        """
         qgis_log_tools.logMessageINFO("Launch 'enable_trackposition(...)' ...")
 
         if self.dlg.enableTrackPosition.isChecked():
@@ -927,15 +830,23 @@ class interactive_map_tracking:
         else:
             self.disable_trackposition()
 
-    @DecoratorsForQt.save_checked_state("IMT")
+    @DecoratorsForQt.save_checked_state(qsettings_group_name)
     def slot_enable_logging(self):
         """ Action when the checkbox 'Enable LOGging' is clicked """
-        #
+        self.enable_logging()
+
+    def enable_logging(self):
+        """
+        """
         qgis_log_tools.setLogging(self.dlg.enableLogging.isChecked())
 
-    @DecoratorsForQt.save_checked_state("IMT")
+    @DecoratorsForQt.save_checked_state(qsettings_group_name)
     def slot_enable_asynch(self):
-        """ Action when the checkbox 'Use Mutex (for TrackingPosition) [BETA]' is clicked
+        """ Action when the checkbox 'Use Mutex (for TrackingPosition) [BETA]' is clicked """
+        self.enable_asynch()
+
+    def enable_asynch(self):
+        """
         - using Mutex to protect commitChange operation in multi-threads context (signals strategy)
         Beta test for:
         - using queuing requests from TrackPosition (we try to amortize the cost and effects on QGIS GUI)
@@ -946,16 +857,22 @@ class interactive_map_tracking:
         if not (self.dlg.enableUseMutexForTP.isChecked() and self.dlg.enableTrackPosition.isChecked()):
             self.stop_threads()
 
-    @DecoratorsForQt.save_checked_state("IMT")
+    @DecoratorsForQt.save_checked_state(qsettings_group_name)
     def slot_enabled_plugin(self):
         """ Action when the checkbox 'Enable SteetGen3 Plugin' is clicked
         Activate/desactivate all options/capabilities of IMT plugin: AutoSave&Refresh, TrackPosition
 
         """
+        self.enabled_pluging()
+
+    def enabled_pluging(self):
+        """
+
+        """
         qgis_log_tools.logMessageINFO("Launch 'enabled_plugin(...)' ...")
+
         #force the plugin to be in front
         self.dlg.raise_()
-        result_commit = False
 
         if self.dlg.enablePlugin.isChecked():
             #
@@ -966,10 +883,6 @@ class interactive_map_tracking:
                                      self.slot_returnPressed_threshold)     # use the same slot
             #
             self.autosave.enable()
-            #
-            self.slot_enabled_trackposition()
-            self.slot_enable_logging()
-            self.slot_enable_asynch()
         else:
             self.disabled_plugin_GUI()
             #
@@ -978,11 +891,10 @@ class interactive_map_tracking:
             # if self.dlg.enableTrackPosition.isChecked():
             # self.disconnect_signal_extentsChanged()
             #     self.stop_threads()
-            self.slot_enabled_trackposition()
-            self.slot_enable_logging()
-            self.slot_enable_asynch()
 
-        return result_commit
+        self.enabled_trackposition()
+        self.enable_logging()
+        self.enable_asynch()
 
     def enabled_pluging_GUI(self):
         """
