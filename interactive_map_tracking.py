@@ -259,7 +259,6 @@ class interactive_map_tracking:
             (self.dlg.enableUseMutexForTP, 'enableUseMutexForTP', interactive_map_tracking.slot_enable_asynch.__name__)
         ]
 
-
     def slot_readProject(self):
         """
 

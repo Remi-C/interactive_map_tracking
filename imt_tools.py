@@ -28,10 +28,12 @@ from qgis.core import *
 import os
 import socket
 from PyQt4.QtCore import QSettings
+from PyQt4.QtGui import QAbstractButton
 try:
     import cPickle as pickle
 except:
     import pickle
+import qgis_log_tools
 
 defaultQtDateFormatString = "yyyy-MM-ddThh:mm:ss.zzz"
 
@@ -370,6 +372,43 @@ def restore_states_from_pickle(imt, pickle_name_in_qsettings="pickle"):
         imt.restoreState(state)
     else:
         update_list_checkbox_from_qsettings(imt)
+
+    #TODO: test on QT dump
+    test_qt_dump(imt)
+
+
+def test_qt_dump(imt):
+    """
+    Show a connection between Python class and Qt Gui (wrapper)
+    :param imt:
+    """
+    list_id_qt_children = []
+    list_children = imt.dlg.findChildren(QAbstractButton)
+    for qt_button in list_children:
+        qgis_log_tools.logMessageINFO("* From Qt, filter 'QAbstractButton'" + "\n" +
+                                      "\t- text: " + qt_button.text() + "\n" +
+                                      "\t- isChecked: " + str(qt_button.isChecked()) + "\n" +
+        # url: http://stackoverflow.com/questions/121396/accessing-object-memory-address
+        # url: https://docs.python.org/2/reference/datamodel.html#object.__repr__
+                                      "\t- python mem: " + str(qt_button.__repr__) + "\n")
+        # url: https://docs.python.org/2/library/functions.html#id
+        list_id_qt_children.append(id(qt_button))
+
+    # url: http://stackoverflow.com/questions/1810526/python-calling-a-method-of-an-instances-member-by-name-using-getattribute
+    # get member from interactive_map_tracking dlg (Qt Gui)
+    imt_dict_dlg = imt.dlg.__getattribute__('__dict__')
+    for id_string_dlg in imt_dict_dlg.keys():
+        # url: http://stackoverflow.com/questions/16408472/print-memory-address-of-python-variable
+        # get the Qt object member associated
+        qt_object = imt_dict_dlg[id_string_dlg]
+        # get the 'unique' python id
+        unique_id_qt_object = id(qt_object)
+        # check if this id is present in dict: dict_qt_children previously generated
+        # if unique_id_qt_object in dict_qt_children.keys():
+        if unique_id_qt_object in list_id_qt_children:
+            qgis_log_tools.logMessageINFO("* From IMT Python class, find Qt element (in dlg)" + "\n" +
+                                          "\t-- Member name in imt: " + id_string_dlg + "\n" +
+                                          "\t-- isChecked: " + str(qt_object.isChecked()))
 
 
 def update_list_checkbox_from_qsettings(imt):
