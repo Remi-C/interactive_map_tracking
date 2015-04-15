@@ -24,11 +24,12 @@
 __author__ = 'latty'
 
 from qgis.core import *
-
 import os
 import socket
+
 from PyQt4.QtCore import QSettings
-from PyQt4.QtGui import QAbstractButton
+from PyQt4.QtGui import QAbstractButton, QCheckBox
+
 try:
     import cPickle as pickle
 except:
@@ -282,6 +283,13 @@ def extent_equal(r1, r2, epsilon=DEFAULT_SEGMENT_EPSILON):
            abs(r1.yMinimum() - r2.yMinimum()) <= epsilon
 
 
+qsettings_id_pickle = "pickle"
+#
+pickle_id_gui = "GUI"
+pickle_id_list_checkbox = "list_checkbox"
+pickle_id_list_tabs_size = "list_tabs_size"
+
+
 def save_gui_states_in_qsettings(dict_qobject_slot):
     """
 
@@ -295,33 +303,43 @@ def save_gui_states_in_qsettings(dict_qobject_slot):
         s.setValue(id_string, str(qobject.isChecked()))
 
 
-def serialize_checkbox(qt_dlg):
+def serialize_checkbox(checkbox):
     """
 
-    :param qt_dlg:
+    :param checkbox:
     :return:
     """
     return {
-        'isEnabled': qt_dlg.isEnabled(),
-        'isChecked': qt_dlg.isChecked()
+        'isEnabled': checkbox.isEnabled(),
+        'isChecked': checkbox.isChecked()
     }
 
 
-def serialize_list_checkbox(list_tuples_dlg_id):
+def serialize_list_checkbox(dlg, list_id_checkbox):
     """
 
     :return:
     """
     return_dict = {}
-    for tuple_id_checkbox in list_tuples_dlg_id:
-        dict_dlg_id = {
-            tuple_id_checkbox[1]: serialize_checkbox(tuple_id_checkbox[0])
+    for string_id_checkbox in list_id_checkbox:
+        qt_checkbox = dlg.__getattribute__(string_id_checkbox)
+        dict_checkbox_id = {
+            string_id_checkbox: serialize_checkbox(qt_checkbox)
         }
-        return_dict.update(dict_dlg_id)
+        return_dict.update(dict_checkbox_id)
     return return_dict
 
 
-def update_checkbox_from_serialization(state, qobject, id_qobject):
+def serialize_tabs_size(imt):
+    """
+
+    :param dlg:
+    :return:
+    """
+    return imt.dict_tabs_size
+
+
+def update_checkbox_from_serialization(qobject, id_qobject, state):
     """
 
     :param state:
@@ -329,34 +347,52 @@ def update_checkbox_from_serialization(state, qobject, id_qobject):
     :param id_qobject:
     :return:
     """
-    qobject.setEnabled(state['dlg']['list_checkbox'][id_qobject].setdefault('isEnabled', True))
-    qobject.setChecked(state['dlg']['list_checkbox'][id_qobject].setdefault('isChecked', False))
+    qobject.setEnabled(state[pickle_id_gui][pickle_id_list_checkbox][id_qobject].setdefault('isEnabled', True))
+    qobject.setChecked(state[pickle_id_gui][pickle_id_list_checkbox][id_qobject].setdefault('isChecked', False))
     #
-    print state['dlg']['list_checkbox'][id_qobject], ' * ', \
-        id_qobject, ' * ', \
-        state['dlg']['list_checkbox'][id_qobject].setdefault('isChecked', False)
+    # print state[pickle_id_gui][pickle_id_list_checkbox][id_qobject], ' * ', \
+    # id_qobject, ' * ', \
+    #     state[pickle_id_gui][pickle_id_list_checkbox][id_qobject].setdefault('isChecked', False)
 
 
-def update_list_checkbox_from_serialization(pickle_state, list_tuples_dlg_id):
+def update_list_checkbox_from_serialization(dlg, list_string_id_checkbox, pickle_state):
     """
 
+    :param dlg:
+    :param list_string_id_checkbox:
     :param pickle_state:
     :return:
     """
-    for tuple_dlg_id in list_tuples_dlg_id:
-        update_checkbox_from_serialization(pickle_state, tuple_dlg_id[0], tuple_dlg_id[1])
+    for string_id_dlg in list_string_id_checkbox:
+        qt_checkbox = dlg.__getattribute__(string_id_dlg)
+        update_checkbox_from_serialization(qt_checkbox, string_id_dlg, pickle_state)
 
 
-def saves_states_in_qsettings_pickle(imt, pickle_name_in_qsettings="pickle"):
+def update_tabs_size_from_serialization(imt, pickle_state):
+    """
+
+    :param imt:
+    :param pickle_state:
+    :return:
+    """
+    imt.dict_tabs_size = pickle_state[pickle_id_gui][pickle_id_list_tabs_size]
+
+
+def saves_states_in_qsettings_pickle(imt, pickle_name_in_qsettings=qsettings_id_pickle):
     """
 
     :param imt:
     """
-    imt.qsettings.beginGroup(imt.qsettings_group_name)
-    imt.qsettings.setValue(pickle_name_in_qsettings, pickle.dumps(imt))
-    imt.qsettings.endGroup()
+    pickle_string_dump = ""
+    try:
+        pickle_string_dump = pickle.dumps(imt)
+    finally:
+        imt.qsettings.beginGroup(imt.qsettings_group_name)
+        imt.qsettings.setValue(pickle_name_in_qsettings, pickle_string_dump)
+        imt.qsettings.endGroup()
 
-def restore_states_from_pickle(imt, pickle_name_in_qsettings="pickle"):
+
+def restore_states_from_pickle(imt, pickle_name_in_qsettings=qsettings_id_pickle):
     """
 
     :return:
@@ -365,16 +401,95 @@ def restore_states_from_pickle(imt, pickle_name_in_qsettings="pickle"):
     s.beginGroup(imt.qsettings_group_name)
     qsettings_pickle = s.value(pickle_name_in_qsettings)
     s.endGroup()
-    print "in QSettings - pickle: ", qsettings_pickle
+    # print "in QSettings - pickle: ", qsettings_pickle
     if qsettings_pickle:
-        imt_for_states = pickle.loads(str(qsettings_pickle))
-        state = imt_for_states.getState()
-        imt.restoreState(state)
-    else:
-        update_list_checkbox_from_qsettings(imt)
+        imt_for_states = None
+        try:
+            imt_for_states = pickle.loads(str(qsettings_pickle))
+        finally:
+            state = imt_for_states.getState()
+            imt.restoreState(state)
+    # else:
+    # update_list_checkbox_from_qsettings(imt)
 
     #TODO: test on QT dump
     test_qt_dump(imt)
+
+
+# url: http://stackoverflow.com/questions/121396/accessing-object-memory-address
+# url: https://docs.python.org/2/reference/datamodel.html#object.__repr__
+# url: http://stackoverflow.com/questions/1810526/python-calling-a-method-of-an-instances-member-by-name-using-getattribute
+# url: https://docs.python.org/2/library/functions.html#id
+
+def build_list_id_filter_by_qt_type(dlg, qt_type):
+    """
+
+    :param dlg:
+    :param qt_type:
+    :return:
+    """
+    list_id = []
+    list_children = dlg.findChildren(qt_type)
+    for qt_object in list_children:
+        qt_object_id = id(qt_object)
+        list_id.append(qt_object_id)
+    return list_id
+
+
+def build_dict_id_qt_type(dlg, qt_type):
+    """
+
+    :param dlg:
+    :param qt_type:
+    :return:
+    """
+    dict_id_qt_type = {}
+    list_id_for_qt_type = build_list_id_filter_by_qt_type(dlg, qt_type)
+    for qt_object_id in list_id_for_qt_type:
+        dict_id_qt_type[qt_object_id] = qt_type
+    return dict_id_qt_type
+
+
+def build_list_member_name_filter_by_qtype(dlg, *qt_types):
+    """
+
+    :param dlg:
+    :return:
+    """
+    list_member_name = []
+    for qt_type in qt_types:
+        dict_id_qt_type = build_dict_id_qt_type(dlg, qt_type)
+        dlg_dict = dlg.__getattribute__('__dict__')
+        for dlg_id_string_member in dlg_dict:
+            # get the Qt object member associated
+            qt_object = dlg_dict[dlg_id_string_member]
+            # get the 'unique' python id
+            unique_id_qt_object = id(qt_object)
+            if unique_id_qt_object in dict_id_qt_type:
+                list_member_name.append(dlg_id_string_member)
+    return list_member_name
+
+
+def build_list_member_name_filter_by_qtypes(dlg, *qt_types):
+    """
+
+    :param dlg:
+    :param qt_types:
+    :return:
+    """
+    return_list = []
+    for qt_type in qt_types:
+        return_list.extend(build_list_member_name_filter_by_qtype(dlg, qt_type))
+    return return_list
+
+
+def build_list_member_name_filter_qcheckbox(dlg):
+    """
+
+    :param dlg:
+    :return:
+    """
+    return build_list_member_name_filter_by_qtypes(dlg, QCheckBox)
 
 
 def test_qt_dump(imt):
@@ -382,32 +497,37 @@ def test_qt_dump(imt):
     Show a connection between Python class and Qt Gui (wrapper)
     :param imt:
     """
-    list_id_qt_children = []
-    list_children = imt.dlg.findChildren(QAbstractButton)
-    for qt_button in list_children:
-        qgis_log_tools.logMessageINFO("* From Qt, filter 'QAbstractButton'" + "\n" +
-                                      "\t- text: " + qt_button.text() + "\n" +
-                                      "\t- isChecked: " + str(qt_button.isChecked()) + "\n" +
-        # url: http://stackoverflow.com/questions/121396/accessing-object-memory-address
-        # url: https://docs.python.org/2/reference/datamodel.html#object.__repr__
-                                      "\t- python mem: " + str(qt_button.__repr__) + "\n")
-        # url: https://docs.python.org/2/library/functions.html#id
-        list_id_qt_children.append(id(qt_button))
+    list_qt_types = [
+        QAbstractButton
+    ]
+    dict_id_qt_type = {}
+    for qt_type in list_qt_types:
+        dict_id_qt_type.update(build_dict_id_qt_type(imt.dlg, qt_type))
+
+    # list_id_for_qabstractbutton = []
+    # list_children = imt.dlg.findChildren(QAbstractButton)
+    # for qt_button in list_children:
+    # qgis_log_tools.logMessageINFO("* From Qt, filter 'QAbstractButton'" + "\n" +
+    #                                   "\t- text: " + qt_button.text() + "\n" +
+    #                                   "\t- isChecked: " + str(qt_button.isChecked()) + "\n" +
+
+    #                                   "\t- python mem: " + str(qt_button.__repr__) + "\n")
+    #     # url: https://docs.python.org/2/library/functions.html#id
+    #     list_id_for_qabstractbutton.append(id(qt_button))
 
     # url: http://stackoverflow.com/questions/1810526/python-calling-a-method-of-an-instances-member-by-name-using-getattribute
     # get member from interactive_map_tracking dlg (Qt Gui)
-    imt_dict_dlg = imt.dlg.__getattribute__('__dict__')
-    for id_string_dlg in imt_dict_dlg.keys():
+    imt_dlg_dict = imt.dlg.__getattribute__('__dict__')
+    for imt_dlg_id_string_member in imt_dlg_dict.keys():
         # url: http://stackoverflow.com/questions/16408472/print-memory-address-of-python-variable
         # get the Qt object member associated
-        qt_object = imt_dict_dlg[id_string_dlg]
+        qt_object = imt_dlg_dict[imt_dlg_id_string_member]
         # get the 'unique' python id
         unique_id_qt_object = id(qt_object)
-        # check if this id is present in dict: dict_qt_children previously generated
-        # if unique_id_qt_object in dict_qt_children.keys():
-        if unique_id_qt_object in list_id_qt_children:
+        if unique_id_qt_object in dict_id_qt_type:
             qgis_log_tools.logMessageINFO("* From IMT Python class, find Qt element (in dlg)" + "\n" +
-                                          "\t-- Member name in imt: " + id_string_dlg + "\n" +
+                                          "\t- Member name: " + imt_dlg_id_string_member + "\n" +
+                                          "\t- Qt type: " + str(dict_id_qt_type[unique_id_qt_object]) + "\n" +
                                           "\t-- isChecked: " + str(qt_object.isChecked()))
 
 

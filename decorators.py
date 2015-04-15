@@ -40,7 +40,7 @@ class DecoratorsForQt(object):
                     s.setValue(key, _s_bool_[qobj_sender.isChecked()])
                     s.endGroup()
                     #
-                    print "* dictionnary: " + str(dict_qobj)
+                    # print "* dictionnary: " + str(dict_qobj)
 
             def wrapper(*args, **kwargs):
                 """

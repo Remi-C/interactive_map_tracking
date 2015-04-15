@@ -39,6 +39,7 @@ from signalsmanager import SignalsManager
 from autosave import AutoSave
 from decorators import DecoratorsForQt
 
+
 #
 # for beta test purposes
 #
@@ -58,7 +59,7 @@ class interactive_map_tracking:
     """QGIS Plugin Implementation."""
 
     qsettings_group_name = "IMT"
-    
+
     def __init__(self, iface):
         """Constructor.
 
@@ -73,7 +74,7 @@ class interactive_map_tracking:
         self.qsettings = QSettings()
 
         # self.clean_qsettings()
-        imt_tools.print_group_name_values_in_qsettings(self.qsettings_group_name)
+        # imt_tools.print_group_name_values_in_qsettings(self.qsettings_group_name)
 
         self.currentLayer = None
 
@@ -97,9 +98,9 @@ class interactive_map_tracking:
 
         # Create the dialog (after translation) and keep reference
         # print "declare dlg here !"
-        if not 'dlg' in dir(self):
-            self.dlg = interactive_map_trackingDialog()
-            print "- self.dlg: ", self.dlg
+        # if not 'dlg' in dir(self):
+        self.dlg = interactive_map_trackingDialog()
+        # print "- self.dlg: ", self.dlg
 
         # Declare instance attributes
         self.actions = []
@@ -234,7 +235,7 @@ class interactive_map_tracking:
         # getting proxy
         self._set_proxy_()
 
-        self.dict_tabs_size = {}
+        self.dict_tabs_size = {}  # dict useful for using setdefault(...)
 
         self.tp_last_extent_saved = QgsRectangle()
 
@@ -250,21 +251,21 @@ class interactive_map_tracking:
         from qgis.core import QgsProject
         self.connect_signal_qgis(QgsProject.instance(), "readProject(const QDomDocument & )", self.slot_readProject)
 
-        self.list_tuples_dlg_id_slot = [
-            (self.dlg.enablePlugin, 'enablePlugin', interactive_map_tracking.slot_enabled_plugin.__name__),
-            (self.dlg.enableAutoSave, 'enableAutoSave', AutoSave.slot_clicked_checkbox_autosave.__name__),
-            (self.dlg.enableTrackPosition, 'enableTrackPosition',
-             interactive_map_tracking.slot_enabled_trackposition.__name__),
-            (self.dlg.enableLogging, 'enableLogging', interactive_map_tracking.slot_enable_logging.__name__),
-            (self.dlg.enableUseMutexForTP, 'enableUseMutexForTP', interactive_map_tracking.slot_enable_asynch.__name__)
-        ]
+        # self.list_id_checkbox = [
+        # 'enablePlugin',
+        #     'enableAutoSave',
+        #     'enableTrackPosition',
+        #     'enableLogging',
+        #     'enableUseMutexForTP'
+        # ]
+        # print "imt_tools.build_list_member_name_qt_checkbox: ", imt_tools.build_list_member_name_qt_checkbox(self.dlg)
+        self.list_id_checkbox = imt_tools.build_list_member_name_filter_qcheckbox(self.dlg)
 
     def slot_readProject(self):
         """
 
         :return:
         """
-        qgis_log_tools.logMessageINFO("")
         self.enabled_pluging()
 
     def clean_qsettings(self):
@@ -272,6 +273,10 @@ class interactive_map_tracking:
 
         :return:
         """
+        print "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+        print "CLEAN QSETTINGS !!! DON'T FORGET TO REMOVE !!!"
+        print "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+        #
         self.qsettings.beginGroup("interactive_map_tracking_plugin")
         self.qsettings.remove("")
         self.qsettings.endGroup()
@@ -476,9 +481,11 @@ class interactive_map_tracking:
 
         :return:
         """
+        # list_id_checkbox = imt_tools.build_list_member_name_qt_checkbox(self.dlg)
         dict_state = {
-            'dlg': {
-                'list_checkbox': imt_tools.serialize_list_checkbox(self.list_tuples_dlg_id_slot)
+            imt_tools.pickle_id_gui: {
+                imt_tools.pickle_id_list_checkbox: imt_tools.serialize_list_checkbox(self.dlg, self.list_id_checkbox),
+                imt_tools.pickle_id_list_tabs_size: imt_tools.serialize_tabs_size(self),
             }
         }
         return dict_state
@@ -489,7 +496,11 @@ class interactive_map_tracking:
         :param state:
         :return:
         """
-        imt_tools.update_list_checkbox_from_serialization(state, self.list_tuples_dlg_id_slot)
+        # list_id_checkbox = imt_tools.build_list_member_name_qt_checkbox(self.dlg)
+        #
+        imt_tools.update_list_checkbox_from_serialization(self.dlg, self.list_id_checkbox, state)
+        #
+        imt_tools.update_tabs_size_from_serialization(self, state)
         #
         if b_synchro:
             self._synchronize_gui_and_plugin()
@@ -874,22 +885,11 @@ class interactive_map_tracking:
         self.dlg.raise_()
 
         if self.dlg.enablePlugin.isChecked():
-            #
             self.enabled_pluging_GUI()
-            #
-            self.signals_manager.add(self.dlg.threshold_extent,
-                                     "editingFinished ()",
-                                     self.slot_returnPressed_threshold)     # use the same slot
-            #
             self.autosave.enable()
         else:
             self.disabled_plugin_GUI()
-            #
             self.autosave.disable()
-            #
-            # if self.dlg.enableTrackPosition.isChecked():
-            # self.disconnect_signal_extentsChanged()
-            #     self.stop_threads()
 
         self.enabled_trackposition()
         self.enable_logging()
@@ -903,9 +903,13 @@ class interactive_map_tracking:
         self.dlg.enableAutoSave.setEnabled(True)
         self.dlg.enableTrackPosition.setEnabled(True)
         self.dlg.enableLogging.setEnabled(True)
-        self.dlg.thresholdLabel.setEnabled(True)
-        self.dlg.threshold_extent.setEnabled(True)
         self.dlg.enableUseMutexForTP.setEnabled(True)
+        self.dlg.thresholdLabel.setEnabled(True)
+        #
+        self.dlg.threshold_extent.setEnabled(True)
+        self.signals_manager.add(self.dlg.threshold_extent,
+                                 "editingFinished ()",
+                                 self.slot_returnPressed_threshold)  # use the same slot
 
     def disabled_plugin_GUI(self):
         """
