@@ -23,7 +23,6 @@
 
 __author__ = 'latty'
 
-from qgis.gui import QgsMessageBar
 import qgis_log_tools
 
 # constant value for epsilon
@@ -56,6 +55,7 @@ def refreshLayer(layer, iface):
     layer.triggerRepaint()
     iface.mapCanvas().refresh()
 
+
 def find_layer_in_mapcanvas(_mapCanvas, _layername):
     """ Finding the index of an item given a list containing it in Python
     url : http://stackoverflow.com/questions/176918/finding-the-index-of-an-item-given-a-list-containing-it-in-python
@@ -69,11 +69,12 @@ def find_layer_in_mapcanvas(_mapCanvas, _layername):
     :rtype : QGIS layer
     """
     index_layer_searched = [iLayer for iLayer in range(_mapCanvas.layerCount()) if
-                    _mapCanvas.layer(iLayer).name() == _layername]
+                            _mapCanvas.layer(iLayer).name() == _layername]
     if not index_layer_searched:
         return None
     else:
         return _mapCanvas.layer(index_layer_searched[0])
+
 
 def find_layer_in_mapcanvas(_mapCanvas, _layername):
     """ Finding the index of an item given a list containing it in Python
@@ -87,7 +88,8 @@ def find_layer_in_mapcanvas(_mapCanvas, _layername):
 
     :rtype : QGIS layer
     """
-    index_layer_searched = [iLayer for iLayer in range(_mapCanvas.layerCount()) if _mapCanvas.layer(iLayer).name() == _layername]
+    index_layer_searched = [iLayer for iLayer in range(_mapCanvas.layerCount()) if
+                            _mapCanvas.layer(iLayer).name() == _layername]
     if not index_layer_searched:
         return None
     else:

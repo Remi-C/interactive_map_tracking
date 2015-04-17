@@ -40,6 +40,7 @@ from autosave import AutoSave
 from decorators import DecoratorsForQt
 
 
+
 #
 # for beta test purposes
 #
@@ -598,6 +599,14 @@ class interactive_map_tracking:
                                  "returnPressed ()",
                                  self.slot_returnPressed_threshold,
                                  "GUI")
+        #
+        # self.signals_manager.add_clicked(self.dlg.get_edges, self.slot_get_edges, "GUI")
+        self.signals_manager.add_clicked(self.dlg.execute_sql_commands, self.slot_execute_SQL_commands, "GUI")
+        self.signals_manager.add_clicked(self.dlg.refreshSqlScriptList, self.slot_refreshSqlScriptList, "GUI")
+        self.signals_manager.add(self.dlg.combobox_sql_scripts,
+                                 "currentIndexChanged (int)",
+                                 self.slot_currentIndexChanged_SQL,
+                                 "GUI")
 
     def disconnect_signal_extentsChanged(self):
         """ Disconnect the signal: 'Canvas Extents Changed' of the QGIS MapCanvas """
@@ -745,6 +754,24 @@ class interactive_map_tracking:
         except:
             pass
 
+    def slot_currentIndexChanged_SQL(self, id_index):
+        """
+
+        :param id_index:
+        """
+        sqlFile = ""
+        fd = None
+        try:
+            fd = open(interactive_map_tracking.get_itemData(self.dlg.combobox_sql_scripts))
+            if fd:
+                sqlFile = fd.read()
+                fd.close()
+        except:
+            sqlFile = "Error ! Can't read the SQL file"
+
+        self.dlg.plainTextEdit_sql_script.setPlainText(sqlFile)
+
+
     def slot_refreshComboBoxLayers(self):
         """ Action when the Combo Box attached to refreshing layers for tracking position is clicked """
         #
@@ -793,6 +820,32 @@ class interactive_map_tracking:
             self.disable_trackposition()
             #
             qgis_log_tools.logMessageWARNING("WARNING: No layer selected for Tracking Position !")
+
+    def slot_refreshSqlScriptList(self):
+        """
+
+        """
+
+        self.dlg.combobox_sql_scripts.clear()
+
+        import os
+
+        path = self.qgis_plugins_directory
+        files = os.listdir(path)
+
+        [
+            self.dlg.combobox_sql_scripts.addItem(os.path.basename(i)[:-4], path + '/' + i)
+            for i in files if i.endswith('.sql')
+        ]
+        # #
+        # for i in files:
+        # if i.endswith('.sql'):
+        #         self.dlg.combobox_sql_scripts.addItem(
+        #             os.path.basename(i)[:-4],  # just the filename wo ext.
+        #             path + '/' + i
+        #         )
+        #         print path + '/' + i
+
 
     def stop_threads(self):
         """
@@ -968,6 +1021,90 @@ class interactive_map_tracking:
         return self.threshold
 
     @staticmethod
+    def get_itemData(combobox):
+        """
+
+        :param combobox:
+        :return:
+        """
+        return combobox.itemData(combobox.currentIndex())
+
+    def slot_execute_SQL_commands(self):
+        """
+
+        :return:
+        """
+        mapCanvas = self.mapCanvas
+        mapCanvas_extent = mapCanvas.extent()
+        # get the list points from the current extent (from QGIS MapCanvas)
+        list_points_from_mapcanvas = imt_tools.construct_listpoints_from_extent(mapCanvas_extent)
+
+        # url: http://qgis.org/api/classQgsMapCanvas.html#af0ffae7b5e5ec8b29764773fa6a74d58
+        extent_src_crs = mapCanvas.mapSettings().destinationCrs()
+        # url: http://qgis.org/api/classQgsCoordinateReferenceSystem.html#a3cb64f24049d50fbacffd1eece5125ee
+        extent_postgisSrid = 932011
+        extent_dst_crs = QgsCoordinateReferenceSystem(extent_postgisSrid, QgsCoordinateReferenceSystem.PostgisCrsId)
+        # url: http://docs.qgis.org/testing/en/docs/pyqgis_developer_cookbook/crs.html
+        xform = QgsCoordinateTransform(extent_src_crs, extent_dst_crs)
+        #
+        list_points = [xform.transform(point) for point in list_points_from_mapcanvas]
+
+        # list of lists of points
+        gPolyline = QgsGeometry.fromPolyline(list_points)
+        gPolylineWkt = gPolyline.exportToWkt()
+
+        print "* list_points_from_mapcanvas: ", list_points_from_mapcanvas
+        print ""
+        print "* gPolygonWkt: ", gPolylineWkt
+        print ""
+        print "* extent_postgisSrid: ", extent_postgisSrid
+        print "* extent_src_crs.postgisSrid: ", extent_src_crs.postgisSrid()
+        print ""
+
+        import psycopg2
+
+        connection = psycopg2.connect(database="bdtopo_topological",
+                                      dbname="street_gen_3",
+                                      user="streetgen", password="streetgen",
+                                      host="172.16.3.50")
+
+        cursor = connection.cursor()
+
+        fd = open(interactive_map_tracking.get_itemData(self.dlg.combobox_sql_scripts))
+        sqlFile = fd.read()
+        fd.close()
+
+        self.dlg.plainTextEdit_sql_script.setPlainText(sqlFile)
+
+        # all SQL commands (split on ';')
+        sqlCommands = sqlFile.split(';')
+
+        # Execute every command from the input file
+        for command in sqlCommands:
+            # This will skip and report errors
+            # For example, if the tables do not yet exist, this will skip over
+            # the DROP TABLE commands
+            try:
+                command = command.format(gPolylineWkt, extent_postgisSrid)
+                if not command.isspace():
+                    print "## command_sql: ", command
+                    cursor.execute(command)
+                    try:
+                        tuples = cursor.fetchall()
+                        print "=> len(tuples): ", len(tuples)
+                        for tuple in tuples:
+                            for element in tuple:
+                                print element
+                    except:
+                        print "commit to Sql Server"
+                        connection.commit()
+            except psycopg2.OperationalError, msg:
+                print "Command skipped: ", msg
+
+        cursor.close()
+        connection.close()
+
+    @staticmethod
     def compute_frame_size(frame, dlg=None, margin_width=60):
         """
 
@@ -1104,10 +1241,12 @@ class interactive_map_tracking:
         #
         self.signals_manager.disconnect_group("WEB")
         #
-        if index == 3:
+        # Note: convention, 'user' & 'about' are the lastest tab in IMT_Window_Tabs (QTabWidget)
+        count_tabs = self.dlg.IMT_Window_Tabs.count()
+        if index == count_tabs - 1:
             qgis_log_tools.logMessageINFO("## Tab : User Doc")
             self.webview_load_page(self.dlg.webView_userdoc, index, self.webview_margin)
-        elif index == 4:
+        elif index == count_tabs - 2:
             qgis_log_tools.logMessageINFO("## Tab : About")
             self.webview_load_page(self.dlg.webView_about, index, self.webview_margin)
         else:

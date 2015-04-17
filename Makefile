@@ -76,7 +76,7 @@ PY_FILES = \
 
 UI_FILES = interactive_map_tracking_dialog_base.ui
 
-EXTRAS = icon.png metadata.txt
+EXTRAS = icon.png metadata.txt *.sql
 
 COMPILED_RESOURCE_FILES = resources_rc.py
 
