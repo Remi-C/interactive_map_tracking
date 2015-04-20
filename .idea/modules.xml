@@ -2,6 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
+      <module fileurl="file://$PROJECT_DIR$/../../../__PYTHON__/__TESTS__/PyXB_on_Symuvia/.idea/PyXB_on_Symuvia.iml" filepath="$PROJECT_DIR$/../../../__PYTHON__/__TESTS__/PyXB_on_Symuvia/.idea/PyXB_on_Symuvia.iml" />
       <module fileurl="file://$PROJECT_DIR$/.idea/interactive_map_tracking.iml" filepath="$PROJECT_DIR$/.idea/interactive_map_tracking.iml" />
     </modules>
   </component>

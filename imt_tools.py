@@ -30,6 +30,7 @@ import socket
 from PyQt4.QtCore import QSettings
 from PyQt4.QtGui import QAbstractButton, QCheckBox
 
+
 try:
     import cPickle as pickle
 except:
@@ -578,3 +579,12 @@ def print_group_name_values_in_qsettings(group_name=""):
         print key, str(qsettings.value(key))
         # import qgis_log_tools
         # qgis_log_tools.logMessageINFO(str(key)+": "+str(qsettings.value(key)))
+
+
+def get_itemData(combobox):
+    """
+
+    :param combobox:
+    :return:
+    """
+    return combobox.itemData(combobox.currentIndex())
