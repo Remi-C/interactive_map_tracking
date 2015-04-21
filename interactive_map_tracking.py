@@ -40,8 +40,6 @@ from trafipollu import TrafiPollu
 from decorators import DecoratorsForQt
 
 
-
-
 #
 # for beta test purposes
 #

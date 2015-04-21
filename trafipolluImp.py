@@ -4,7 +4,8 @@ from qgis.core import QgsCoordinateReferenceSystem, QgsCoordinateTransform, QgsG
 
 from signalsmanager import SignalsManager
 import imt_tools
-
+# from psycopg2.extras import NamedTupleConnection
+from shapely.wkb import loads
 
 class TrafiPolluImp(object):
     """
@@ -19,6 +20,7 @@ class TrafiPolluImp(object):
         self._dlg = dlg
         self._mapCanvas = self._iface.mapCanvas()
         self._signals_manager = SignalsManager.instance()
+        self._dict_edges = {}  # key: id_edge  -   value: (topo) informations from SG3
 
     def _init_signals_(self):
         """
@@ -87,7 +89,9 @@ class TrafiPolluImp(object):
                                       user="streetgen", password="streetgen",
                                       host="172.16.3.50")
 
-        cursor = connection.cursor()
+        # cursor = connection.cursor()
+        # cursor = connection.cursor(cursor_factory=psycopg2.extras.NamedTupleCursor)
+        cursor = connection.cursor(cursor_factory=psycopg2.extras.DictCursor)
 
         fd = open(imt_tools.get_itemData(self._dlg.combobox_sql_scripts))
         sqlFile = fd.read()
@@ -115,20 +119,38 @@ class TrafiPolluImp(object):
                     # url: http://initd.org/psycopg/docs/advanced.html#adapting-new-types
                     cursor.execute(command, dict_parameters)
                     try:
-                        tuples = cursor.fetchall()
-                        print "=> len(tuples): ", len(tuples)
-                        for tuple in tuples:
-                            print
-                            for element in tuple:
-                                print element
+                        tuples_from_sql_request = cursor.fetchall()
                     except:
                         print "commit to Sql Server"
                         connection.commit()
+                    else:
+                        # url: http://stackoverflow.com/questions/10252247/how-do-i-get-a-list-of-column-names-from-a-psycopg2-cursor
+                        # column_names = [desc[0] for desc in cursor.description]
+                        # namedtuple = imt_tools.create_named_tuple_from_names('DUMP_SQL_TRAFIPOLLU', column_names)
+                        for tuple_from_sql_request in tuples_from_sql_request:
+                            # url: http://www.dotnetperls.com/namedtuple
+                            # tuple_trafipollu = namedtuple._make(tuple_from_sql_request)
+                            # self._dict_edges.update({tuple_trafipollu.edge_id: tuple_trafipollu})
+                            self._dict_edges.update({tuple_from_sql_request['edge_id']: tuple_from_sql_request})
+
+                            # ul: http://toblerity.org/shapely/manual.htmlhttp://toblerity.org/shapely/manual.html
+                            # url: http://gis.stackexchange.com/questions/89323/postgis-parse-geometry-wkb-with-ogr
+                            # url: https://docs.python.org/2/c-api/buffer.html
+                            edge = self._dict_edges[tuple_from_sql_request['edge_id']]
+                            for name_key in edge.keys():
+                                sql_object = edge[name_key]
+                                if isinstance(sql_object, buffer):
+                                    self._dict_edges[tuple_from_sql_request['edge_id']][name_key] = loads(
+                                        bytes(sql_object))
+
+                        print "=> len(tuples_from_sql_request): ", len(tuples_from_sql_request)
             except psycopg2.OperationalError, msg:
                 print "Command skipped: ", msg
 
         cursor.close()
         connection.close()
+
+        print self._dict_edges
 
     def _slot_refreshSqlScriptList(self):
         """
@@ -163,3 +185,17 @@ class TrafiPolluImp(object):
             sqlFile = "Error ! Can't read the SQL file"
 
         self._dlg.plainTextEdit_sql_script.setPlainText(sqlFile)
+
+    def convert_SQL_to_Python(self, str_sql):
+        """
+
+        :param str_sql:
+        :return:
+        """
+        try:
+            first_split = str.split('(')
+            sql_type = first_split[0]
+            sql_type = sql_type.replace(' ', '')
+
+        except:
+            pass

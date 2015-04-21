@@ -13,11 +13,11 @@ SELECT
 --
   edges.start_node,
   edges.end_node,
+-- url: http://www.postgis.org/docs/ST_AsEWKB.html
+  ST_AsEWKB(edges.geom)               AS points_internes,
 --
-  ST_asText(edges.geom) AS Points_Internes,
---
-  ST_asText(axis.intersection_limit1) AS Point_Amont,
-  ST_asText(axis.intersection_limit2) AS Point_Aval,
+  ST_AsEWKB(axis.intersection_limit1) AS point_amont,
+  ST_AsEWKB(axis.intersection_limit2) AS point_aval,
 --
   axis.road_width,
   axis.lane_number,

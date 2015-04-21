@@ -36,6 +36,7 @@ try:
 except:
     import pickle
 import qgis_log_tools
+from collections import namedtuple
 
 defaultQtDateFormatString = "yyyy-MM-ddThh:mm:ss.zzz"
 
@@ -588,3 +589,13 @@ def get_itemData(combobox):
     :return:
     """
     return combobox.itemData(combobox.currentIndex())
+
+
+def create_named_tuple_from_names(name, list_names):
+    """
+
+    :param list_names:
+    :return:
+    """
+    return namedtuple(name, list_names)
+
