@@ -42,6 +42,7 @@ defaultQtDateFormatString = "yyyy-MM-ddThh:mm:ss.zzz"
 if os.name != "nt":
     import fcntl
     import struct
+
     def get_interface_ip(ifname):
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         return socket.inet_ntoa(fcntl.ioctl(
@@ -60,7 +61,7 @@ def get_lan_ip():
     """
     ip = socket.gethostbyname(socket.gethostname())
     if ip.startswith("127.") and os.name != "nt":
-        interfaces = ["eth0","eth1","eth2","wlan0","wlan1","wifi0","ath0","ath1","ppp0"]
+        interfaces = ["eth0", "eth1", "eth2", "wlan0", "wlan1", "wifi0", "ath0", "ath1", "ppp0"]
         for ifname in interfaces:
             try:
                 ip = get_interface_ip(ifname)
@@ -98,6 +99,7 @@ def get_os_username():
     :return:
     """
     import getpass
+
     return getpass.getuser()
 
 
@@ -110,18 +112,19 @@ def get_timestamp():
 def convert_timestamp_to_qdatetime(timestamp):
     from PyQt4.QtCore import QDateTime
     from math import modf
+
     timestamp_frac, timestamp_whole = modf(timestamp)
     # Qt time
     qdatetime = QDateTime()
     qdatetime.setTime_t(int(timestamp_whole))
-    qdatetime = qdatetime.addMSecs(int(timestamp_frac*1000))
+    qdatetime = qdatetime.addMSecs(int(timestamp_frac * 1000))
     #
     return qdatetime
 
 
 # def convert_timestamp_to_qt_string_format(timestamp, QtDateFormat):
-#     # String Qt time
-#     return convert_timestamp_to_qdatetime(timestamp).toString(QtDateFormat)
+# # String Qt time
+# return convert_timestamp_to_qdatetime(timestamp).toString(QtDateFormat)
 
 
 def convert_timestamp_to_qt_string_format(timestamp, QtDateFormatString=defaultQtDateFormatString):
@@ -197,7 +200,6 @@ import time
 
 
 class TpTimer:
-
     def __init__(self):
         self.currentTime = self.default_timers()
         self.dict_process_timeupdate = {}
@@ -272,6 +274,7 @@ def isConnected(url):
     socket = QTcpSocket()
     socket.connectToHost(url, 80)
     return socket.waitForConnected(1000)
+
 
 DEFAULT_SEGMENT_EPSILON = 1e-08
 
@@ -578,3 +581,47 @@ def print_group_name_values_in_qsettings(group_name=""):
         print key, str(qsettings.value(key))
         # import qgis_log_tools
         # qgis_log_tools.logMessageINFO(str(key)+": "+str(qsettings.value(key)))
+
+
+import types
+import exceptions
+
+
+class EnumException(exceptions.Exception):
+    pass
+
+
+class Enumeration:
+    def __init__(self, name, enumList):
+        self.__doc__ = name
+        lookup = {}
+        reverseLookup = {}
+        i = 0
+        uniqueNames = []
+        uniqueValues = []
+        for x in enumList:
+            if isinstance(x, types.TupleType):
+                x, i = x
+            if not isinstance(x, types.StringType):
+                raise EnumException("enum name is not a string: " + x)
+            if not isinstance(i, types.IntType):
+                raise EnumException("enum value is not an integer: " + i)
+            if x in uniqueNames:
+                raise EnumException("enum name is not unique: " + x)
+            if i in uniqueValues:
+                raise EnumException("enum value is not unique for " + x)
+            uniqueNames.append(x)
+            uniqueValues.append(i)
+            lookup[x] = i
+            reverseLookup[i] = x
+            i += 1
+        self.lookup = lookup
+        self.reverseLookup = reverseLookup
+
+    def __getattr__(self, attr):
+        if not self.lookup.has_key(attr):
+            raise AttributeError
+        return self.lookup[attr]
+
+    def whatis(self, value):
+        return self.reverseLookup[value]

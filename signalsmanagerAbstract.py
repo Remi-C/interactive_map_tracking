@@ -29,100 +29,100 @@ class AbstractSignalsManagerWithSingletonPattern(Singleton):
         """
         return AbstractSignalsManagerWithSingletonPattern.NAMEDTUPLE_QOBJECT_SIGNAL(qobject, signal_signature)
 
-    def _action_with_test_(self, dict_params):
+    def _action_with_test_(self, kwargs):
         """
 
-        :param dict_params:
+        :param kwargs:
         :return:
         """
         #
         return_state = 1
         #
-        if dict_params['key'] in self.dict_signals.keys():
-            key = dict_params['key']  # key build with qobject + signature
-            dict_params['dict_values'] = self.dict_signals[key]
+        key = kwargs['key']  # key build with qobject + signature
+        if key in self.dict_signals.keys():
+            kwargs['dict_values'] = self.dict_signals[key]
             #
-            if dict_params['func_test_action'](dict_params):
+            if kwargs['func_test_action'](kwargs):
                 # already connected
                 return_state = -2
             else:
                 # perform connection
-                dict_params['func_perform_action'](dict_params)
+                kwargs['func_perform_action'](kwargs)
         else:
             # signal doesn't exist
             return_state = -1
         #
         return return_state
 
-    def _action_with_key_(self, dict_params):
+    def _action_with_key_(self, kwargs):
         """
 
-        :param dict_params:
+        :param kwargs:
         :return:
         """
         #
         return_state = 1
         #
-        key = dict_params['key']
+        key = kwargs['key']
         if key in self.dict_signals.keys():
-            dict_params['dict_values'] = self.dict_signals[key]
+            kwargs['dict_values'] = self.dict_signals[key]
             # perform action
-            dict_params['func_perform_action'](dict_params)
+            kwargs['func_perform_action'](kwargs)
         else:
             # signal doesn't exist
             return_state = -1
         #
         return return_state
 
-    def _action_for_all_(self, dict_params):
+    def _action_for_all_(self, kwargs):
         """
 
         :param action:
         :return:
         """
-        action = dict_params['action_for_all']
+        action = kwargs['action_for_all']
         for key in self.dict_signals.keys():
             action(key)
 
-    def _action_for_group_with_test_(self, dict_params):
+    def _action_for_group_with_test_(self, kwargs):
         """
 
-        :param dict_params:
+        :param kwargs:
         :return:
         """
         #
         return_state = 1
         #
-        s_group = dict_params.setdefault('s_group', "all")
+        s_group = kwargs.setdefault('s_group', "all")
         if s_group == "all":
-            dict_params['action_for_all']()
+            kwargs['action_for_all']()
         else:
             # noinspection PyBroadException
             try:
-                action_with_key_test = dict_params['action_with_key_test']
+                action_with_key_test = kwargs['action_with_key_test']
                 for key in self.dict_signals.keys():
                     if key in self.dict_groups[s_group]:
-                        action_with_key_test(dict_params)
+                        action_with_key_test(kwargs)
             except:
                 # print s_group
                 return_state = -1
         return return_state
 
-    def _action_for_group_(self, dict_params):
+    def _action_for_group_(self, kwargs):
         """
 
-        :param dict_params:
+        :param kwargs:
         :return:
         """
         return_state = 1
         #
-        s_group = dict_params.setdefault('s_group', "all")
+        s_group = kwargs.setdefault('s_group', "all")
         if s_group == "all":
             self._action_for_all_()
         else:
             # noinspection PyBroadException
             try:
-                action_with_key = dict_params['action_with_key']
+                action_with_key = kwargs['action_with_key']
                 for key in self.dict_signals.keys():
                     if key in self.dict_group[s_group]:
                         action_with_key(key)

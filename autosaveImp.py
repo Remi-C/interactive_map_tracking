@@ -22,7 +22,6 @@ class AutoSaveImp(object):
         self._iface_ = iface
         self._dlg_ = dlg
         self._mapCanvas_ = self._iface_.mapCanvas()
-        # self._signals_manager_ = SignalsManager.getInstance()
         self._signals_manager_ = SignalsManager.instance()
         self._active_layer_ = None
 
@@ -30,7 +29,7 @@ class AutoSaveImp(object):
         """
 
         """
-        self._signals_manager_.add_clicked(self._dlg_, self.slot_clicked_checkbox_autosave, "GUI")
+        self._signals_manager_.add_clicked(self._dlg_, self._slot_clicked_checkbox_autosave_, "GUI")
         #
         self._connect_signal_currentLayerChanged_()
 
@@ -52,7 +51,7 @@ class AutoSaveImp(object):
             self._disconnect_signal_layerModified_(self._active_layer_)
 
     @DecoratorsForQt.save_checked_state("IMT")
-    def slot_clicked_checkbox_autosave(self):
+    def _slot_clicked_checkbox_autosave_(self):
         """ Action when the checkbox 'Enable Auto-Save and Refresh' is clicked """
         #
         self.enable_autosave()
@@ -80,7 +79,7 @@ class AutoSaveImp(object):
             # filtre sur les layers
             # if qgis_layer_tools.filter_layer_for_imt(self.iface.activeLayer():
             if qgis_layer_tools.filter_layer_for_imt(self._iface_.activeLayer(),
-                                                     [qgis_layer_tools.filter_layer_vectorlayer]):  # for test
+                                                     [qgis_layer_tools.filter_layer_vectorlayer]):  # TODO: just windows testing [need to remove]
                 #
                 qgis_log_tools.logMessageINFO("Active layer: " + self._iface_.activeLayer().name()
                                               + "is 'compatible' for Auto-Saving !"

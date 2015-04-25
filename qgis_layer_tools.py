@@ -26,8 +26,10 @@ __author__ = 'latty'
 import qgis_gui_tools
 import qgis_mapcanvas_tools
 import qgis_log_tools
+import imt_tools
 
 from qgis.gui import QgsMessageBar
+
 
 
 def commit_changes(layer, iface, s, bShowCommitError=True):
@@ -165,15 +167,24 @@ def filter_layer_postgis(layer, list_filters=["PostgreSQL", "database", "PostGIS
     return result
 
 
-def filter_layer_vectorlayer(layer, layertype=0):
-    """ Helper to decided if 'layer' is a QGIS Vector Layer.
-
-    url: http://qgis.org/api/2.6/classQgsMapLayer.html#adf3b0b576d7812c4359ece2142170308
+""" url: http://qgis.org/api/2.6/classQgsMapLayer.html#adf3b0b576d7812c4359ece2142170308
     Enumerator:
         VectorLayer   (=0)
         RasterLayer
         PluginLayer
+"""
+QgsMapLayer_LayerType = imt_tools.Enumeration(
+    "QgsMapLayer::LayerType",
+    [
+        ("VectorLayer", 0),
+        "RasterLayer",
+        "PluginLayer"
+    ]
+)
 
+
+def filter_layer_vectorlayer(layer, layertype=QgsMapLayer_LayerType.VectorLayer):
+    """ Helper to decided if 'layer' is a QGIS Vector Layer.
 
     :param layer: QGIS layer to commit
     :type layer: QgsMapLayer
@@ -188,8 +199,7 @@ def filter_layer_vectorlayer(layer, layertype=0):
 
 
 #
-def filter_layer_for_imt(layer,
-                         list_filters=[filter_layer_vectorlayer, filter_layer_postgis]):
+def filter_layer_for_imt(layer, list_layer_filters=[filter_layer_vectorlayer, filter_layer_postgis]):
     """ Helper to decided if 'layer' is acceptable for IMT (AutoSave&Refresh)
     i.e. 'layer' is a QGIS Vector Layer and 'layer' is provide by PostGres with PostGis extension
 
@@ -199,12 +209,11 @@ def filter_layer_for_imt(layer,
     :return: Result of the filter
     :rtype: bool
     """
-    for filter in list_filters:
-        if not filter(layer):
+    for layer_filter in list_layer_filters:
+        if not layer_filter(layer):
             return False
     return True
-    # return filter_layer_vectorlayer(layer) and filter_layer_postgis(layer)
-    # return filter_layer_vectorlayer(layer)
+
 
 def filter_layer_trackingposition_required_fields(layer, list_fields=["user_id", "w_time"]):
     """ Helper to decided if 'layer' has at least 2 fields :
@@ -227,6 +236,7 @@ def filter_layer_trackingposition_required_fields(layer, list_fields=["user_id",
     except:
             return []
     return list_id_fields
+
 
 def filter_layer_for_trackingposition(layer):
     """ Helper to decided if 'layer' is compatible for Tracking Position

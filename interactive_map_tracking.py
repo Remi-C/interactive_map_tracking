@@ -614,11 +614,13 @@ class interactive_map_tracking:
         :param slot:
         :return:
         """
-        if qgis_object:
+        try:
             self.signals_manager.add(qgis_object,
                                      signal_signature,
                                      slot,
                                      "QGIS")
+        except:
+            pass
 
     def connect_signal_extentsChanged(self):
         """ Connect the signal: 'Extent Changed' to the QGIS MapCanvas """
@@ -636,16 +638,15 @@ class interactive_map_tracking:
 
         """
         #
-        if None != self.currentLayer:
-            if None != self.mapCanvas:
-                #
-                self.signals_manager.add(
-                    self.mapCanvas,
-                    "renderComplete(QPainter*)",
-                    self.slot_renderComplete_layerModified
-                )
-                #
-                qgis_log_tools.logMessageINFO("Detect modification on layer:" + self.currentLayer.name())
+        if self.currentLayer is not None and self.mapCanvas is not None:
+        #
+        #
+            self.signals_manager.add(
+                self.mapCanvas,
+                "renderComplete(QPainter*)",
+                self.slot_renderComplete_layerModified
+            )
+        qgis_log_tools.logMessageINFO("Detect modification on layer:" + self.currentLayer.name())
 
     def slot_renderComplete_layerModified(self):
         """ Action when the signal: 'Render Complete' from QGIS Layer (current) is emitted&captured (after emitted&captured signal: 'Layer Modified') """
@@ -677,37 +678,6 @@ class interactive_map_tracking:
             self.update_track_position_with_qtimers()
         else:
             self.update_track_position()
-
-    @staticmethod
-    def filter_layer_for_tracking_position(layer):
-        # set Attributes for Layer in DB
-        # On récupère automatiquement le nombre de champs qui compose les features présentes dans ce layer
-        # How to get field names in pyqgis 2.0
-        # url: http://gis.stackexchange.com/questions/76364/how-to-get-field-names-in-pyqgis-2-0
-        dataProvider = layer.dataProvider()
-
-        # Return a map of indexes with field names for this layer.
-        # url: http://qgis.org/api/classQgsVectorDataProvider.html#a53f4e62cb05889ecf9897fc6a015c296
-        fields = dataProvider.fields()
-
-        # get fields name from the layer
-        field_names = [field.name() for field in fields]
-
-        # find index for field 'user-id'
-        id_user_id_field = imt_tools.find_index_field_by_name(field_names, "user_id")
-        if id_user_id_field == -1:
-            qgis_log_tools.logMessageWARNING(
-                "No \"user_id\"::text field attributes found in layer: " + layer.name())
-            return -1
-
-        # find index for field 'writing_time'
-        id_w_time_field = imt_tools.find_index_field_by_name(field_names, "w_time")
-        if id_w_time_field == -1:
-            qgis_log_tools.logMessageWARNING(
-                "No \"w_time\"::text attributes found in layer: " + layer.name())
-            return -1
-
-        return [id_user_id_field, id_w_time_field]
 
     def slot_currentIndexChanged(self, layer_name):
         """
