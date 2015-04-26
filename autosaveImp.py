@@ -19,57 +19,64 @@ class AutoSaveImp(object):
         """
 
         """
-        self._iface_ = iface
-        self._dlg_ = dlg
-        self._mapCanvas_ = self._iface_.mapCanvas()
-        self._signals_manager_ = SignalsManager.instance()
-        self._active_layer_ = None
+        self.__iface = iface
+        self.__dlg = dlg
+        self.__mapCanvas = self.__iface.mapCanvas()
+        self.__signals_manager = SignalsManager.instance()
+        self.__active_layer = None
 
-    def _init_signals_(self):
+    def _get_dlg(self):
+        """
+
+        :return:
+        """
+        return self.__dlg
+
+    def _init_signals(self):
         """
 
         """
-        self._signals_manager_.add_clicked(self._dlg_, self._slot_clicked_checkbox_autosave_, "GUI")
+        self.__signals_manager.add_clicked(self.__dlg, self._slot_clicked_checkbox_autosave, "GUI")
         #
-        self._connect_signal_currentLayerChanged_()
+        self.__connect_signal_currentLayerChanged()
 
-    def _enable_autosave_(self):
+    def _enable_autosave(self):
         """
         Connection with QGIS interface
         """
-        self._connect_signal_currentLayerChanged_()
+        self.__connect_signal_currentLayerChanged()
         #
-        self.enable_autosave()
+        self.__action_enable_autosave()
 
-    def _disable_autosave_(self):
+    def _disable_autosave(self):
         """
         Disconnection with QGIS interface
         """
-        self._disconnect_signal_currentLayerChanged_()
+        self.__disconnect_signal_currentLayerChanged()
         #
-        if self._active_layer_ is not None:
-            self._disconnect_signal_layerModified_(self._active_layer_)
+        if self.__active_layer is not None:
+            self.__disconnect_signal_layerModified(self.__active_layer)
 
     @DecoratorsForQt.save_checked_state("IMT")
-    def _slot_clicked_checkbox_autosave_(self):
+    def _slot_clicked_checkbox_autosave(self):
         """ Action when the checkbox 'Enable Auto-Save and Refresh' is clicked """
         #
-        self.enable_autosave()
+        self.__action_enable_autosave()
 
-    def enable_autosave(self):
+    def __action_enable_autosave(self):
         #
         qgis_log_tools.logMessageINFO("Launch 'enable_autosave(...)' ...")
         #
-        if self._dlg_.isChecked():
-            self._update_current_layer_()
+        if self.__dlg.isChecked():
+            self._update_current_layer()
             #
-            if self._active_layer_ is not None:
-                self._connect_signal_layerModified_(self._active_layer_)
+            if self.__active_layer is not None:
+                self._connect_signal_layerModified_(self.__active_layer)
         else:
-            if self._active_layer_ is not None:
-                self._disconnect_signal_layerModified_(self._active_layer_)
+            if self.__active_layer is not None:
+                self.__disconnect_signal_layerModified(self.__active_layer)
 
-    def _update_current_layer_(self):
+    def _update_current_layer(self):
         """
 
         :return:
@@ -78,22 +85,22 @@ class AutoSaveImp(object):
         try:
             # filtre sur les layers
             # if qgis_layer_tools.filter_layer_for_imt(self.iface.activeLayer():
-            if qgis_layer_tools.filter_layer_for_imt(self._iface_.activeLayer(),
-                                                     [qgis_layer_tools.filter_layer_vectorlayer]):  # TODO: just windows testing [need to remove]
+            if qgis_layer_tools.filter_layer_for_imt(self.__iface.activeLayer(),
+                                                     [qgis_layer_tools.filter_layer_vectorlayer]):  # TODO: just windows testing
                 #
-                qgis_log_tools.logMessageINFO("Active layer: " + self._iface_.activeLayer().name()
+                qgis_log_tools.logMessageINFO("Active layer: " + self.__iface.activeLayer().name()
                                               + "is 'compatible' for Auto-Saving !"
                                               + "- [OK]")
                 #
-                self._active_layer_ = self._iface_.activeLayer()
+                self.__active_layer = self.__iface.activeLayer()
                 #
                 return_value = True
             else:
-                qgis_log_tools.logMessageWARNING("Active layer: " + self._iface_.activeLayer().name()
+                qgis_log_tools.logMessageWARNING("Active layer: " + self.__iface.activeLayer().name()
                                                  + "is not 'compatible' for Auto-Saving ! (VectorLayer + PostGIS)"
                                                  + "- [FAILED]")
                 #
-                self._active_layer_ = None
+                self.__active_layer = None
         except:
             qgis_log_tools.logMessageINFO("Exception here!")
         #
@@ -107,14 +114,14 @@ class AutoSaveImp(object):
 
         """
         if layer is not None:
-            self._signals_manager_.add(layer,
+            self.__signals_manager.add(layer,
                                      "layerModified()",
-                                     self._slot_layerModified_,
+                                     self.__slot_layerModified,
                                      "QGIS")
             #
             qgis_log_tools.logMessageINFO("Connect SIGNAL on layer: " + layer.name())
 
-    def _disconnect_signal_layerModified_(self, layer):
+    def __disconnect_signal_layerModified(self, layer):
         """ Disconnect the signal: 'Layer Modified' of the layer given
 
         :param layer: QGIS Layer
@@ -122,11 +129,11 @@ class AutoSaveImp(object):
 
         """
         if layer is not None:
-            self._signals_manager_.disconnect(layer, "layerModified()")
+            self.__signals_manager.disconnect(layer, "layerModified()")
             #
             qgis_log_tools.logMessageINFO("Disconnect SIGNAL on layer: " + layer.name())
 
-    def _slot_layerModified_(self):
+    def __slot_layerModified(self):
         """ Action when the signal: 'Layer Modified' from QGIS Layer (current) is emitted&captured
         We connect a new signal: 'RenderComplete' to perform operation after the QGIS rendering (deferred strategy)
 
@@ -135,34 +142,34 @@ class AutoSaveImp(object):
         # if self.currentLayer is not None and self.mapCanvas is not None:
         #
         #
-        self._signals_manager_.add(
-            self._mapCanvas_,
+        self.__signals_manager.add(
+            self.__mapCanvas,
             "renderComplete(QPainter*)",
-            self._slot_renderComplete_layerModified_
+            self.__slot_renderComplete_layerModified
         )
-        qgis_log_tools.logMessageINFO("Detect modification on layer:" + self._active_layer_.name())
+        qgis_log_tools.logMessageINFO("Detect modification on layer:" + self.__active_layer.name())
 
-    def _slot_renderComplete_layerModified_(self):
+    def __slot_renderComplete_layerModified(self):
         """ Action when the signal: 'Render Complete' from QGIS Layer (current) is emitted&captured (after emitted&captured signal: 'Layer Modified') """
         #
-        self._signals_manager_.disconnect(self._mapCanvas_, "renderComplete(QPainter*)")
+        self.__signals_manager.disconnect(self.__mapCanvas, "renderComplete(QPainter*)")
         #
-        qgis_layer_tools.commit_changes_and_refresh(self._active_layer_, self._iface_, QSettings())
+        qgis_layer_tools.commit_changes_and_refresh(self.__active_layer, self.__iface, QSettings())
 
-    def _connect_signal_currentLayerChanged_(self):
+    def __connect_signal_currentLayerChanged(self):
         """ Connect the signal: 'Layer Changed' to the layer given """
-        self._connect_signal_qgis_(self._iface_, "currentLayerChanged(QgsMapLayer*)", self._slot_currentLayerChanged_)
+        self.__connect_signal_qgis(self.__iface, "currentLayerChanged(QgsMapLayer*)", self.__slot_currentLayerChanged)
         #
         qgis_log_tools.logMessageINFO("Connect SIGNAL on QGISInterface")
 
-    def _disconnect_signal_currentLayerChanged_(self):
+    def __disconnect_signal_currentLayerChanged(self):
         """ Disconnect the signal: 'Current Layer Changed' of the QGIS Interface"""
         #
-        self._signals_manager_.disconnect(self._iface_, "currentLayerChanged(QgsMapLayer*)")
+        self.__signals_manager.disconnect(self.__iface, "currentLayerChanged(QgsMapLayer*)")
         #
         qgis_log_tools.logMessageINFO("Disconnect SIGNAL on QGISInterface")
 
-    def _connect_signal_qgis_(self, qgis_object, signal_signature, slot):
+    def __connect_signal_qgis(self, qgis_object, signal_signature, slot):
         """
 
         :param qgis_object:
@@ -171,12 +178,12 @@ class AutoSaveImp(object):
 
         """
         if qgis_object:
-            self._signals_manager_.add(qgis_object,
+            self.__signals_manager.add(qgis_object,
                                      signal_signature,
                                      slot,
                                      "QGIS")
 
-    def _slot_currentLayerChanged_(self, layer):
+    def __slot_currentLayerChanged(self, layer):
         """ Action when the signal: 'Current Layer Changed' from QGIS MapCanvas is emitted&captured
 
         :param layer: QGIS layer -> current layer using by Interactive_Map_Tracking plugin
@@ -184,18 +191,18 @@ class AutoSaveImp(object):
 
         """
         # disconnect the current layer
-        if None != self._active_layer_:
-            self._disconnect_signal_layerModified_(self._active_layer_)
+        if None != self.__active_layer:
+            self.__disconnect_signal_layerModified(self.__active_layer)
 
         #
-        self._update_current_layer_()
+        self._update_current_layer()
 
-        if self._active_layer_ is not None:
+        if self.__active_layer is not None:
             #
-            if self._dlg_.isChecked():
-                qgis_layer_tools.commit_changes_and_refresh(self._active_layer_, self._iface_, QSettings())
-                self._connect_signal_layerModified_(self._active_layer_)
+            if self.__dlg.isChecked():
+                qgis_layer_tools.commit_changes_and_refresh(self.__active_layer, self.__iface, QSettings())
+                self._connect_signal_layerModified_(self.__active_layer)
                 #
-                qgis_log_tools.logMessageINFO("Change Layer: self.currentLayer.name()=" + self._active_layer_.name())
+                qgis_log_tools.logMessageINFO("Change Layer: self.currentLayer.name()=" + self.__active_layer.name())
         else:
             qgis_log_tools.logMessageINFO("No layer selected (for ITP)")

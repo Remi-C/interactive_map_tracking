@@ -17,25 +17,25 @@ class IAutoSave(AutoSaveImp):
         """
 
         """
-        self._init_signals_()
+        self._init_signals()
 
     def update(self):
         """
 
         """
-        self._update_current_layer_()
+        self._update_current_layer()
 
     def enable(self):
         """
 
         """
-        self._enable_autosave_()
+        self._enable_autosave()
 
     def disable(self):
         """
 
         """
-        self._disable_autosave_()
+        self._disable_autosave()
 
     def get_dlg(self):
         """
@@ -43,7 +43,7 @@ class IAutoSave(AutoSaveImp):
         :return:
 
         """
-        return self._dlg_
+        return self._get_dlg()
 
     @staticmethod
     def get_name_slot():
@@ -51,7 +51,7 @@ class IAutoSave(AutoSaveImp):
 
         :return:
         """
-        return AutoSaveImp._slot_clicked_checkbox_autosave_.__name__
+        return AutoSaveImp._slot_clicked_checkbox_autosave.__name__
 
 class AutoSave:
     pass

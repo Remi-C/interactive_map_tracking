@@ -25,18 +25,16 @@
 import os.path
 from qgis.gui import QgsMessageBar
 from qgis.core import *
-
 from PyQt4.QtCore import QSettings, QTranslator, qVersion, QCoreApplication
 from PyQt4.QtCore import QUrl, QReadWriteLock, QReadLocker, pyqtSlot
 from PyQt4.QtGui import QAction, QIcon, QTabWidget
-from PyQt4.QtWebKit import QWebSettings
-
 from interactive_map_tracking_dialog import interactive_map_trackingDialog
 import qgis_layer_tools
 import qgis_log_tools
 import imt_tools
 from signalsmanager import SignalsManager
 from autosave import AutoSave
+from webviewImp import WebViewImp
 from decorators import DecoratorsForQt
 
 
@@ -49,10 +47,6 @@ import time
 from PyQt4.QtNetwork import QNetworkProxy
 
 from collections import namedtuple
-
-
-def CONVERT_S_TO_MS(s):
-    return s * 1000
 
 
 class interactive_map_tracking:
@@ -70,9 +64,8 @@ class interactive_map_tracking:
         """
         current_time = time.time()
 
-        # Clean QSettings
         self.qsettings = QSettings()
-
+        # Clean QSettings
         # self.clean_qsettings()
         # imt_tools.print_group_name_values_in_qsettings(self.qsettings_group_name)
 
@@ -98,9 +91,7 @@ class interactive_map_tracking:
 
         # Create the dialog (after translation) and keep reference
         # print "declare dlg here !"
-        # if not 'dlg' in dir(self):
         self.dlg = interactive_map_trackingDialog()
-        # print "- self.dlg: ", self.dlg
 
         # Declare instance attributes
         self.actions = []
@@ -166,7 +157,7 @@ class interactive_map_tracking:
         self.tp_timers.set_delay("tp_threshold_time_for_sending_layer_to_dp", tp_threshold_time_for_sending_layer_to_dp)
         # in S
         delay_time_still_moving = 0.750  # delta time used to decide if the user still moving on the map
-        self.tp_timers.set_delay("delay_time_still_moving", delay_time_still_moving)
+        self.tp_timers.set_delay("still moving", delay_time_still_moving)
         # for timing
         self.tp_time_last_rttp_to_mem = current_time
         self.tp_time_last_construct_geom = current_time
@@ -199,41 +190,11 @@ class interactive_map_tracking:
 
         self.bRefreshMapFromAutoSave = False
 
-        self.TP_NAMEDTUPLE_WEBVIEW = namedtuple(
-            'TP_NAMEDTUPLE_WEBVIEW',
-            ['state', 'width', 'height', 'online_url', 'offline_url']
-        )
         # very dirty @FIXME @TODO : here is the proper way to do it (from within the class `self.plugin_dir`)
-        self.qgis_plugins_directory = self.plugin_dir
-        self.webview_offline_about = os.path.join(self.qgis_plugins_directory, "gui_doc", "About.htm")
-        self.webview_offline_user_doc = os.path.join(self.qgis_plugins_directory, "gui_doc",
-                                                     "Simplified_User_Guide.htm")
-        self.webview_online_about = "https://github.com/Remi-C/interactive_map_tracking/wiki/[User]-About"
-        self.webview_online_user_doc = "https://github.com/Remi-C/interactive_map_tracking/wiki/[User]-User-Guide"
-        #
-        self.webview_online_itown = "http://www.itowns.fr/api/testAPI.html"
-
-        self.webview_dict = {}
-        # url : http://qt-project.org/doc/qt-4.8/qurl.html
-        self.webview_default_tuple = self.TP_NAMEDTUPLE_WEBVIEW('init', 0, 0, QUrl(""), QUrl(""))
-        self.webview_dict[self.dlg.webView_userdoc] = self.TP_NAMEDTUPLE_WEBVIEW(
-            'init',
-            0, 0,
-            QUrl(self.webview_online_user_doc),
-            QUrl(self.webview_offline_user_doc)
-        )
-        self.webview_dict[self.dlg.webView_about] = self.TP_NAMEDTUPLE_WEBVIEW(
-            'init',
-            0, 0,
-            QUrl(self.webview_online_about),
-            QUrl(self.webview_offline_about)
-        )
-        self.webview_current = None
-        self.webview_margin = 60
-        self.webview_tab_index = -1
+        self.webview = WebViewImp(self.iface, self.dlg, self.plugin_dir)
 
         # getting proxy
-        self._set_proxy_()
+        self.set_proxy()
 
         self.dict_tabs_size = {}  # dict useful for using setdefault(...)
 
@@ -249,16 +210,9 @@ class interactive_map_tracking:
         self.mapCanvas = self.iface.mapCanvas()
 
         from qgis.core import QgsProject
+
         self.connect_signal_qgis(QgsProject.instance(), "readProject(const QDomDocument & )", self.slot_readProject)
 
-        # self.list_id_checkbox = [
-        # 'enablePlugin',
-        #     'enableAutoSave',
-        #     'enableTrackPosition',
-        #     'enableLogging',
-        #     'enableUseMutexForTP'
-        # ]
-        # print "imt_tools.build_list_member_name_qt_checkbox: ", imt_tools.build_list_member_name_qt_checkbox(self.dlg)
         self.list_id_checkbox = imt_tools.build_list_member_name_filter_qcheckbox(self.dlg)
 
     def slot_readProject(self):
@@ -291,7 +245,7 @@ class interactive_map_tracking:
         """
         return self.dlg
 
-    def _set_proxy_(self):
+    def set_proxy(self):
         """
 
         :return:
@@ -416,7 +370,7 @@ class interactive_map_tracking:
         """Create the menu entries and toolbar icons inside the QGIS GUI."""
 
         # icon_path = ':/plugins/interactive_map_tracking/icon.png'
-        icon_path = self.qgis_plugins_directory + '/icon.png'   # TODO: problem with Qt ressources
+        icon_path = self.plugin_dir + '/icon.png'  # TODO: problem with Qt ressources
         # icon_path = ':/plugins/interactive_map_tracking/icon_svg.png'
         self.add_action(
             icon_path,
@@ -453,8 +407,8 @@ class interactive_map_tracking:
         #
         # set the icon IMT ^^
         # icon_path = ':/plugins/interactive_map_tracking/icon.png'
-        icon_path = self.qgis_plugins_directory + '/icon.png'
-        qgis_log_tools.logMessageINFO(str(self.qgis_plugins_directory + 'icon.png'))
+        icon_path = self.plugin_dir + '/icon.png'
+        qgis_log_tools.logMessageINFO(str(self.plugin_dir + 'icon.png'))
         self.dlg.setWindowIcon(QIcon(icon_path))
 
         # set the tab at init
@@ -480,8 +434,8 @@ class interactive_map_tracking:
         """
 
         :return:
+
         """
-        # list_id_checkbox = imt_tools.build_list_member_name_qt_checkbox(self.dlg)
         dict_state = {
             imt_tools.pickle_id_gui: {
                 imt_tools.pickle_id_list_checkbox: imt_tools.serialize_list_checkbox(self.dlg, self.list_id_checkbox),
@@ -495,9 +449,8 @@ class interactive_map_tracking:
 
         :param state:
         :return:
+
         """
-        # list_id_checkbox = imt_tools.build_list_member_name_qt_checkbox(self.dlg)
-        #
         imt_tools.update_list_checkbox_from_serialization(self.dlg, self.list_id_checkbox, state)
         #
         imt_tools.update_tabs_size_from_serialization(self, state)
@@ -639,8 +592,8 @@ class interactive_map_tracking:
         """
         #
         if self.currentLayer is not None and self.mapCanvas is not None:
-        #
-        #
+            #
+            #
             self.signals_manager.add(
                 self.mapCanvas,
                 "renderComplete(QPainter*)",
@@ -689,7 +642,7 @@ class interactive_map_tracking:
         qgis_log_tools.logMessageINFO("Launch 'currentIndexChangedTPLCB(self, layer_name=" + layer_name + ")' ...")
         # layer_name == "" when when we clear the combobox (for example)
         # if layer_name == "":
-        #     return
+        # return
 
         # noinspection PyBroadException
         try:
@@ -823,9 +776,9 @@ class interactive_map_tracking:
     @DecoratorsForQt.save_checked_state(qsettings_group_name)
     def slot_enable_asynch(self):
         """ Action when the checkbox 'Use Mutex (for TrackingPosition) [BETA]' is clicked """
-        self.enable_asynch()
+        self.action_enable_asynch()
 
-    def enable_asynch(self):
+    def action_enable_asynch(self):
         """
         - using Mutex to protect commitChange operation in multi-threads context (signals strategy)
         Beta test for:
@@ -851,7 +804,7 @@ class interactive_map_tracking:
         """
         qgis_log_tools.logMessageINFO("Launch 'enabled_plugin(...)' ...")
 
-        #force the plugin to be in front
+        # force the plugin to be in front
         self.dlg.raise_()
 
         if self.dlg.enablePlugin.isChecked():
@@ -863,7 +816,7 @@ class interactive_map_tracking:
 
         self.enabled_trackposition()
         self.enable_logging()
-        self.enable_asynch()
+        self.action_enable_asynch()
 
     def enabled_pluging_GUI(self):
         """
@@ -937,133 +890,6 @@ class interactive_map_tracking:
 
         return self.threshold
 
-    @staticmethod
-    def compute_frame_size(frame, dlg=None, margin_width=60):
-        """
-
-        :param dlg:
-        :param frame:
-        :param margin_width:
-        :return:
-        """
-        width = frame.contentsSize().width()
-        height = frame.contentsSize().height()
-        #
-        width += margin_width
-        #
-        width = max(1024, width)
-        height = min(768, max(height, width * 4 / 3))
-        #
-        if dlg:
-            dlg.resize(width, height)
-        #
-        return width, height
-
-    @staticmethod
-    def update_size_dlg_from_tuple(dlg, param_tuple):
-        """
-
-        :param dlg:
-        :param param_tuple:
-        :return:
-        """
-        dlg.resize(param_tuple.width, param_tuple.height)
-        return param_tuple.width, param_tuple.height
-
-    def slot_loadFinished_webview(self, ok):
-        """
-
-        :param ok:
-        """
-
-        # safe because we stop the listener of this event when we changed the tab
-        webview = self.webview_current
-
-        tuple_webview = self.webview_dict.setdefault(webview, self.webview_default_tuple)
-        last_state = tuple_webview.state
-        qgis_log_tools.logMessageINFO("#last_state : " + str(last_state))
-
-        if ok:
-            # we have loaded a HTML page (offline or online)
-            qgis_log_tools.logMessageINFO("## WebView : OK")
-
-            # update the QDiaglog sizes
-            dlg = None
-            if self.dlg.IMT_Window_Tabs.currentIndex() == self.webview_tab_index:
-                dlg = self.dlg
-            width, height = self.compute_frame_size(webview.page().currentFrame(),
-                                                    dlg,
-                                                    self.webview_margin)
-            # update the tuple for this webview
-            self.webview_dict[webview] = self.TP_NAMEDTUPLE_WEBVIEW(
-                'online',
-                width, height,
-                tuple_webview.online_url,
-                tuple_webview.offline_url
-            )
-            #
-            qgis_log_tools.logMessageINFO("### width : " + str(width) + " - height : " + str(height))
-        else:
-            if self.webview_dict[webview].state == 'online':
-                qgis_log_tools.logMessageINFO(
-                    "## WebView : FAILED TO LOAD from " + str(self.webview_dict[webview].online_url))  #online_url
-            else:
-                qgis_log_tools.logMessageINFO(
-                    "## WebView : FAILED TO LOAD from " + str(self.webview_dict[webview].offline_url))
-            #
-            if self.webview_dict[webview].state != 'offline':  #regular case we failed, but we are going to try again
-                self.webview_dict[webview] = self.TP_NAMEDTUPLE_WEBVIEW(
-                    'offline',
-                    tuple_webview.width, tuple_webview.height,
-                    tuple_webview.online_url,
-                    tuple_webview.offline_url
-                )
-
-                # try to load the offline version (still in initial state)
-                # @FIXME : doesn't load the images in offline mode on XP...
-                webview.load(QUrl(tuple_webview.offline_url))
-
-            else:  # we already failed last, time, stopping to try
-                qgis_log_tools.logMessageINFO("## WebView : stopping to try to retrieve html")
-
-    def webview_load_page(self, webview, index_tab=-1, margin=60):
-        """
-
-        :param webview:
-        :param margin:
-        :return:
-        """
-        #
-        tuple_webview = self.webview_dict.setdefault(webview, self.webview_default_tuple)
-
-        self.webview_margin = margin
-        self.webview_current = webview
-        self.webview_tab_index = index_tab
-
-        # signal : 'loadFinished(bool)'
-        self.signals_manager.add(webview,
-                                 "loadFinished (bool)",
-                                 self.slot_loadFinished_webview,
-                                 "WEB")
-
-        # reset/clear the web widget
-        # url : http://qt-project.org/doc/qt-4.8/qwebview.html#settings
-        web_setting = webview.settings()
-        web_setting.clearMemoryCaches()
-        web_setting.setAttribute(QWebSettings.PluginsEnabled, True)
-
-        global_settings = web_setting.globalSettings()
-        #
-        global_settings.clearMemoryCaches()
-        # Enables plugins in Web pages (e.g. using NPAPI).
-        # url: http://doc.qt.io/qt-4.8/qwebsettings.html#WebAttribute-enum
-        global_settings.setAttribute(QWebSettings.PluginsEnabled, True)
-
-        if tuple_webview.state == 'offline':  # offline
-            webview.load(tuple_webview.offline_url)
-        else:  # 'init' or 'online'
-            webview.load(tuple_webview.online_url)
-
     def slot_currentChanged_tabs(self, index):
         """
 
@@ -1076,10 +902,10 @@ class interactive_map_tracking:
         #
         if index == 3:
             qgis_log_tools.logMessageINFO("## Tab : User Doc")
-            self.webview_load_page(self.dlg.webView_userdoc, index, self.webview_margin)
+            self.webview.load(name="user doc", index_tab=index)
         elif index == 4:
             qgis_log_tools.logMessageINFO("## Tab : About")
-            self.webview_load_page(self.dlg.webView_about, index, self.webview_margin)
+            self.webview.load(name="about", index_tab=index)
         else:
             self.dict_tabs_size[index] = self.dict_tabs_size.setdefault(index, self.dlg.minimumSize())
             self.dlg.resize(self.dict_tabs_size[index])
@@ -1157,7 +983,8 @@ class interactive_map_tracking:
                 #
                 self.signals_manager.stop(self.qtimer_tracking_position_memory_to_geom)
 
-            if not tp_dict_key_l_values_listfeatures_is_empty and len(self.tp_dict_key_l_values_listfeatures.keys()) == 0:
+            if not tp_dict_key_l_values_listfeatures_is_empty and len(
+                    self.tp_dict_key_l_values_listfeatures.keys()) == 0:
                 qgis_log_tools.logMessageINFO("Need to stop QTimer : qtimer_tracking_position_geom_to_layer ! ")
                 #
                 self.signals_manager.stop(self.qtimer_tracking_position_geom_to_layer)
@@ -1228,7 +1055,7 @@ class interactive_map_tracking:
         # get the list points from the current extent (from QGIS MapCanvas)
         list_points_from_mapcanvas = imt_tools.construct_listpoints_from_extent(mapCanvas_extent)
 
-        ## NEED TO OPTIMIZE ##
+        # # NEED TO OPTIMIZE ##
         if bWithProjectionInCRSLayer:
             # url: http://qgis.org/api/classQgsMapCanvas.html#af0ffae7b5e5ec8b29764773fa6a74d58
             extent_src_crs = mapCanvas.mapSettings().destinationCrs()
@@ -1272,8 +1099,8 @@ class interactive_map_tracking:
             #
             commitErrorString = layer_for_polygon_extent.commitErrors()[2]
             #
-            interval = [commitErrorString.rfind(":") + 2,   # start :  +2 to skip ': ' prefix of commitError msg
-                        len(commitErrorString)]             # end
+            interval = [commitErrorString.rfind(":") + 2,  # start :  +2 to skip ': ' prefix of commitError msg
+                        len(commitErrorString)]  # end
             commitErrorStringShort = commitErrorString[interval[0]:interval[1]]
             #
             self.iface.messageBar().pushMessage("IMT. ERROR : " + "\"" + commitErrorStringShort + "\"",
@@ -1354,10 +1181,21 @@ class interactive_map_tracking:
         return 1
 
     def slot_tp_rttp_to_memory(self):
-        """ Action perform when the QTimer for Tracking Position is time out
-        Enqueue requests from Tracking Position to amortize the cost&effect on QGIS GUI
+        """Slot:
 
+        """
+        self.action_rttp_to_memory()
+
+        self.signals_manager.stop(self.qtimer_tracking_position_rtt_to_memory)
+        # next link
+        interval = self.tp_timers.get_delay("tp_threshold_time_for_construct_geom")
+        self.signals_manager.start(self.qtimer_tracking_position_memory_to_geom, interval)
+
+    def action_rttp_to_memory(self):
+        """ Action:
+        Enqueue requests from Tracking Position to amortize the cost&effect on QGIS GUI
         This pass transfer events inputs map moving into memory (QGIS -> Python)
+
         """
         qgis_log_tools.logMessageINFO("~~ CALL : tracking_position_qtimer_rttp_to_memory ~~")
 
@@ -1379,21 +1217,30 @@ class interactive_map_tracking:
             if size_tp_queue != 0:
                 qgis_log_tools.logMessageINFO("** Pack " + str(size_tp_queue) + " tuples for 1 call -> mem")
 
-        #####################
-        # Process Management
-        #####################
-        self.signals_manager.stop(self.qtimer_tracking_position_rtt_to_memory)
-        #
-        interval = self.tp_timers.get_delay("tp_threshold_time_for_construct_geom")
-        self.signals_manager.start(self.qtimer_tracking_position_memory_to_geom, interval)
-        #####################
-
     def slot_memory_to_geom_tp(self):
-        """ Action perform when the QTimer for Tracking Position is time out
-        Enqueue requests from Tracking Position to amortize the cost&effect on QGIS GUI
+        """Slot:
 
+        """
+        append_in_dic = self.action_memory_to_geom()
+
+        if append_in_dic:
+            self.signals_manager.stop(self.qtimer_tracking_position_memory_to_geom)
+            #
+            interval = self.tp_timers.get_delay("tp_threshold_time_for_sending_geom_to_layer")
+            dt_still_moving = self.tp_timers.get_delay("still moving") - \
+                                    self.tp_timers.delta_with_current_time("still moving")
+            dt_still_moving = max(0.0, dt_still_moving)
+            interval += imt_tools.CONVERT_S_TO_MS(dt_still_moving)
+            # next link
+            self.signals_manager.start(self.qtimer_tracking_position_geom_to_layer, interval)
+
+    def action_memory_to_geom(self):
+        """ Action:
+        Enqueue requests from Tracking Position to amortize the cost&effect on QGIS GUI
         This pass convert tracking extents datas (MEMory side) to QGIS GEOMetries (MEMory side)
-        In this pass we project the entries points in world (QGIS) CRS into CRS of the layer target (for tracking position)
+        In this pass we project the entries points in world (QGIS) CRS into CRS of the layer target
+        (for tracking position)
+
         """
         qgis_log_tools.logMessageINFO("~~ CALL : tracking_position_qtimer_memory_to_geom ~~")
 
@@ -1413,6 +1260,13 @@ class interactive_map_tracking:
                 extent_dst_crs = layer_to_commit.crs()
                 # url: http://docs.qgis.org/testing/en/docs/pyqgis_developer_cookbook/crs.html
                 xform = QgsCoordinateTransform(extent_src_crs, extent_dst_crs)
+                # TODO: add a option for this feature (Projected points in CRS destination layer) in GUI
+                bWithProjectionInCRSLayer = True
+                dict_transform_list_points = {
+                    True: xform.transform,
+                    False: lambda x: x
+                }
+                func_transform_list_points = dict_transform_list_points[bWithProjectionInCRSLayer]
 
                 tp_list_fets = []
 
@@ -1420,109 +1274,87 @@ class interactive_map_tracking:
                 list_ntuples = self.tp_dict_key_l_values_et.pop(id_layer)
                 if len(list_ntuples) != 0:
                     for tp_namedtuple in list_ntuples:
+                        # extract tuple informations
                         mapcanvas_extent = tp_namedtuple.extent
-
                         w_time = tp_namedtuple.w_time
-
                         # get the list points from the current extent (from QGIS MapCanvas)
-                        list_points_from_mapcanvas = mapcanvas_extent
-
-                        # TODO: add a option for this feature (Projected points in CRS destination layer) in GUI
-                        bWithProjectionInCRSLayer = True
-                        if bWithProjectionInCRSLayer:
-                            #
-                            list_points = [xform.transform(point) for point in list_points_from_mapcanvas]
-                        else:
-                            list_points = list_points_from_mapcanvas
-
-                        # list of lists of points
-                        gPolygon = QgsGeometry.fromPolygon([list_points])
-
+                        list_points_from_mapcanvas = [
+                            func_transform_list_points(point)
+                            for point in mapcanvas_extent
+                        ]
+                        gPolygon = QgsGeometry.fromPolygon([list_points_from_mapcanvas])
+                        #
                         fet = QgsFeature()
-
                         fet.setGeometry(gPolygon)
-
                         # update the time stamp attribute
                         self.values[self.tp_id_w_time] = imt_tools.convert_timestamp_to_qt_string_format(w_time)
-
                         fet.setAttributes(self.values)
-
                         tp_list_fets.append(fet)
-                        # append_at_least_1_fet = True
 
                     self.tp_dict_key_l_values_listfeatures.setdefault(id_layer, []).append(tp_list_fets)
                     append_in_dic = True
                     #
                     qgis_log_tools.logMessageINFO(
                         "-- Pack " + str(len(tp_list_fets)) + " features in layer: " + layer.name())
-
-        if append_in_dic:
-            #####################
-            # Process Management
-            #####################
-            self.signals_manager.stop(self.qtimer_tracking_position_memory_to_geom)
-            #
-            interval = self.tp_timers.get_delay("tp_threshold_time_for_sending_geom_to_layer")
-            interval += CONVERT_S_TO_MS(max(0.0, (
-                self.tp_timers.get_delay("delay_time_still_moving") - self.tp_timers.delta_with_current_time(
-                    "still moving"))))
-            self.signals_manager.start(self.qtimer_tracking_position_geom_to_layer, interval)
-            #####################
+        return append_in_dic
 
     def slot_geom_to_layer_tp(self):
-        """ Action perform when the QTimer for Tracking Position is time out
-        Enqueue requests from Tracking Position to amortize the cost&effect on QGIS GUI
+        """ Slot:
+        """
+        qgis_log_tools.logMessageINFO("~~ CALL : tracking_position_qtimer_geom_to_layer ~~")
 
+        bNotMovingOnQGISMap = self.tp_timers.is_time_to_update("still moving", "still moving")
+
+        if bNotMovingOnQGISMap:
+            append_in_dict_one_time = self.action_geom_to_layer()
+            if append_in_dict_one_time:
+                self.signals_manager.stop(self.qtimer_tracking_position_geom_to_layer)
+                #
+                interval = self.tp_timers.get_delay("tp_threshold_time_for_sending_layer_to_dp")
+                interval_still_moving = self.tp_timers.get_delay("still moving") - \
+                                        self.tp_timers.delta_with_current_time("still moving")
+                interval += imt_tools.CONVERT_S_TO_MS(max(0.0, interval_still_moving))
+                # next link
+                self.signals_manager.start(self.qtimer_tracking_position_layers_to_commit, interval)
+        else:
+            interval = imt_tools.CONVERT_S_TO_MS(self.tp_timers.get_delay("still moving"))
+            self.qtimer_tracking_position_geom_to_layer.setInterval(interval)
+
+    def action_geom_to_layer(self):
+        """ Action:
+        Enqueue requests from Tracking Position to amortize the cost&effect on QGIS GUI
         In this pass we transfer if timeout for delay is done and we 'not moving' on QGIS Map
         QGIS GEOmetries [MEM] into target Layer [MEM]
         This operation send/render geometries into the Layer (we see a rectangle representation of our extent on the screen)
         """
-        qgis_log_tools.logMessageINFO("~~ CALL : tracking_position_qtimer_geom_to_layer ~~")
+        append_in_dict_one_time = False
 
-        bNotMovingOnQGISMap = self.tp_timers.is_time_to_update("still moving", "delay_time_still_moving")
+        with QReadLocker(self.tp_mutex_on_layers):
 
-        if bNotMovingOnQGISMap:
-            append_in_dict_one_time = False
+            for id_layer in self.tp_dict_key_l_values_listfeatures.keys():
+                # from the dict we retrieve a list of list
+                tp_list_of_list_fets = self.tp_dict_key_l_values_listfeatures.pop(id_layer)
 
-            with QReadLocker(self.tp_mutex_on_layers):
+                layer = self.qgsmap_layer_registry.mapLayer(id_layer)
+                try:
+                    # How can I programatically create and add features to a memory layer in QGIS 1.9?
+                    # url: http://gis.stackexchange.com/questions/60473/how-can-i-programatically-create-and-add-features-to-a-memory-layer-in-qgis-1-9
+                    # write the layer and send request to DB
+                    layer.startEditing()
+                    for tp_list_fets in tp_list_of_list_fets:
+                        layer.addFeatures(tp_list_fets, False)  # bool_makeSelected=False
 
-                for id_layer in self.tp_dict_key_l_values_listfeatures.keys():
-                    # from the dict we retrieve a list of list
-                    tp_list_of_list_fets = self.tp_dict_key_l_values_listfeatures.pop(id_layer)
+                    qgis_log_tools.logMessageINFO(
+                        "++ Pack requests => " + str(
+                            len(tp_list_of_list_fets)) + " extents for layer: " + layer.name())
+                except:
+                    qgis_log_tools.logMessageWARNING("tracking_position_qtimer_geom_to_layer : exception here !")
+                    pass
 
-                    layer = self.qgsmap_layer_registry.mapLayer(id_layer)
-                    try:
-                        # How can I programatically create and add features to a memory layer in QGIS 1.9?
-                        # url: http://gis.stackexchange.com/questions/60473/how-can-i-programatically-create-and-add-features-to-a-memory-layer-in-qgis-1-9
-                        # write the layer and send request to DB
-                        layer.startEditing()
-                        for tp_list_fets in tp_list_of_list_fets:
-                            layer.addFeatures(tp_list_fets, False)  # bool_makeSelected=False
-
-                        qgis_log_tools.logMessageINFO(
-                            "++ Pack requests => " + str(
-                                len(tp_list_of_list_fets)) + " extents for layer: " + layer.name())
-                    except:
-                        qgis_log_tools.logMessageWARNING("tracking_position_qtimer_geom_to_layer : exception here !")
-                        pass
-
-                    self.tp_dict_layers_to_commit[id_layer] = 1
-                    append_in_dict_one_time = True
-
-            if append_in_dict_one_time:
-                #####################
-                # Process Management
-                #####################
-                self.signals_manager.stop(self.qtimer_tracking_position_geom_to_layer)
-                #
-                interval = self.tp_timers.get_delay("tp_threshold_time_for_sending_layer_to_dp")
-                interval_still_moving = self.tp_timers.get_delay("delay_time_still_moving") - \
-                                        self.tp_timers.delta_with_current_time("still moving")
-                interval += CONVERT_S_TO_MS(max(0.0, interval_still_moving))
-                self.signals_manager.start(self.qtimer_tracking_position_layers_to_commit, interval)
-                #####################
-        else:
-            self.qtimer_tracking_position_geom_to_layer.setInterval(CONVERT_S_TO_MS(self.tp_timers.get_delay("delay_time_still_moving")))
+                self.tp_dict_layers_to_commit[id_layer] = 1
+                append_in_dict_one_time = True
+        #
+        return append_in_dict_one_time
 
     @staticmethod
     def _commit_layer_(iface, layer_to_commit):
@@ -1531,7 +1363,6 @@ class interactive_map_tracking:
         :param layer_to_commit:
         :return:
         """
-        #
         try:
             if layer_to_commit.commitChanges():
                 qgis_log_tools.logMessageINFO("* Commit change layer:" +
@@ -1550,39 +1381,37 @@ class interactive_map_tracking:
         except Exception, err:
             qgis_log_tools.logMessageWARNING("exception here !")
             import sys
+
             qgis_log_tools.logMessageWARNING("Unexpected error: " + str(err))
 
     def slot_layers_to_commit_tp(self):
-        """Action perform when the QTimer for Tracking Position is time out
-         Enqueue requests from Tracking Position to amortize the cost&effect on QGIS GUI
-
-         In this pass, we commit QGIS Layer into Data Provider (PostGIS DataBase, or ShapeFile, or anything (local or distant)
-         MEM -> DP
+        """Slot:
          """
         qgis_log_tools.logMessageINFO("~~ CALL : tracking_position_qtimer_layers_to_commit ~~")
         #
-        bNotMovingOnQGISMap = self.tp_timers.is_time_to_update("still moving", "delay_time_still_moving")
+        bNotMovingOnQGISMap = self.tp_timers.is_time_to_update("still moving", "still moving")
         #
         if bNotMovingOnQGISMap:
-            with QReadLocker(self.tp_mutex_on_layers):
-                id_layers = self.tp_dict_layers_to_commit.keys()
-                # clear dict
-                self.tp_dict_layers_to_commit.clear()
+            self.action_layers_to_commit()
 
-                for id_layer_to_commit in id_layers:
-                    layer_to_commit = self.qgsmap_layer_registry.mapLayer(id_layer_to_commit)
-                    #
-                    self._commit_layer_(self.iface, layer_to_commit)
-            #####################
-            # Process Management
-            #####################
             # last link of processes chain
             self.signals_manager.stop(self.qtimer_tracking_position_layers_to_commit)
-            #####################
         else:
-            #####################
-            # Process Management
-            #####################
-            interval = CONVERT_S_TO_MS(self.tp_timers.get_delay("delay_time_still_moving"))
+            interval = imt_tools.CONVERT_S_TO_MS(self.tp_timers.get_delay("still moving"))
             self.qtimer_tracking_position_layers_to_commit.setInterval(interval)
-            #####################
+
+    def action_layers_to_commit(self):
+        """ Enqueue requests from Tracking Position to amortize the cost&effect on QGIS GUI
+         In this pass, we commit QGIS Layer into Data Provider (PostGIS DataBase, or ShapeFile,
+         or anything (local or distant))
+            MEM -> DP
+         """
+        with QReadLocker(self.tp_mutex_on_layers):
+            id_layers = self.tp_dict_layers_to_commit.keys()
+            # clear dict
+            self.tp_dict_layers_to_commit.clear()
+
+            for id_layer_to_commit in id_layers:
+                layer_to_commit = self.qgsmap_layer_registry.mapLayer(id_layer_to_commit)
+                #
+                self._commit_layer_(self.iface, layer_to_commit)

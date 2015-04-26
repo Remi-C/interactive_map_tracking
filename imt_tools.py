@@ -583,6 +583,7 @@ def print_group_name_values_in_qsettings(group_name=""):
         # qgis_log_tools.logMessageINFO(str(key)+": "+str(qsettings.value(key)))
 
 
+# url: http://code.activestate.com/recipes/67107/
 import types
 import exceptions
 
@@ -625,3 +626,7 @@ class Enumeration:
 
     def whatis(self, value):
         return self.reverseLookup[value]
+
+
+def CONVERT_S_TO_MS(s):
+    return s * 1000
