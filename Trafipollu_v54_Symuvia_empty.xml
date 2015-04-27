@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ROOT_SYMUBRUIT xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="reseau.xsd"
+                version="2.04">
+    <SIMULATIONS>
+        <SIMULATION id="simID" pasdetemps="1" debut="00:00:00" fin="00:05:00" comportementflux="iti" date="1985-01-17"
+                    titre="" proc_deceleration="false" seed="1">
+            <RESTITUTION trace_route="false" trajectoires="true" debug="false" debug_matrice_OD="false"
+                         debug_SAS="false"/>
+        </SIMULATION>
+    </SIMULATIONS>
+    <TRAFICS>
+        <TRAFIC id="trafID" accbornee="true" coeffrelax="0.55" chgtvoie_ghost="false">
+            <TYPES_DE_VEHICULE>
+                <TYPE_DE_VEHICULE id="VL" w="-0.1" kx="0.5" vx="25"/>
+            </TYPES_DE_VEHICULE>
+            <EXTREMITES/>
+            <CONNEXIONS_INTERNES/>
+        </TRAFIC>
+    </TRAFICS>
+    <RESEAUX>
+        <RESEAU id="resID">
+            <TRONCONS>
+                <TRONCON id="56189288_FRef" nom_axe="A86" id_eltamont="E_08" id_eltaval="71591905"
+                         extremite_amont="661969.030992 6862970.442979" extremite_aval="662025.681066 6862782.307551"
+                         nb_voie="3" largeur_voie="3" vit_reg="25">
+                    <POINTS_INTERNES>
+                        <POINT_INTERNE coordonnees="661981.053833 6862926.143744"/>
+                        <POINT_INTERNE coordonnees="661989.947868 6862897.514038"/>
+                        <POINT_INTERNE coordonnees="661997.413665 6862874.727130"/>
+                        <POINT_INTERNE coordonnees="662003.775822 6862854.277340"/>
+                        <POINT_INTERNE coordonnees="662012.669857 6862825.258114"/>
+                        <POINT_INTERNE coordonnees="662021.001890 6862798.179963"/>
+                        <POINT_INTERNE coordonnees="662023.310535 6862790.665927"/>
+                    </POINTS_INTERNES>
+                </TRONCON>
+            </TRONCONS>
+            <CONNEXIONS>
+                <EXTREMITES/>
+                <REPARTITEURS/>
+                <GIRATOIRES/>
+                <CARREFOURSAFEUX/>
+            </CONNEXIONS>
+            <PARAMETRAGE_VEHICULES_GUIDES/>
+        </RESEAU>
+    </RESEAUX>
+    <SCENARIOS>
+        <SCENARIO id="defaultScenario" simulation_id="simID" trafic_id="trafID" reseau_id="resID" dirout="OUT"
+                  prefout="defaultOut"/>
+    </SCENARIOS>
+</ROOT_SYMUBRUIT>

@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ROOT_SYMUBRUIT version="2.01">
+    <SIMULATIONS>
+        <SIMULATION affectation_alpha="0.15" affectation_commonality_filter="true" affectation_teta_logit="0.2"
+                    comportementflux="iti" date="2012-10-09" debut="00:00:00" fin="05:00:00" id="simID"
+                    loipoursuite="exacte" pasdetemps="1.0" proc_deceleration="false" resolution="E" seed="3" titre="">
+            <RESTITUTION debug="false" debug_SAS="false" debug_matrice_OD="false" trace_route="false"
+                         trajectoires="true" vehicules_capteur_extraction="true"/>
+        </SIMULATION>
+    </SIMULATIONS>
+    <TRAFICS>
+        <TRAFIC accbornee="true" chgtvoie_dstfin="10.0" chgtvoie_ghost="false" coeffrelax="0.55" id="trafID"
+                traversees="false">
+            <TYPES_DE_VEHICULE>
+                <TYPE_DE_VEHICULE id="VL" kx="0.17" vx="15.0" w="-5.8823"/>
+                <TYPE_DE_VEHICULE id="BUS" kx="0.0834" pi_rabattement="0.0" vx="15.0" w="-5.0"/>
+            </TYPES_DE_VEHICULE>
+            <EXTREMITES>
+                <EXTREMITE id="E_49489"/>
+            </EXTREMITES>
+            <PARKINGS>
+                <PARKING id="Park_BldStGermain">
+                    <PARAMETRES stock_initial="500"/>
+                </PARKING>
+            </PARKINGS>
+            <CONNEXIONS_INTERNES>
+                <CONNEXION_INTERNE id="CAF0" traversees="true"/>
+            </CONNEXIONS_INTERNES>
+            <CONTROLEURS_DE_FEUX/>
+        </TRAFIC>
+    </TRAFICS>
+    <RESEAUX>
+        <RESEAU id="resID">
+            <TRONCONS>
+                <TRONCON extremite_amont="6759.09999999 21185.0999985" extremite_aval="6827.35017145 21262.5337917"
+                         id="TRONROUT0000000000195918" id_eltamont="-1" id_eltaval="-1" largeur_voie="3.0" nb_voie="4"/>
+            </TRONCONS>
+            <CONNEXIONS>
+                <EXTREMITES/>
+                <REPARTITEURS/>
+                <GIRATOIRES/>
+                <CARREFOURSAFEUX/>
+            </CONNEXIONS>
+            <PARAMETRAGE_VEHICULES_GUIDES/>
+        </RESEAU>
+    </RESEAUX>
+    <SCENARIOS>
+        <SCENARIO dirout="OUT" id="scenario1" prefout="reseau_paris6_new_v10" reseau_id="resID" simulation_id="simID"
+                  trafic_id="trafID"/>
+    </SCENARIOS>
+</ROOT_SYMUBRUIT>

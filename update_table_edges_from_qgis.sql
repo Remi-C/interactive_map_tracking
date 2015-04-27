@@ -11,10 +11,11 @@ DROP TABLE IF EXISTS test.edges_selected;
 CREATE TABLE test.edges_selected
 AS (
   SELECT
-    edge_id,
-    start_node,
-    end_node,
-    geom
+    edge_id
+    ,ign_id
+    ,start_node
+    ,end_node
+    ,geom
   FROM
     bdtopo_topological.edge_data
   WHERE

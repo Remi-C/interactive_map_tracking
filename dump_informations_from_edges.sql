@@ -9,27 +9,24 @@
 
 SELECT
 --
-  DISTINCT edges.edge_id,
---
+  DISTINCT
+  edges.edge_id,
+  edges.ign_id
+--,
   edges.start_node,
-  edges.end_node,
--- url: http://www.postgis.org/docs/ST_AsEWKB.html
-  ST_AsEWKB(edges.geom)               AS points_internes,
---
+edges.end_node
+-- url: http://www.postgis.org/docs/ST_AsEWKB.html,
+ST_AsEWKB(edges.geom)               AS linez_geom
+--,
   ST_AsEWKB(axis.intersection_limit1) AS point_amont,
-  ST_AsEWKB(axis.intersection_limit2) AS point_aval,
---
+ST_AsEWKB(axis.intersection_limit2) AS point_aval
+--,
   axis.road_width,
-  axis.lane_number,
---
-  lane.lane_side,
-  lane.lane_position
-FROM 
+axis.lane_number
+FROM
   test.edges_selected AS edges
   JOIN
-  street_amp.visu_result_axis AS axis  
-NATURAL JOIN 
-  street_amp.visu_result_lane AS lane  
-ON 
+  street_amp.visu_result_axis AS axis
+ON
   edges.edge_id = axis.edge_id
-ORDER BY edges.edge_id, lane.lane_side
+ORDER BY edges.edge_id

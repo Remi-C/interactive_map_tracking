@@ -54,6 +54,7 @@ SOURCES = \
 	autosaveImp.py \
 	trafipollu.py \
 	trafipolluImp.py \
+	PyXB_on_Symuvia_reseau.py \
 	decorators.py
 
 PLUGINNAME = interactive_map_tracking
@@ -76,11 +77,12 @@ PY_FILES = \
 	trafipollu.py \
 	trafipolluImp.py \
 	decorators.py \
+	PyXB_on_Symuvia_reseau.py \
 	__init__.py
 
 UI_FILES = interactive_map_tracking_dialog_base.ui
 
-EXTRAS = icon.png metadata.txt *.sql
+EXTRAS = icon.png metadata.txt *.sql Trafipollu_v54_Symuvia_empty.xml
 
 COMPILED_RESOURCE_FILES = resources_rc.py
 
