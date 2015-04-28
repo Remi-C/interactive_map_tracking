@@ -13,6 +13,13 @@ from collections import namedtuple
 from itertools import groupby
 import PyXB_on_Symuvia_reseau as reseau
 
+# class CTD_ANON_93(pyxb.binding.basis.complexTypeDefinition):
+#     """Liste des troncons"""
+CTD_SYMUVIA_TRONCONS = reseau.CTD_ANON_93
+# class CTD_ANON_162(pyxb.binding.basis.complexTypeDefinition):
+#     """Description d'un point interne du troncon
+CTD_SYMUVIA_POINT_INTERNE = reseau.CTD_ANON_162
+
 class TrafiPolluImp(object):
     """
 
@@ -252,7 +259,7 @@ class TrafiPolluImp(object):
                 # )
                 for edge_id in self.__dict_grouped_lanes:
                     self.__dict_edges[edge_id].update(self.__dict_grouped_lanes[edge_id])
-                    # print "** self._dict_edges: ", self.__dict_edges
+                # print "** self._dict_edges: ", self.__dict_edges
 
         # test export
         self.export_sg3_to_symuvia()
@@ -413,7 +420,8 @@ class TrafiPolluImp(object):
         :return:
 
         """
-        sym_TRONCONS = reseau.CTD_ANON_93()
+        # sym_TRONCONS = reseau.CTD_ANON_93()
+        sym_TRONCONS = CTD_SYMUVIA_TRONCONS()
         for edge_id in self.__dict_sides:
             for sym_TRONCON in self.export_TRONCON(edge_id):
                 sym_TRONCONS.append(sym_TRONCON)
@@ -525,7 +533,8 @@ class TrafiPolluImp(object):
                 edge_center_axis.project(Point(sg3_edge['aval']))
             ]
         )
-        # print "list_amont_aval_proj: ", list_amont_aval_proj
+        # print "++ list_amont_aval_proj: ", list_amont_aval_proj
+
         coef_amont = list_amont_aval_proj[0]
         coef_aval = list_amont_aval_proj[1]
         troncon_center_axis = []
@@ -533,7 +542,8 @@ class TrafiPolluImp(object):
             coef_point = edge_center_axis.project(Point(point))
             if coef_point >= coef_amont and coef_point <= coef_aval:
                 troncon_center_axis.append(point)
-        # print "troncon_center_axis: ", troncon_center_axis
+        # print "++ troncon_center_axis: ", troncon_center_axis
+
         sym_TRONCON.POINTS_INTERNES = self.export_POINTS_INTERNES(troncon_center_axis)
         #
         sym_TRONCON.extremite_amont = sg3_edge['amont']
@@ -588,29 +598,6 @@ class TrafiPolluImp(object):
         """
         # print "list_points: ", list_points
         points_internes = reseau.typePointsInternes()
-        [points_internes.append(reseau.CTD_ANON_162(coordonnees=[x[0], x[1]])) for x in list_points]
+        # [points_internes.append(reseau.CTD_ANON_162(coordonnees=[x[0], x[1]])) for x in list_points]
+        [points_internes.append(CTD_SYMUVIA_POINT_INTERNE(coordonnees=[x[0], x[1]])) for x in list_points]
         return points_internes
-
-        # def export_POINTS_INTERNES(self, edge_id):
-        # """
-        #
-        #     :param edge_id:
-        #     :return:
-        #     """
-        #     list_points_internes = []
-        #     # update list_POINTS_INTERNES
-        #     try:
-        #         # points_internes = self.__dict_edges[edge_id]['points_internes']
-        #         # print "point_amont: ", self.__dict_edges[edge_id]['amont']
-        #         # print "point aval: ", self.__dict_edges[edge_id]['aval']
-        #         # print "points_internes: ", points_internes
-        #         # for point_interne in points_internes[1:-1]:
-        #         # for point_interne in points_internes:
-        #         # list_points_internes.append(reseau.CTD_ANON_162(coordonnees=[point_interne[0], point_interne[1]]))
-        #         pass
-        #     except:
-        #         print "exception in export_POINTS_INTERNES"
-        #     finally:
-        #         points_internes = reseau.typePointsInternes()
-        #         [points_internes.append(x) for x in list_points_internes]
-        #         return points_internes
