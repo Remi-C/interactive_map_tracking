@@ -4,7 +4,6 @@ from qgis.core import QgsCoordinateReferenceSystem, QgsCoordinateTransform, QgsG
 
 from signalsmanager import SignalsManager
 import imt_tools
-# from psycopg2.extras import NamedTupleConnection
 from psycopg2.extras import DictCursor
 from shapely.wkb import loads
 from shapely.geometry import LineString, Point
@@ -13,12 +12,14 @@ from collections import namedtuple
 from itertools import groupby
 import PyXB_on_Symuvia_reseau as reseau
 
-# class CTD_ANON_93(pyxb.binding.basis.complexTypeDefinition):
-#     """Liste des troncons"""
+###################################################
+### ALIAS des classes de binding
+### verifier les liens si problemes !
+###################################################
 CTD_SYMUVIA_TRONCONS = reseau.CTD_ANON_93
-# class CTD_ANON_162(pyxb.binding.basis.complexTypeDefinition):
-#     """Description d'un point interne du troncon
 CTD_SYMUVIA_POINT_INTERNE = reseau.CTD_ANON_162
+###################################################
+
 
 class TrafiPolluImp(object):
     """
@@ -40,13 +41,13 @@ class TrafiPolluImp(object):
         self._mapCanvas = self._iface.mapCanvas()
         self._signals_manager = SignalsManager.instance()
         self.__dict_edges = {}  # key: id_edge  -   value: (topo) informations from SG3
-        self.__dict_sides = {}
+        self.__dict_lanes = {}
         self.__dict_grouped_lanes = {}
 
         self._dict_sql_methods = {
             'update_table_edges_from_qgis': self._update_table_edges_from_qgis,
             'dump_informations_from_edges': self._dump_informations_from_edges,
-            'dump_sides_from_edges': self._dump_sides_from_edges
+            'dump_sides_from_edges': self._dump_lanes_from_edges
         }
 
         self.NAMEDTUPLE_LANESIDE_OUTCOMING = namedtuple(
@@ -184,9 +185,9 @@ class TrafiPolluImp(object):
         :param edge1:
         :return:
         """
-        return edge0.dot(edge1) < 0
+        return edge0.dot(edge1) > 0
 
-    def _dump_sides_from_edges(self, cursor, *args, **kwargs):
+    def _dump_lanes_from_edges(self, cursor, *args, **kwargs):
         """
 
         :param objects_from_sql_request:
@@ -212,7 +213,7 @@ class TrafiPolluImp(object):
                     lane_side = object_from_sql_request['lane_side']
                     #
                     nb_lanes = self.__dict_edges[id_edge]['lane_number']
-                    self.__dict_sides.setdefault(id_edge,
+                    self.__dict_lanes.setdefault(id_edge,
                                                  {
                                                      'id_list': [None] * nb_lanes  # pre-allocate size for list
                                                  })
@@ -221,9 +222,8 @@ class TrafiPolluImp(object):
                     oncoming = False
                     if b_load_geom:
                         lane_center_axis = np.asarray(loads(bytes(lane_center_axis)))
-                        # self.__dict_edges[id_edge]['lane_center_axis'] = np_points_internes     # TODO: chaque voie a la meme structure d'axe (que le troncon) !
-                        self.__dict_sides[id_edge].setdefault('lane_center_axis', []).append(lane_center_axis)
-                        oncoming = not self._edges_is_same_orientation(
+                        self.__dict_lanes[id_edge].setdefault('lane_center_axis', []).append(lane_center_axis)
+                        oncoming = self._edges_is_same_orientation(
                             self.__dict_edges[id_edge]['amont_to_aval'],
                             self._compute_direction_linestring(lane_center_axis)
                         )
@@ -231,22 +231,22 @@ class TrafiPolluImp(object):
                     position = object_from_sql_request['lane_position']
                     lambda_generate_id = self._lambdas_generate_id[lane_side]
                     nb_lanes_by_2 = (nb_lanes / 2)
-                    even = bool(1 - nb_lanes % 2)
+                    even = not bool(nb_lanes % 2)
                     id_in_list = lambda_generate_id(nb_lanes_by_2, position, even)
+                    self.__dict_lanes[id_edge]['id_list'][id_in_list] = self.NAMEDTUPLE_LANESIDE_OUTCOMING(lane_side,
+                                                                                                           oncoming)
                     # print 'position: ', position
                     # print 'id: ', id
-                    self.__dict_sides[id_edge]['id_list'][id_in_list] = self.NAMEDTUPLE_LANESIDE_OUTCOMING(lane_side,
-                                                                                                           oncoming)
                 # print "** _dict_sides:", self.__dict_sides
 
                 # create the dict: __dict_grouped_lanes
                 # contain : for each edge_id list of lanes in same direction
                 map(lambda x, y: self.__dict_grouped_lanes.__setitem__(x, {'grouped_lanes': y}),
-                    self.__dict_sides,
+                    self.__dict_lanes,
                     [
                         [sum(1 for i in g) for k, g in
-                         groupby(self.__dict_sides[id_edge]['id_list'], lambda x: x.oncoming)]
-                        for id_edge in self.__dict_sides
+                         groupby(self.__dict_lanes[id_edge]['id_list'], lambda x: x.oncoming)]
+                        for id_edge in self.__dict_lanes
                     ])
                 # print "** self._dict_grouped_lanes:", self.__dict_grouped_lanes
 
@@ -257,8 +257,8 @@ class TrafiPolluImp(object):
                 #     self.__dict_edges,
                 #     self.__dict_grouped_lanes
                 # )
-                for edge_id in self.__dict_grouped_lanes:
-                    self.__dict_edges[edge_id].update(self.__dict_grouped_lanes[edge_id])
+                for k, v in self.__dict_grouped_lanes.items():
+                    self.__dict_edges[k].update(v)
                 # print "** self._dict_edges: ", self.__dict_edges
 
         # test export
@@ -420,9 +420,8 @@ class TrafiPolluImp(object):
         :return:
 
         """
-        # sym_TRONCONS = reseau.CTD_ANON_93()
         sym_TRONCONS = CTD_SYMUVIA_TRONCONS()
-        for edge_id in self.__dict_sides:
+        for edge_id in self.__dict_lanes:
             for sym_TRONCON in self.export_TRONCON(edge_id):
                 sym_TRONCONS.append(sym_TRONCON)
         return sym_TRONCONS
@@ -442,11 +441,11 @@ class TrafiPolluImp(object):
         try:
             grouped_lanes = sg3_edge['grouped_lanes']
         except:
+            # Il y a des edge_sg3 sans voie(s) dans le reseau SG3 ... faudrait demander a Remi !
+            # Peut etre des edges_sg3 aidant uniquement aux connexions/creation (de zones) d'intersections
             print ""
             print "!!! 'BUG' with edge id: ", edge_id, " - no 'group_lanes' found !!!"
             print ""
-            # Il y a des edge_sg3 sans voie(s) dans le reseau SG3 ... faudrait demander a Remi !
-            # Peut etre des edges_sg3 aidant uniquement aux connexions/creation (de zones) d'intersections
         else:
             if len(grouped_lanes) > 1:
                 # on a plusieurs groupes de voies (dans des directions differentes) pour ce troncon
@@ -478,44 +477,72 @@ class TrafiPolluImp(object):
     def build_TRONCON_lanes_in_groups(self, sym_TRONCON, edge_id, cur_id_lane, nb_lanes):
         """
         1 Groupe de plusieurs voies (dans la meme direction) dans une serie de groupes (de voies) pour l'edge_sg3
-        Pas encore finie, experimental car le cas n'est pas present dans le reseau (dur de tester)
+        Pas encore finie, experimental car le cas n'est pas present dans le reseau (pas possible de tester directement
+        cet algo).
         :return:
         """
         lanes_center_axis = []
         # transfert lane_center_axis for each lane in 2D
         list_1D_coefficients = []
+        # on parcourt le groupe de 'voies' dans le meme sens
         for id_lane in range(cur_id_lane, cur_id_lane + nb_lanes, 1):
-            # get the linestring of lane_center_axis
-            linestring = LineString(self.__dict_sides[edge_id]['lane_center_axis'][id_lane])
-            # project this line (1D coefficients)
+            # get the linestring of the current lane
+            linestring = LineString(self.__dict_lanes[edge_id]['lane_center_axis'][id_lane])
+            # project this linestring into 1D coefficients
             linestring_proj = [
                 linestring.project(Point(point), normalized=True)
                 for point in list(linestring.coords)
             ]
             # save the lane informations
-            edge_center_axis = {
+            lane_center_axis = {
                 'LineString': linestring,
                 'LineString_Proj': linestring_proj
             }
-            lanes_center_axis.append(edge_center_axis)
+            lanes_center_axis.append(lane_center_axis)
+            # update the list of 1D coefficients
             list_1D_coefficients += linestring_proj
+
+        ###########################
+        # clean the list of 1D coefficients
         # remove duplicate values
         # url: http://stackoverflow.com/questions/480214/how-do-you-remove-duplicates-from-a-list-in-python-whilst-preserving-order
         list_1D_coefficients = list(set(list_1D_coefficients))
         # sort the list of 1D coefficients
         list_1D_coefficients.sort()
-        troncon_center_axis = []
+        ###########################
+
+        # Compute the troncon center axis
+        # Methode: on utilise les coefficients 1D de chaque voie qui va composer ce troncon.
+        # On retroprojete chaque coeffient (1D) sur l'ensemble des voies (2D) et on effectue la moyenne des positions
+        # On recupere 'une sorte d'axe median' des voies (du meme groupe)
+        #
+        # coefficient de normalisation depend du nombre de voies qu'on utilise pour la moyenne
         norm_lanes_center_axis = 1.0 / len(lanes_center_axis)
+        troncon_center_axis = []
+        # pour chaque coefficient 1D
         for coef_point in list_1D_coefficients:
+            # on calcule la moyenne des points sur les lanes pour ce coefficient
             point_for_troncon = Point(0, 0)
-            for edge_center_axis in lanes_center_axis:
-                linestring = edge_center_axis['LineString']
+            # pour chaque lane
+            for lane_center_axis in lanes_center_axis:
+                # on recupere la geometrie
+                linestring = lane_center_axis['LineString']
+                # on projete le coefficient et on somme le point
                 point_for_troncon += linestring.interpolate(coef_point)
+            # on calcule la moyenne
             point_for_troncon *= norm_lanes_center_axis
-            # print "point_for_troncon: ", point_for_troncon.wkt
             troncon_center_axis.append(point_for_troncon)
+            #
+            # print "point_for_troncon: ", point_for_troncon.wkt
             # print "list_lane_center_axis:", lanes_center_axis
             # print "list_1D_coefficients:", list_1D_coefficients
+
+        # Comme la liste des coefficients 1D est triee,
+        # on peut declarer le 1er et dernier point comme Amont/Aval
+        sym_TRONCON.nb_voie = nb_lanes
+        sym_TRONCON.POINTS_INTERNES = self.export_POINTS_INTERNES(troncon_center_axis[1:-1])
+        sym_TRONCON.extremite_amont = troncon_center_axis[0]    # 1er point
+        sym_TRONCON.extremite_aval = troncon_center_axis[-1]    # dernier point
 
     def build_TRONCON_lanes_in_one_group(self, sym_TRONCON, sg3_edge, nb_lanes):
         """
@@ -527,6 +554,8 @@ class TrafiPolluImp(object):
         sym_TRONCON.nb_voie = nb_lanes
         #
         edge_center_axis = LineString(sg3_edge['linez_geom'])
+        # note : on pourrait recuperer le sens avec les attributs 'left' 'right' des lanes_sg3
+        # ca eviterait le sort (sur 2 valeurs c'est pas ouf mais bon)
         list_amont_aval_proj = sorted(
             [
                 edge_center_axis.project(Point(sg3_edge['amont'])),
@@ -534,12 +563,13 @@ class TrafiPolluImp(object):
             ]
         )
         # print "++ list_amont_aval_proj: ", list_amont_aval_proj
-
-        coef_amont = list_amont_aval_proj[0]
-        coef_aval = list_amont_aval_proj[1]
+        # on recupere les coefficients 1D des amont/aval
+        coef_amont, coef_aval = list_amont_aval_proj
         troncon_center_axis = []
+        # liste des points formant l'axe de l'edge_sg3
         for point in list(edge_center_axis.coords):
             coef_point = edge_center_axis.project(Point(point))
+            # clipping du point, pour etre sure d'etre amont et aval
             if coef_point >= coef_amont and coef_point <= coef_aval:
                 troncon_center_axis.append(point)
         # print "++ troncon_center_axis: ", troncon_center_axis
@@ -565,7 +595,7 @@ class TrafiPolluImp(object):
         sym_TRONCON.id += '_lane' + str(cur_id_lane)
 
         # le nouveau troncon est identique a l'unique voie
-        edge_center_axis = self.__dict_sides[edge_id]['lane_center_axis'][cur_id_lane]
+        edge_center_axis = self.__dict_lanes[edge_id]['lane_center_axis'][cur_id_lane]
         sym_TRONCON.extremite_amont = edge_center_axis[0]
         sym_TRONCON.extremite_aval = edge_center_axis[-1]
         # transfert des points internes (eventuellement)
@@ -579,14 +609,10 @@ class TrafiPolluImp(object):
         :return:
         """
         sym_TRONCON = reseau.typeTroncon()
-        #
         sym_TRONCON.id = sg3_edge['ign_id']
-        #
         sym_TRONCON.largeur_voie = sg3_edge['road_width'] / sg3_edge['lane_number']
-        #
         sym_TRONCON.id_eltamont = -1
         sym_TRONCON.id_eltaval = -1
-        #
         return sym_TRONCON
 
     @staticmethod
@@ -598,6 +624,5 @@ class TrafiPolluImp(object):
         """
         # print "list_points: ", list_points
         points_internes = reseau.typePointsInternes()
-        # [points_internes.append(reseau.CTD_ANON_162(coordonnees=[x[0], x[1]])) for x in list_points]
         [points_internes.append(CTD_SYMUVIA_POINT_INTERNE(coordonnees=[x[0], x[1]])) for x in list_points]
         return points_internes
