@@ -24,3 +24,17 @@ AS (
     ST_Contains(ST_MakePolygon(ST_GeomFromText(%(gPolylineWkt)s, %(extent_postgisSrid)s)), geom)
   ORDER BY edge_id
 );
+
+DROP TABLE IF EXISTS test.nodes_selected;
+CREATE TABLE test.nodes_selected
+AS (
+  SELECT
+    DISTINCT node_id
+  FROM
+    bdtopo_topological.node
+  WHERE
+    ST_Intersects(ST_MakePolygon(ST_GeomFromText(%(gPolylineWkt)s, %(extent_postgisSrid)s)), geom)
+    OR
+    ST_Contains(ST_MakePolygon(ST_GeomFromText(%(gPolylineWkt)s, %(extent_postgisSrid)s)), geom)
+  ORDER BY node_id
+);

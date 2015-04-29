@@ -54,7 +54,9 @@ SOURCES = \
 	autosaveImp.py \
 	trafipollu.py \
 	trafipolluImp.py \
-	PyXB_on_Symuvia_reseau.py \
+	trafipolluImp_SQL.py \
+	trafipolluImp_DUMP.py \
+	trafipolluImp_EXPORT.py \
 	decorators.py
 
 PLUGINNAME = interactive_map_tracking
@@ -76,15 +78,18 @@ PY_FILES = \
 	autosaveImp.py \
 	trafipollu.py \
 	trafipolluImp.py \
+	trafipolluImp_SQL.py \
+	trafipolluImp_DUMP.py \
+	trafipolluImp_EXPORT.py \
 	decorators.py \
-	PyXB_on_Symuvia_reseau.py \
 	__init__.py
 
 UI_FILES = interactive_map_tracking_dialog_base.ui
 
-EXTRAS = icon.png metadata.txt *.sql Trafipollu_v54_Symuvia_empty.xml
+EXTRAS = icon.png metadata.txt *.sql *.xml *.xsd
 
-COMPILED_RESOURCE_FILES = resources_rc.py
+COMPILED_RESOURCE_FILES = resources_rc.py \
+    parser_symuvia_xsd_2_04_pyxb.py
 
 PEP8EXCLUDE=pydev,resources_rc.py,conf.py,third_party,ui
 
@@ -112,6 +117,16 @@ compile: $(COMPILED_RESOURCE_FILES)
 
 %.qm : %.ts
 	$(LRELEASE) $<
+
+GET_XSD_VERSION = $(subst _,.,$(subst _pyxb.py,,$(subst parser_symuvia_xsd_,,$1)))
+
+%_pyxb.py:
+	@echo "----------------------------------"
+	@echo "XSD : Generate Parser for SYMUVIA"
+	@echo "----------------------------------"
+    # $@ : fichier courant
+    # $< : dependance
+	pyxbgen -u reseau_$(call GET_XSD_VERSION,$@).xsd -m $(subst .py,,$@)
 
 test: compile transcompile
 	@echo

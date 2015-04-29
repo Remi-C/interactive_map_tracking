@@ -10,8 +10,7 @@
 
 SELECT
 --
-  DISTINCT
-  edges.edge_id
+  DISTINCT edges.edge_id
   ,edges.ign_id
   ,edges.start_node
   ,edges.end_node
