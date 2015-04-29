@@ -7,12 +7,17 @@ import parser_symuvia_xsd_2_04_pyxb as network
 
 ###################################################
 ### ALIAS des classes de binding
-### verifier les liens si problemes !
+### verifier les liens si problemes d'export!
 ###################################################
-
-
 def format_string(str):
-    # print 'str: ', str
+    """
+    retire les espaces :
+    - plus de 2 reduit a 1
+    - en debut et fin de string
+    les tabulations, les retours a la ligne
+    :param str:
+    :return:
+    """
     str = unicode(str).encode('ascii', 'replace')
     import re
     str = re.sub(' +', ' ', str)
@@ -23,6 +28,11 @@ def format_string(str):
 
 
 def get_class_from_parser(str_doc_class):
+    """
+
+    :param str_doc_class:
+    :return:
+    """
     return_class = None
     try:
         return_class = network.__dict__[
@@ -37,7 +47,7 @@ def get_class_from_parser(str_doc_class):
         return return_class
 
 CTD_SYMUVIA_TRONCONS = get_class_from_parser(u'Liste des tron?ons')
-CTD_SYMUVIA_POINT_INTERNE_TRONCON = get_class_from_parser("Description d'un point interne du tron?on")
+CTD_SYMUVIA_POINT_INTERNE_TRONCON = get_class_from_parser(u"Description d'un point interne du tron?on")
 ###################################################
 
 import os
@@ -58,7 +68,7 @@ class trafipolluImp_EXPORT(object):
         self.dict_edges = dict_edges
         self.dict_lanes = dict_lanes
 
-    def export_sg3_to_symuvia(self, infilename=infilename_for_symuvia, outfilename=outfilename_for_symuvia):
+    def export(self, infilename=infilename_for_symuvia, outfilename=outfilename_for_symuvia):
         """
 
         :param filename:
@@ -83,7 +93,8 @@ class trafipolluImp_EXPORT(object):
         """
         return self.save_SYMUVIA_Node("ROOT_SYMUBRUIT", sym_ROOT, outfilename)
 
-    def save_SYMUVIA_Node(self, element_name, sym_node, outfilename):
+    @staticmethod
+    def save_SYMUVIA_Node(element_name, sym_node, outfilename):
         """
 
         :param sym_node:

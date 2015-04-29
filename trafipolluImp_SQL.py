@@ -171,4 +171,4 @@ class trafipolluImp_SQL(object):
                 tpi_DUMP.dump_lanes(objects_from_sql_request, self.__dict_edges, self.__dict_lanes)
 
         # test export
-        self.__exporter.export_sg3_to_symuvia()
+        self.__exporter.export()
