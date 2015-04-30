@@ -44,7 +44,7 @@ class ITrafiPollu(TrafiPolluImp):
         :return:
 
         """
-        return self.__dlg
+        return self.dlg
 
 
 class TrafiPollu:

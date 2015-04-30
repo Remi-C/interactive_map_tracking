@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>728</width>
-    <height>330</height>
+    <width>531</width>
+    <height>353</height>
    </rect>
   </property>
   <property name="minimumSize">
@@ -312,17 +312,6 @@ p, li { white-space: pre-wrap; }
        <string>TrafiPollu</string>
       </attribute>
       <layout class="QGridLayout" name="gridLayout_6">
-       <item row="2" column="2" rowspan="2">
-        <layout class="QFormLayout" name="formLayout_10">
-         <item row="0" column="0">
-          <widget class="QPushButton" name="execute_sql_commands">
-           <property name="text">
-            <string>Execute SQL commands</string>
-           </property>
-          </widget>
-         </item>
-        </layout>
-       </item>
        <item row="3" column="1">
         <spacer name="horizontalSpacer_5">
          <property name="orientation">
@@ -398,7 +387,48 @@ p, li { white-space: pre-wrap; }
          </property>
         </spacer>
        </item>
-       <item row="0" column="1" rowspan="2" colspan="2">
+       <item row="0" column="3">
+        <spacer name="horizontalSpacer_6">
+         <property name="orientation">
+          <enum>Qt::Horizontal</enum>
+         </property>
+         <property name="sizeType">
+          <enum>QSizePolicy::Minimum</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>1</width>
+           <height>1</height>
+          </size>
+         </property>
+        </spacer>
+       </item>
+       <item row="3" column="2">
+        <layout class="QFormLayout" name="formLayout_10">
+         <item row="0" column="0">
+          <widget class="QPushButton" name="execute_sql_commands">
+           <property name="text">
+            <string>Execute SQL commands</string>
+           </property>
+          </widget>
+         </item>
+         <item row="2" column="0">
+          <widget class="QPushButton" name="pickle_trafipollu">
+           <property name="text">
+            <string>Pickle TrafiPollu</string>
+           </property>
+          </widget>
+         </item>
+         <item row="1" column="0">
+          <widget class="QPushButton" name="export_to_symuvia">
+           <property name="text">
+            <string>Export to Symuvia</string>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+       <item row="0" column="1" rowspan="3" colspan="2">
         <widget class="QPlainTextEdit" name="plainTextEdit_sql_script">
          <property name="minimumSize">
           <size>
@@ -415,22 +445,6 @@ p, li { white-space: pre-wrap; }
           <string>[SQL script]</string>
          </property>
         </widget>
-       </item>
-       <item row="0" column="3">
-        <spacer name="horizontalSpacer_6">
-         <property name="orientation">
-          <enum>Qt::Horizontal</enum>
-         </property>
-         <property name="sizeType">
-          <enum>QSizePolicy::Minimum</enum>
-         </property>
-         <property name="sizeHint" stdset="0">
-          <size>
-           <width>1</width>
-           <height>1</height>
-          </size>
-         </property>
-        </spacer>
        </item>
       </layout>
      </widget>

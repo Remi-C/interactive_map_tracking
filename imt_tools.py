@@ -613,3 +613,11 @@ def create_named_tuple_from_names(name, list_names):
     """
     return namedtuple(name, list_names)
 
+
+# url: http://stackoverflow.com/questions/16377215/how-to-pickle-a-namedtuple-instance-correctly
+# url: https://docs.python.org/2/library/functions.html#globals
+def CreateNamedOnGlobals(*args):
+    import collections
+    namedtupleClass = collections.namedtuple(*args)
+    globals()[namedtupleClass.__name__] = namedtupleClass
+    return namedtupleClass

@@ -1,13 +1,16 @@
 __author__ = 'latty'
 
 import numpy as np
-from collections import namedtuple
 from itertools import groupby
 
 from shapely.wkb import loads as sp_wkb_loads
 
+import imt_tools
 
-NT_LANESIDE_OUTCOMING = namedtuple(
+
+
+# need to be in Globals for Pickled 'dict_edges'
+NT_LANESIDE_OUTCOMING = imt_tools.CreateNamedOnGlobals(
     'NAMEDTUPLE_LANESIDE_OUTCOMING',
     [
         'lane_side',
@@ -40,9 +43,20 @@ def dump_for_edges(objects_from_sql_request, dict_edges):
         dict_sql_request['aval'] = np.asarray(dict_sql_request['point_aval'])
         dict_sql_request['amont_to_aval'] = dict_sql_request['aval'] - dict_sql_request['amont']
         dict_sql_request['linez_geom'] = np.asarray(dict_sql_request['linez_geom'])
+    # print 'self._dict_edges: ', self._dict_edges
+    #
 
-        # print 'self._dict_edges: ', self._dict_edges
-        #
+def dump_for_nodes(objects_from_sql_request, dict_nodes):
+    """
+
+    :return:
+    """
+    for object_from_sql_request in objects_from_sql_request:
+        node_id = object_from_sql_request['node_id']
+        dict_sql_request = object_from_sql_request.copy()
+        dict_nodes.setdefault(node_id, []).append(dict_sql_request['edge_id1'])
+    #
+    print 'self.dict_nodes: ', dict_nodes
 
 
 def load_geom_with_shapely_from_dict(dict_objects_from_sql_request):

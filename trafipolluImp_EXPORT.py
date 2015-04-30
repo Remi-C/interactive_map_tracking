@@ -94,7 +94,7 @@ class trafipolluImp_EXPORT(object):
         return self.save_SYMUVIA_Node("ROOT_SYMUBRUIT", sym_ROOT, outfilename)
 
     @staticmethod
-    def save_SYMUVIA_Node(element_name, sym_node, outfilename):
+    def save_SYMUVIA_Node(element_name, sym_node, outfilename, prettyxml=True):
         """
 
         :param sym_node:
@@ -103,7 +103,13 @@ class trafipolluImp_EXPORT(object):
         """
         print "Write in file: ", outfilename, "..."
         f = open(outfilename, "w")
-        f.write(sym_node.toxml('utf-8', element_name=element_name))
+        str_xml = ""
+        if prettyxml:
+            dom = sym_node.toDOM(None, element_name=element_name)
+            str_xml = dom.toprettyxml(indent="\t", newl="\n", encoding='utf-8')
+        else:
+            str_xml = sym_node.toxml('utf-8', element_name=element_name)
+        f.write(str_xml)
         f.close()
         print "Write in file: ", outfilename, "[DONE]"
 
