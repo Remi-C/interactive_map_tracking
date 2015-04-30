@@ -483,27 +483,22 @@ class interactive_map_tracking:
 
         :return:
         """
-        # list_id_checkbox = imt_tools.build_list_member_name_qt_checkbox(self.dlg)
-        dict_state = {
+        dict_states_for_pickle = {
             imt_tools.pickle_id_gui: {
                 imt_tools.pickle_id_list_checkbox: imt_tools.serialize_list_checkbox(self.dlg, self.list_id_checkbox),
                 imt_tools.pickle_id_list_tabs_size: imt_tools.serialize_tabs_size(self),
             }
         }
-        return dict_state
+        return dict_states_for_pickle
 
-    def restoreState(self, state, b_synchro=True):
+    def restoreState(self, str_pickle_states, b_synchro=True):
         """
 
-        :param state:
+        :param str_pickle_states:
         :return:
         """
-        # list_id_checkbox = imt_tools.build_list_member_name_qt_checkbox(self.dlg)
-        #
-        imt_tools.update_list_checkbox_from_serialization(self.dlg, self.list_id_checkbox, state)
-        #
-        imt_tools.update_tabs_size_from_serialization(self, state)
-        #
+        imt_tools.update_list_checkbox_from_serialization(self.dlg, self.list_id_checkbox, str_pickle_states)
+        imt_tools.update_tabs_size_from_serialization(self, str_pickle_states)
         if b_synchro:
             self._synchronize_gui_and_plugin()
 

@@ -402,10 +402,12 @@ def restore_states_from_pickle(imt, pickle_name_in_qsettings=qsettings_id_pickle
 
     :return:
     """
-    s = imt.qsettings
-    s.beginGroup(imt.qsettings_group_name)
-    qsettings_pickle = s.value(pickle_name_in_qsettings)
-    s.endGroup()
+
+    qsettings = imt.qsettings
+    qsettings.beginGroup(imt.qsettings_group_name)
+    qsettings_pickle = qsettings.value(pickle_name_in_qsettings)
+    qsettings.endGroup()
+
     # print "in QSettings - pickle: ", qsettings_pickle
     if qsettings_pickle:
         imt_for_states = None

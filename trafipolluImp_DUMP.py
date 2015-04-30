@@ -4,22 +4,16 @@ import numpy as np
 from collections import namedtuple
 from itertools import groupby
 
-from shapely.wkb import loads
+from shapely.wkb import loads as sp_wkb_loads
 
 
-NAMEDTUPLE_LANESIDE_OUTCOMING = namedtuple(
+NT_LANESIDE_OUTCOMING = namedtuple(
     'NAMEDTUPLE_LANESIDE_OUTCOMING',
     [
         'lane_side',
         'oncoming'
     ]
 )
-
-lambdas_generate_id = {
-    'left': lambda nb_lanes_by_2, position, even: nb_lanes_by_2 - int(position / 2),
-    'right': lambda nb_lanes_by_2, position, even: nb_lanes_by_2 + int(position / 2) - even,
-    'center': lambda nb_lanes_by_2, position, even: nb_lanes_by_2
-}
 
 
 def dump_for_edges(objects_from_sql_request, dict_edges):
@@ -34,20 +28,18 @@ def dump_for_edges(objects_from_sql_request, dict_edges):
         # url: http://www.dotnetperls.com/namedtuple
         # tuple_trafipollu = namedtuple._make(tuple_from_sql_request)
         # self._dict_edges.update({tuple_trafipollu.edge_id: tuple_trafipollu})
-
         edge_id = object_from_sql_request['edge_id']
 
         dict_sql_request = object_from_sql_request.copy()
 
         dict_edges.update({edge_id: dict_sql_request})
 
-        #
         load_geom_with_shapely_from_dict(dict_edges[edge_id])
 
-        dict_sql_request['amont'] = np.asarray(dict_edges[edge_id]['point_amont'])
-        dict_sql_request['aval'] = np.asarray(dict_edges[edge_id]['point_aval'])
+        dict_sql_request['amont'] = np.asarray(dict_sql_request['point_amont'])
+        dict_sql_request['aval'] = np.asarray(dict_sql_request['point_aval'])
         dict_sql_request['amont_to_aval'] = dict_sql_request['aval'] - dict_sql_request['amont']
-        dict_sql_request['linez_geom'] = np.asarray(dict_edges[edge_id]['linez_geom'])
+        dict_sql_request['linez_geom'] = np.asarray(dict_sql_request['linez_geom'])
 
         # print 'self._dict_edges: ', self._dict_edges
         #
@@ -59,18 +51,25 @@ def load_geom_with_shapely_from_dict(dict_objects_from_sql_request):
     :param dict_objects_from_sql_request:
     :return:
     """
-    # ul: http://toblerity.org/shapely/manual.htmlhttp://toblerity.org/shapely/manual.html
-    # url: http://gis.stackexchange.com/questions/89323/postgis-parse-geometry-wkb-with-ogr
-    # url: https://docs.python.org/2/c-api/buffer.html
-    for name_key in dict_objects_from_sql_request.keys():
-        object = dict_objects_from_sql_request[name_key]
-        if isinstance(object, buffer):
-            dict_objects_from_sql_request[name_key] = loads(bytes(object))
+    # urls:
+    # - http://toblerity.org/shapely/manual.html
+    # - http://gis.stackexchange.com/questions/89323/postgis-parse-geometry-wkb-with-ogr
+    # - https://docs.python.org/2/c-api/buffer.html
+    for column_name, object_from_sql_request in dict_objects_from_sql_request.iteritems():
+        if isinstance(object_from_sql_request, buffer):
+            dict_objects_from_sql_request[column_name] = sp_wkb_loads(bytes(object_from_sql_request))
 
 
 def dump_lanes(objects_from_sql_request, dict_edges, dict_lanes):
+    lambdas_generate_id = {
+        'left': lambda nb_lanes_by_2, position, even: nb_lanes_by_2 - int(position / 2),
+        'right': lambda nb_lanes_by_2, position, even: nb_lanes_by_2 + int(position / 2) - even,
+        'center': lambda nb_lanes_by_2, position, even: nb_lanes_by_2
+    }
+
     # get sides informations for each 'edge'/'troncon'
     for object_from_sql_request in objects_from_sql_request:
+        #
         id_edge = object_from_sql_request['edge_id']
         lane_side = object_from_sql_request['lane_side']
         #
@@ -82,7 +81,7 @@ def dump_lanes(objects_from_sql_request, dict_edges, dict_lanes):
         #
         lane_center_axis = object_from_sql_request['lane_center_axis']
         oncoming = False
-        lane_center_axis = np.asarray(loads(bytes(lane_center_axis)))
+        lane_center_axis = np.asarray(sp_wkb_loads(bytes(lane_center_axis)))
         dict_lanes[id_edge].setdefault('lane_center_axis', []).append(lane_center_axis)
         oncoming = edges_is_same_orientation(
             dict_edges[id_edge]['amont_to_aval'],
@@ -94,7 +93,8 @@ def dump_lanes(objects_from_sql_request, dict_edges, dict_lanes):
         nb_lanes_by_2 = (nb_lanes / 2)
         even = not bool(nb_lanes % 2)
         id_in_list = lambda_generate_id(nb_lanes_by_2, position, even)
-        dict_lanes[id_edge]['id_list'][id_in_list] = NAMEDTUPLE_LANESIDE_OUTCOMING(lane_side, oncoming)
+        dict_lanes[id_edge]['id_list'][id_in_list] = NT_LANESIDE_OUTCOMING(lane_side, oncoming)
+        #
         # print 'position: ', position
         # print 'id: ', id
     # print "** _dict_sides:", self.__dict_sides
@@ -105,7 +105,7 @@ def dump_lanes(objects_from_sql_request, dict_edges, dict_lanes):
     map(lambda x, y: dict_grouped_lanes.__setitem__(x, {'grouped_lanes': y}),
         dict_lanes,
         [
-            [sum(1 for i in g) for k, g in
+            [sum(1 for i in g) for id_edge, g in
              groupby(dict_lanes[id_edge]['id_list'], lambda x: x.oncoming)]
             for id_edge in dict_lanes
         ])
@@ -118,8 +118,8 @@ def dump_lanes(objects_from_sql_request, dict_edges, dict_lanes):
     #     dict_edges,
     #     dict_grouped_lanes
     # )
-    for k, v in dict_grouped_lanes.items():
-        dict_edges[k].update(v)
+    for id_edge, grouped_lanes in dict_grouped_lanes.items():
+        dict_edges[id_edge].update(grouped_lanes)
         # print "** self._dict_edges: ", dict_edges
 
 def edges_is_same_orientation(edge0, edge1):

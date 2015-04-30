@@ -20,6 +20,7 @@ class trafipolluImp_SQL(object):
 
         """
         self.__mapCanvas = iface.mapCanvas()
+        #
         self.__dict_edges = {}  # key: id_edge  -   value: (topo) informations from SG3
         self.__dict_lanes = {}
         #
@@ -28,9 +29,67 @@ class trafipolluImp_SQL(object):
             'dump_informations_from_edges': self.__request_for_edges,
             'dump_sides_from_edges': self.__request_for_lanes
         }
-
         # TODO: TEST -> l'exporter ne sera pas dans cette classe (au final) !
         self.__exporter = tpi_EXPORT.trafipolluImp_EXPORT(self.__dict_edges, self.__dict_lanes)
+
+    def __getstate__(self):
+        """
+
+        :return:
+        """
+        return self.saveState()
+
+    def __setstate__(self, states):
+        """
+
+        :param states:
+        :return:
+        """
+        self.pickle_states = states
+
+    def saveState(self):
+        """
+
+        :return:
+        """
+        # note: normalement les objects numpy (array) et shapely (natif, wkb/t) sont 'dumpables'
+        # et donc serialisables via Pickle !
+        #
+        # NUMPY test:
+        # ----------
+        # >>> import cPickle as pickle
+        # >>> import numpy as np
+        # >>> np_object = np.asarray([1, 2])
+        # >>> pickle.dumps(np_object)
+        # "cnumpy.core.multiarray\n_reconstruct\np1\n(cnumpy\nndarray\np2\n(I0\ntS'b'\ntRp3\n(I1\n(I2\ntcnumpy\ndtype\np4\n(S'i8'\nI0\nI1\ntRp5\n(I3\nS'<'\nNNNI-1\nI-1\nI0\ntbI00\nS'\\x01\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x02\\x00\\x00\\x00\\x00\\x00\\x00\\x00'\ntb."
+        # >>> str_dump_pickle = pickle.dumps(np_object)
+        # >>> pickle.loads(str_dump_pickle)
+        # array([1, 2])
+        #
+        # SHAPELY tests:
+        # -------------
+        # >>> import shapely.geometry as sp_geom
+        # >>> import shapely.wkb as sp_wkb
+        # >>> point = sp_geom.Point(0, 0)
+        # >>> pickle.dumps(point)
+        # "cshapely.geometry.point\nPoint\np1\n(tRp2\nS'\\x01\\x01\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00'\nb."
+        # >>> pickle.dumps(point.wkb)
+        # "S'\\x01\\x01\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00'\n."
+        # >>> str_point_wkb = pickle.dumps(point.wkb)
+        # >>> pickle.loads(str_point_wkb)
+        # '\x01\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00'
+        # >>> sp_wkb.loads(pickle.loads(str_point_wkb))
+        # <shapely.geometry.point.Point object at 0x7fc00e1ace50>
+        # >>> sp_wkb.loads(pickle.loads(str_point_wkb)).wkt
+        # 'POINT (0 0)'
+
+        dict_states_for_pickle = {
+            'SQL': {
+                'dict_edges': self.__dict_edges,
+                'dict_lanes': self.__dict_lanes
+            }
+        }
+        return dict_states_for_pickle
 
     @staticmethod
     def _update_tables_from_qgis(*args, **kwargs):
