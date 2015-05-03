@@ -3,7 +3,7 @@ __author__ = 'latty'
 from shapely.geometry import Point, LineString
 
 import parser_symuvia_xsd_2_04_pyxb as network
-
+# import pyxb
 
 ###################################################
 ### ALIAS des classes de binding
@@ -27,7 +27,7 @@ def format_string(str):
     return str
 
 
-def get_class_from_parser(str_doc_class):
+def get_class_from_parser(str_doc_class, parser_symuvia=network):
     """
 
     :param str_doc_class:
@@ -36,7 +36,7 @@ def get_class_from_parser(str_doc_class):
     return_class = None
     try:
         return_class = network.__dict__[
-            filter(lambda x: format_string(network.__dict__[x].__doc__) == str_doc_class, dir(network))[0]]
+            filter(lambda x: format_string(network.__dict__[x].__doc__) == str_doc_class, dir(parser_symuvia))[0]]
     except:
         print "ERROR! Can't find the class with doc class string:", str_doc_class, " from Parser (SYMUVIA) !!!"
         return_class = None
@@ -291,7 +291,10 @@ class trafipolluImp_EXPORT(object):
         """
         sym_TRONCON.nb_voie = nb_lanes  # == 1
         # TODO: besoin d'un generateur d'id pour les troncons nouvellement generes
-        sym_TRONCON.id += '_lane' + str(cur_id_lane)
+
+        #OPTIMISATION
+        #sym_TRONCON.id += '_lane' + str(cur_id_lane)
+        sym_TRONCON.id = sym_TRONCON.id.join()
 
         # le nouveau troncon est identique a l'unique voie
         edge_center_axis = self.dict_lanes[edge_id]['lane_center_axis'][cur_id_lane]
@@ -308,6 +311,7 @@ class trafipolluImp_EXPORT(object):
         :return:
         """
         sym_TRONCON = network.typeTroncon()
+        #
         sym_TRONCON.id = sg3_edge['ign_id']
         sym_TRONCON.largeur_voie = sg3_edge['road_width'] / sg3_edge['lane_number']
         sym_TRONCON.id_eltamont = -1
@@ -324,4 +328,6 @@ class trafipolluImp_EXPORT(object):
         # print "list_points: ", list_points
         points_internes = network.typePointsInternes()
         [points_internes.append(CTD_SYMUVIA_POINT_INTERNE_TRONCON(coordonnees=[x[0], x[1]])) for x in list_points]
+        # alternative approach:
+        # [points_internes.append(pyxb.BIND(coordonnees=[x[0], x[1]])) for x in list_points]
         return points_internes
