@@ -88,7 +88,7 @@ def build_topo_for_nodes(dict_nodes, dict_edges, dict_lanes):
                 id_in_list = int(symuvia_edge_id[symuvia_edge_id.find('_lane')+5:])
                 oncoming = dict_lanes[edge_id]['id_list'][id_in_list].oncoming
                 # '!=' est l'operateur XOR en Python
-                caf_entrees_sorties[int((sge_edge['start_node'] == node_id) != oncoming)].append(symuvia_edge_id)
+                caf_entrees_sorties[(sge_edge['start_node'] == node_id) != oncoming].append(symuvia_edge_id)
                 # print 'id_in_list: ', id_in_list
                 # print 'oncoming: ', oncoming
             print "id edge in SG3: ", edge_id
@@ -113,9 +113,10 @@ def load_geom_with_shapely_from_dict(dict_objects_from_sql_request):
 
 
 def dump_lanes(objects_from_sql_request, dict_edges, dict_lanes):
+    # url: https://wiki.python.org/moin/BitManipulation
     lambdas_generate_id = {
-        'left': lambda nb_lanes_by_2, position, even: nb_lanes_by_2 - int(position / 2),
-        'right': lambda nb_lanes_by_2, position, even: nb_lanes_by_2 + int(position / 2) - even,
+        'left': lambda nb_lanes_by_2, position, even: nb_lanes_by_2 - (position >> 1),
+        'right': lambda nb_lanes_by_2, position, even: nb_lanes_by_2 + (position >> 1) - even,
         'center': lambda nb_lanes_by_2, position, even: nb_lanes_by_2
     }
 
@@ -132,7 +133,6 @@ def dump_lanes(objects_from_sql_request, dict_edges, dict_lanes):
                               })
         #
         lane_center_axis = object_from_sql_request['lane_center_axis']
-        oncoming = False
         lane_center_axis = np.asarray(sp_wkb_loads(bytes(lane_center_axis)))
         dict_lanes[id_edge].setdefault('lane_center_axis', []).append(lane_center_axis)
         oncoming = edges_is_same_orientation(
@@ -142,8 +142,10 @@ def dump_lanes(objects_from_sql_request, dict_edges, dict_lanes):
         # update list sides for (grouping)
         position = object_from_sql_request['lane_position']
         lambda_generate_id = lambdas_generate_id[lane_side]
-        nb_lanes_by_2 = (nb_lanes / 2)
-        even = not bool(nb_lanes % 2)
+        nb_lanes_by_2 = nb_lanes >> 1
+        # test si l'entier est pair ?
+        # revient a tester le bit de point faible
+        even = not(nb_lanes & 1)
         id_in_list = lambda_generate_id(nb_lanes_by_2, position, even)
         dict_lanes[id_edge]['id_list'][id_in_list] = NT_LANESIDE_OUTCOMING(lane_side, oncoming)
         #
