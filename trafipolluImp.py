@@ -111,7 +111,7 @@ class TrafiPolluImp(object):
         # test Pickle
         qgis_plugins_directory = os.path.normcase(os.path.dirname(__file__))
         infilename_for_pickle = qgis_plugins_directory + '/' + "dump_pickle.p"
-        print "Pickle TrafiPollu in: ", infilename_for_pickle, "..."
+        print "Pickle TrafiPollulo in: ", infilename_for_pickle, "..."
         pickle.dump(self, open(infilename_for_pickle, "wb"))
         print "Pickle TrafiPollu in: ", infilename_for_pickle, "[DONE]"
 

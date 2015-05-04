@@ -9,6 +9,7 @@ import imt_tools
 
 
 
+
 # need to be in Globals for Pickled 'dict_edges'
 NT_LANESIDE_OUTCOMING = imt_tools.CreateNamedOnGlobals(
     'NAMEDTUPLE_LANESIDE_OUTCOMING',
@@ -27,6 +28,7 @@ def dump_for_edges(objects_from_sql_request, dict_edges):
     # url: http://stackoverflow.com/questions/10252247/how-do-i-get-a-list-of-column-names-from-a-psycopg2-cursor
     # column_names = [desc[0] for desc in cursor.description]
     # namedtuple = imt_tools.create_named_tuple_from_names('DUMP_SQL_TRAFIPOLLU', column_names)
+    dict_sql_request = {}
     for object_from_sql_request in objects_from_sql_request:
         # url: http://www.dotnetperls.com/namedtuple
         # tuple_trafipollu = namedtuple._make(tuple_from_sql_request)
@@ -53,11 +55,47 @@ def dump_for_nodes(objects_from_sql_request, dict_nodes):
     """
     for object_from_sql_request in objects_from_sql_request:
         node_id = object_from_sql_request['node_id']
-        dict_sql_request = object_from_sql_request.copy()
-        dict_nodes.setdefault(node_id, []).append(dict_sql_request['edge_id1'])
-    #
+        edge_id = object_from_sql_request['edge_id1']
+        dict_nodes.setdefault(node_id, []).append(edge_id)
     print 'self.dict_nodes: ', dict_nodes
 
+def build_topo_for_nodes(dict_nodes, dict_edges, dict_lanes):
+    """
+
+    :param dict_nodes:
+    :param dict_edges:
+    :return:
+    """
+    for node_id, edges_id in dict_nodes.iteritems():
+        caf_entrees = filter(
+            lambda x: dict_edges[x]['end_node'] == node_id,
+            edges_id)
+        caf_sorties = filter(
+            lambda x: dict_edges[x]['start_node'] == node_id,
+            edges_id)
+        #
+        print "node_id: ", node_id
+        print "-> caf_entrees (SG3): ", caf_entrees
+        print "-> caf_sorties (SG3): ", caf_sorties
+        #
+        caf_entrees = []
+        caf_sorties = []
+        caf_entrees_sorties = [caf_entrees, caf_sorties]
+        for edge_id in edges_id:
+            sge_edge = dict_edges[edge_id]
+            list_symuvia_edges = [pyxb_troncon.id for pyxb_troncon in sge_edge['sg3_to_symuvia']]
+            for symuvia_edge_id in list_symuvia_edges:
+                id_in_list = int(symuvia_edge_id[symuvia_edge_id.find('_lane')+5:])
+                oncoming = dict_lanes[edge_id]['id_list'][id_in_list].oncoming
+                # '!=' est l'operateur XOR en Python
+                caf_entrees_sorties[int((sge_edge['start_node'] == node_id) != oncoming)].append(symuvia_edge_id)
+                # print 'id_in_list: ', id_in_list
+                # print 'oncoming: ', oncoming
+            print "id edge in SG3: ", edge_id
+            print "-> id edges in SYMUVIA: ", list_symuvia_edges
+        #
+        print "-> caf_entrees (SYMUVIA): ", caf_entrees
+        print "-> caf_sorties (SYMUVIA): ", caf_sorties
 
 def load_geom_with_shapely_from_dict(dict_objects_from_sql_request):
     """

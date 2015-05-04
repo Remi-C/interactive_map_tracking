@@ -166,6 +166,8 @@ class trafipolluImp_SQL(object):
                 pass
             else:
                 tpi_DUMP.dump_for_nodes(objects_from_sql_request, self.dict_nodes)
+                # TEST
+                tpi_DUMP.build_topo_for_nodes(self.dict_nodes, self.dict_edges, self.dict_lanes)
 
     def __request_for_lanes(self, **kwargs):
         """

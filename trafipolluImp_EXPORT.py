@@ -1,53 +1,67 @@
 __author__ = 'latty'
 
 from shapely.geometry import Point, LineString
+import pyxb
 
 import parser_symuvia_xsd_2_04_pyxb as network
-# import pyxb
+
 
 ###################################################
 ### ALIAS des classes de binding
 ### verifier les liens si problemes d'export!
 ###################################################
-def format_string(str):
-    """
-    retire les espaces :
-    - plus de 2 reduit a 1
-    - en debut et fin de string
-    les tabulations, les retours a la ligne
-    :param str:
-    :return:
-    """
-    str = unicode(str).encode('ascii', 'replace')
-    import re
-    str = re.sub(' +', ' ', str)
-    str = re.sub('\n', '', str)
-    str = re.sub('\t', '', str)
-    str = str.rstrip().lstrip()
-    return str
+# def format_string(str):
+#     """
+#     retire les espaces :
+#     - plus de 2 reduit a 1
+#     - en debut et fin de string
+#     les tabulations, les retours a la ligne
+#     :param str:
+#     :return:
+#     """
+#     str = unicode(str).encode('ascii', 'replace')
+#     import re
+#     str = re.sub(' +', ' ', str)
+#     str = re.sub('\n', '', str)
+#     str = re.sub('\t', '', str)
+#     str = str.rstrip().lstrip()
+#     return str
+#
+#
+# def get_class_from_parser(str_doc_class):
+#     """
+#
+#     :param str_doc_class:
+#     :return:
+#     """
+#     return_class = None
+#     try:
+#         return_class = network.__dict__[
+#             filter(lambda x: format_string(network.__dict__[x].__doc__) == str_doc_class, dir(network))[0]]
+#     except:
+#         print "ERROR! Can't find the class with doc class string:", str_doc_class, " from Parser (SYMUVIA) !!!"
+#         return_class = None
+#     else:
+#         print "Found the class with doc class string:", str_doc_class, " from Parser (SYMUVIA) !!!"
+#         print "-> ", return_class
+#     finally:
+#         return return_class
+#
+# CTD_SYMUVIA_TRONCONS = get_class_from_parser(u'Liste des tron?ons')
+# CTD_SYMUVIA_POINT_INTERNE_TRONCON = get_class_from_parser(u"Description d'un point interne du tron?on")
 
+### NEW TECHNIQUES !
+PYXB_SYMUVIA_ROOT_SYMUBRUIT = network.ROOT_SYMUBRUIT
+PYXB_SYMUVIA_RESEAUX = PYXB_SYMUVIA_ROOT_SYMUBRUIT.memberElement('RESEAUX')
+PYXB_SYMUVIA_RESEAU = PYXB_SYMUVIA_RESEAUX.memberElement('RESEAU')
+PYXB_RESEAU_TRONCONS = PYXB_SYMUVIA_RESEAU.memberElement('TRONCONS')
+# on recupere a partir du type: typePointsInternes
+# c'est un raccourci (au lieu de faire comme au dessus avec l'arborescence)
+PYXB_POINT_INTERNE = network.typePointsInternes._ElementBindingDeclForName('POINT_INTERNE')[0]
 
-def get_class_from_parser(str_doc_class, parser_symuvia=network):
-    """
+CTD_RESEAU_TRONCONS = PYXB_RESEAU_TRONCONS.typeDefinition()
+CTD_POINT_INTERNE = PYXB_POINT_INTERNE.typeDefinition()
 
-    :param str_doc_class:
-    :return:
-    """
-    return_class = None
-    try:
-        return_class = network.__dict__[
-            filter(lambda x: format_string(network.__dict__[x].__doc__) == str_doc_class, dir(parser_symuvia))[0]]
-    except:
-        print "ERROR! Can't find the class with doc class string:", str_doc_class, " from Parser (SYMUVIA) !!!"
-        return_class = None
-    else:
-        print "Found the class with doc class string:", str_doc_class, " from Parser (SYMUVIA) !!!"
-        print "-> ", return_class
-    finally:
-        return return_class
-
-CTD_SYMUVIA_TRONCONS = get_class_from_parser(u'Liste des tron?ons')
-CTD_SYMUVIA_POINT_INTERNE_TRONCON = get_class_from_parser(u"Description d'un point interne du tron?on")
 ###################################################
 
 import os
@@ -105,10 +119,16 @@ class trafipolluImp_EXPORT(object):
         f = open(outfilename, "w")
         str_xml = ""
         if prettyxml:
-            dom = sym_node.toDOM(None, element_name=element_name)
-            str_xml = dom.toprettyxml(indent="\t", newl="\n", encoding='utf-8')
+            try:
+                dom = sym_node.toDOM(None, element_name=element_name)
+            except pyxb.IncompleteElementContentError as e:
+                print '*** ERROR : IncompleteElementContentError'
+                print '- Details error: ', e.details()
+            else:
+                str_xml = dom.toprettyxml(indent="\t", newl="\n", encoding='utf-8')
         else:
             str_xml = sym_node.toxml('utf-8', element_name=element_name)
+        #
         f.write(str_xml)
         f.close()
         print "Write in file: ", outfilename, "[DONE]"
@@ -119,7 +139,7 @@ class trafipolluImp_EXPORT(object):
         :return:
 
         """
-        sym_TRONCONS = CTD_SYMUVIA_TRONCONS()
+        sym_TRONCONS = CTD_RESEAU_TRONCONS()
         for edge_id in self.dict_lanes:
             for sym_TRONCON in self.export_TRONCON(edge_id):
                 sym_TRONCONS.append(sym_TRONCON)
@@ -171,6 +191,9 @@ class trafipolluImp_EXPORT(object):
                 #
                 list_troncons.append(sym_TRONCON)
         finally:
+            # LINK STREETGEN3 to SYMUVIA (TOPO)
+            sg3_edge['sg3_to_symuvia'] = list_troncons
+            #
             return list_troncons
 
     def build_TRONCON_lanes_in_groups(self, sym_TRONCON, edge_id, cur_id_lane, nb_lanes):
@@ -266,11 +289,15 @@ class trafipolluImp_EXPORT(object):
         coef_amont, coef_aval = list_amont_aval_proj
         troncon_center_axis = []
         # liste des points formant l'axe de l'edge_sg3
-        for point in list(edge_center_axis.coords):
-            coef_point = edge_center_axis.project(Point(point))
-            # clipping du point, pour etre sure d'etre amont et aval
-            if coef_point >= coef_amont and coef_point <= coef_aval:
-                troncon_center_axis.append(point)
+        troncon_center_axis = filter(
+            lambda x: coef_amont <= edge_center_axis.project(Point(x)) <= coef_aval,
+            list(edge_center_axis.coords)
+        )
+        # for point in list(edge_center_axis.coords):
+        #     coef_point = edge_center_axis.project(Point(point))
+        #     # clipping du point, pour etre sure d'etre amont et aval
+        #     if coef_point >= coef_amont and coef_point <= coef_aval:
+        #         troncon_center_axis.append(point)
         # print "++ troncon_center_axis: ", troncon_center_axis
 
         sym_TRONCON.POINTS_INTERNES = self.build_POINTS_INTERNES(troncon_center_axis)
@@ -291,10 +318,7 @@ class trafipolluImp_EXPORT(object):
         """
         sym_TRONCON.nb_voie = nb_lanes  # == 1
         # TODO: besoin d'un generateur d'id pour les troncons nouvellement generes
-
-        #OPTIMISATION
-        #sym_TRONCON.id += '_lane' + str(cur_id_lane)
-        sym_TRONCON.id = sym_TRONCON.id.join()
+        sym_TRONCON.id += '_lane' + str(cur_id_lane)
 
         # le nouveau troncon est identique a l'unique voie
         edge_center_axis = self.dict_lanes[edge_id]['lane_center_axis'][cur_id_lane]
@@ -314,8 +338,9 @@ class trafipolluImp_EXPORT(object):
         #
         sym_TRONCON.id = sg3_edge['ign_id']
         sym_TRONCON.largeur_voie = sg3_edge['road_width'] / sg3_edge['lane_number']
-        sym_TRONCON.id_eltamont = -1
-        sym_TRONCON.id_eltaval = -1
+        sym_TRONCON.id_eltamont = "-1"
+        sym_TRONCON.id_eltaval = "-1"
+        #
         return sym_TRONCON
 
     @staticmethod
@@ -327,7 +352,7 @@ class trafipolluImp_EXPORT(object):
         """
         # print "list_points: ", list_points
         points_internes = network.typePointsInternes()
-        [points_internes.append(CTD_SYMUVIA_POINT_INTERNE_TRONCON(coordonnees=[x[0], x[1]])) for x in list_points]
+        [points_internes.append(CTD_POINT_INTERNE(coordonnees=[x[0], x[1]])) for x in list_points]
         # alternative approach:
         # [points_internes.append(pyxb.BIND(coordonnees=[x[0], x[1]])) for x in list_points]
         return points_internes
