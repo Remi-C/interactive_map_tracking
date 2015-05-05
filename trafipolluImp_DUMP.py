@@ -153,7 +153,7 @@ def dump_lanes(objects_from_sql_request, dict_edges, dict_lanes):
         # print 'id: ', id
     # print "** _dict_sides:", self.__dict_sides
 
-    # create the dict: __dict_grouped_lanes
+    # create the dict: dict_grouped_lanes
     # contain : for each edge_id list of lanes in same direction
     dict_grouped_lanes = {}
     map(lambda x, y: dict_grouped_lanes.__setitem__(x, {'grouped_lanes': y}),
