@@ -2,9 +2,8 @@ __author__ = 'latty'
 
 from shapely.geometry import Point, LineString
 import pyxb
-
 import parser_symuvia_xsd_2_04_pyxb as network
-
+import trafipolluImp_PYXB as pyxb_parser
 
 ###################################################
 ### ALIAS des classes de binding
@@ -81,6 +80,12 @@ class trafipolluImp_EXPORT(object):
         """
         self.dict_edges = dict_edges
         self.dict_lanes = dict_lanes
+        #
+        self.pyxb_parser = pyxb_parser.trafipolluImp_PYXB(network)
+        #
+        element_symuvia = 'TRONCON/POINTS_INTERNES/POINT_INTERNE'
+        print '%s, CTD:%s' % (element_symuvia, self.pyxb_parser.get_CTD(element_symuvia))
+        print '%s, CTD:%s' % (element_symuvia, self.pyxb_parser.get_CTD(element_symuvia))
 
     def export(self, infilename=infilename_for_symuvia, outfilename=outfilename_for_symuvia):
         """
