@@ -1,7 +1,7 @@
 # ./parser_symuvia_xsd_2_04_pyxb.py
 # -*- coding: utf-8 -*-
 # PyXB bindings for NM:e92452c8d3e28a9e27abfc9994d2007779e7f4c9
-# Generated 2015-05-04 18:36:24.653203 by PyXB version 1.2.4 using Python 2.7.6.final.0
+# Generated 2015-05-05 09:27:20.625635 by PyXB version 1.2.4 using Python 2.7.6.final.0
 # Namespace AbsentNamespace0
 
 from __future__ import unicode_literals
@@ -16,7 +16,7 @@ import pyxb.utils.six as _six
 
 
 # Unique identifier for bindings created at the same time
-_GenerationUID = pyxb.utils.utility.UniqueIdentifier('urn:uuid:b3ecda44-f27b-11e4-ac44-60a44c5c87bf')
+_GenerationUID = pyxb.utils.utility.UniqueIdentifier('urn:uuid:2a2870b6-f2f8-11e4-bd39-60a44c5c87bf')
 
 # Version of PyXB used to generate the bindings
 _PyXBVersion = '1.2.4'
