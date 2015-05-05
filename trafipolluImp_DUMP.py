@@ -10,6 +10,7 @@ import imt_tools
 
 
 
+
 # need to be in Globals for Pickled 'dict_edges'
 NT_LANESIDE_OUTCOMING = imt_tools.CreateNamedOnGlobals(
     'NAMEDTUPLE_LANESIDE_OUTCOMING',
@@ -55,8 +56,10 @@ def dump_for_nodes(objects_from_sql_request, dict_nodes):
     """
     for object_from_sql_request in objects_from_sql_request:
         node_id = object_from_sql_request['node_id']
-        edge_id = object_from_sql_request['edge_id1']
-        dict_nodes.setdefault(node_id, []).append(edge_id)
+        # edge_id = object_from_sql_request['edge_id1']
+        # dict_nodes.setdefault(node_id, []).append(edge_id)
+        dict_nodes[node_id] = object_from_sql_request['edge_ids']
+    #
     print 'self.dict_nodes: ', dict_nodes
 
 def build_topo_for_nodes(dict_nodes, dict_edges, dict_lanes):
@@ -67,16 +70,16 @@ def build_topo_for_nodes(dict_nodes, dict_edges, dict_lanes):
     :return:
     """
     for node_id, edges_id in dict_nodes.iteritems():
-        caf_entrees = filter(
-            lambda x: dict_edges[x]['end_node'] == node_id,
-            edges_id)
-        caf_sorties = filter(
-            lambda x: dict_edges[x]['start_node'] == node_id,
-            edges_id)
-        #
-        print "node_id: ", node_id
-        print "-> caf_entrees (SG3): ", caf_entrees
-        print "-> caf_sorties (SG3): ", caf_sorties
+        # caf_entrees = filter(
+        #     lambda x: dict_edges[x]['end_node'] == node_id,
+        #     edges_id)
+        # caf_sorties = filter(
+        #     lambda x: dict_edges[x]['start_node'] == node_id,
+        #     edges_id)
+        # #
+        # print "node_id: ", node_id
+        # print "-> caf_entrees (SG3): ", caf_entrees
+        # print "-> caf_sorties (SG3): ", caf_sorties
         #
         caf_entrees = []
         caf_sorties = []
