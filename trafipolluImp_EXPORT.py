@@ -2,71 +2,73 @@ __author__ = 'latty'
 
 from shapely.geometry import Point, LineString
 import pyxb
-
-import parser_symuvia_xsd_2_04_pyxb as network
-
-
-###################################################
-### ALIAS des classes de binding
-### verifier les liens si problemes d'export!
-###################################################
-### NEW TECHNIQUES !
-PYXB_SYMUVIA_ROOT_SYMUBRUIT = network.ROOT_SYMUBRUIT
-PYXB_SYMUVIA_RESEAUX = PYXB_SYMUVIA_ROOT_SYMUBRUIT.memberElement('RESEAUX')
-PYXB_SYMUVIA_RESEAU = PYXB_SYMUVIA_RESEAUX.memberElement('RESEAU')
-#
-PYXB_RESEAU_TRONCONS = PYXB_SYMUVIA_RESEAU.memberElement('TRONCONS')
-PYXB_RESEAU_CONNEXIONS = PYXB_SYMUVIA_RESEAU.memberElement('CONNEXIONS')
-#
-PYXB_CONNEXIONS_CARREFOURSAFEUX = PYXB_RESEAU_CONNEXIONS.memberElement('CARREFOURSAFEUX')
-PYXB_CARREFOURSAFEUX_CAF = PYXB_CONNEXIONS_CARREFOURSAFEUX.memberElement('CARREFOURAFEUX')
-#
-PYXB_CAF_MOUVEMENTS_AUTORISES = PYXB_CARREFOURSAFEUX_CAF.memberElement('MOUVEMENTS_AUTORISES')
-PYXB_CAF_MOUVEMENT_AUTORISE = PYXB_CAF_MOUVEMENTS_AUTORISES.memberElement('MOUVEMENT_AUTORISE')
-#
-PYXB_MOUVEMENT_SORTIES = PYXB_CAF_MOUVEMENT_AUTORISE.memberElement('MOUVEMENT_SORTIES')
-PYXB_MOUVEMENT_SORTIE = PYXB_MOUVEMENT_SORTIES.memberElement('MOUVEMENT_SORTIE')
-#
-PYXB_CAF_ENTREES_CAF = PYXB_CARREFOURSAFEUX_CAF.memberElement('ENTREES_CAF')
-PYXB_CAF_ENTREE_CAF = PYXB_CAF_ENTREES_CAF.memberElement('ENTREE_CAF')
-#
-PYXB_ENTREE_CAF_MOUVEMENTS = PYXB_CAF_ENTREE_CAF.memberElement('MOUVEMENTS')
-PYXB_ENTREE_CAF_MOUVEMENT = PYXB_ENTREE_CAF_MOUVEMENTS.memberElement('MOUVEMENT')
-# on recupere a partir du type: typePointsInternes
-# c'est un raccourci (au lieu de faire comme au dessus avec l'arborescence)
-PYXB_POINT_INTERNE = network.typePointsInternes._ElementBindingDeclForName('POINT_INTERNE')[0]
-#
-PYXB_TRONCON = PYXB_RESEAU_TRONCONS.memberElement('TRONCON')
-#
-#
-CTD_RESEAU_TRONCONS = PYXB_RESEAU_TRONCONS.typeDefinition()
-CTD_RESEAU_CONNEXIONS = PYXB_RESEAU_CONNEXIONS.typeDefinition()
-#
-CTD_TRONCON = PYXB_TRONCON.typeDefinition()
-CTD_POINT_INTERNE = PYXB_POINT_INTERNE.typeDefinition()
-#
-CTD_CAFS = PYXB_CONNEXIONS_CARREFOURSAFEUX.typeDefinition()
-CTD_CAF = PYXB_CARREFOURSAFEUX_CAF.typeDefinition()
-#
-CTD_CAF_MOUVEMENTS_AUTORISES = PYXB_CAF_MOUVEMENTS_AUTORISES.typeDefinition()
-CTD_CAF_MOUVEMENT_AUTORISE = PYXB_CAF_MOUVEMENT_AUTORISE.typeDefinition()
-#
-CTD_MOUVEMENT_SORTIES = PYXB_MOUVEMENT_SORTIES.typeDefinition()
-CTD_MOUVEMENT_SORTIE = PYXB_MOUVEMENT_SORTIE.typeDefinition()
-#
-CTD_ENTREES_CAF = PYXB_CAF_ENTREES_CAF.typeDefinition()
-CTD_ENTREE_CAF = PYXB_CAF_ENTREE_CAF.typeDefinition()
-#
-CTD_ENTREE_CAF_MOUVEMENTS = PYXB_ENTREE_CAF_MOUVEMENTS.typeDefinition()
-CTD_ENTREE_CAF_MOUVEMENT = PYXB_ENTREE_CAF_MOUVEMENT.typeDefinition()
-
-###################################################
+import parser_symuvia_xsd_2_04_pyxb as symuvia_parser
+import trafipolluImp_PYXB as module_pyxb_parser
 
 import os
 qgis_plugins_directory = os.path.normcase(os.path.dirname(__file__))
 #
 infilename_for_symuvia = qgis_plugins_directory + '/' + "project_empty_from_symunet" + "_xsd_" + "2_04" + ".xml"
 outfilename_for_symuvia = qgis_plugins_directory + '/' + "export_from_sg3_to_symuvia" + "_xsd_" + "2_04" + ".xml"
+
+pyxb_parser = module_pyxb_parser.trafipolluImp_PYXB(symuvia_parser)
+
+
+class pyxbDecorator(object):
+    """
+
+    """
+    def __init__(self, parser_pyxb):
+        self.parser_pyxb = parser_pyxb
+
+    def __call__(self, f):
+        """
+        """
+        str_child_name = f.__name__[7:]     # 7 = len('export_')
+        print 'str_child_name: ', str_child_name
+
+        def wrapped_f(*args):
+            """
+            """
+            str_parent = args[-1]
+            if type(str_parent) is tuple:
+                str_parent = str_parent[0]
+
+            str_path_to_child = str_parent+'/'+str_child_name
+            sym_NODE = self.parser_pyxb.get_instance(str_path_to_child)
+            # print 'str_parent: ', str_parent
+            # print 'str_path_to_child: ', str_path_to_child
+            # print 'sym_NODE: ', sym_NODE
+            args = list(args)
+            args.append((str_child_name, sym_NODE))
+            args = iter(args)
+            # print 'args: ', args
+            return f(*args)
+        return wrapped_f
+
+    @staticmethod
+    def get_path(*args):
+        """
+        """
+        return args[-2]+'/'+args[-1][0]
+
+    @staticmethod
+    def get_instance(*args, **kwargs):
+        """
+        """
+        return pyxb_parser.get_instance(pyxbDecorator.get_path(*args), **kwargs)
+
+    @staticmethod
+    def get_path_instance(*args):
+        """
+        """
+        str_parent = args[-2]
+        str_child = args[-1][0]
+        str_path_to_child = str_parent+'/'+str_child
+        sym_NODE = pyxb_parser.get_instance(str_path_to_child)
+        # print 'str_parent :', str_parent
+        # print 'str_child :', str_child
+        return str_path_to_child, sym_NODE
 
 
 class trafipolluImp_EXPORT(object):
@@ -80,17 +82,42 @@ class trafipolluImp_EXPORT(object):
         self.dict_edges = dict_edges
         self.dict_lanes = dict_lanes
         self.dict_nodes = dict_nodes
-
-        self.cur_sg3_node = None
-        self.cur_node_id = 0
+        #
+        self.pyxb_parser = pyxb_parser
+        #
+        self.cursor_symuvia = {
+            'sg3_node': None,
+            'node_id': 0,
+            'sym_CAF': None
+        }
+        # element_symuvia = 'ROOT_SYMUBRUIT/RESEAUX/RESEAU/TRONCONS/TRONCON'
+        # print '%s, CTD:%s' % (element_symuvia, self.pyxb_parser.get_CTD(element_symuvia))
+        # print '%s, CTD:%s' % (element_symuvia, self.pyxb_parser.get_CTD(element_symuvia))
+        # print '%s, Instance:%s' % (element_symuvia, self.pyxb_parser.get_instance(element_symuvia))
+        # print '%s, typeTroncon:%s' % (element_symuvia, symuvia_parser.typeTroncon())
 
     def select_node(self, node_id):
         """
 
         :param node_id:
         """
-        self.cur_node_id = node_id
-        self.cur_sg3_node = self.dict_nodes[node_id]
+        self.cursor_symuvia['node_id'] = node_id
+        self.cursor_symuvia['sg3_node'] = self.dict_nodes[node_id]
+
+    def select_CAF(self, sym_CAF):
+        """
+
+        :param sym_CAF:
+        :return:
+        """
+        self.cursor_symuvia['sym_CAF'] = sym_CAF
+
+    def get_CAF(self):
+        """
+
+        :return:
+        """
+        return self.cursor_symuvia['sym_CAF']
 
     def export(self, infilename=infilename_for_symuvia, outfilename=outfilename_for_symuvia):
         """
@@ -100,15 +127,16 @@ class trafipolluImp_EXPORT(object):
         """
         print "Open file: ", infilename, "..."
         xml = open(infilename).read()
-        sym_ROOT = network.CreateFromDocument(xml)
+        sym_ROOT = symuvia_parser.CreateFromDocument(xml)
         print "Open file: ", infilename, "[DONE]"
 
         print "Export SG3 to SYMUVIA ..."
         #
         sym_ROOT.RESEAUX.RESEAU[0].TRONCONS.reset()
-        sym_ROOT.RESEAUX.RESEAU[0].TRONCONS = self.export_TRONCONS()
+        sym_ROOT.RESEAUX.RESEAU[0].TRONCONS = self.export_TRONCONS('RESEAU')
         #
-        sym_ROOT.RESEAUX.RESEAU[0].CONNEXIONS = self.export_CONNEXIONS()
+        sym_ROOT.RESEAUX.RESEAU[0].CONNEXIONS.reset()
+        sym_ROOT.RESEAUX.RESEAU[0].CONNEXIONS = self.export_CONNEXIONS('RESEAU')
         #
         print "Export SG3 to SYMUVIA [DONE]"
 
@@ -150,171 +178,236 @@ class trafipolluImp_EXPORT(object):
         f.close()
         print "Write in file: ", outfilename, "[DONE]"
 
-    def export_CONNEXIONS(self):
+    @pyxbDecorator(pyxb_parser)
+    def export_CONNEXIONS(self, *args):
         """
 
         :return:
+
         """
-        sym_CONNEXIONS = CTD_RESEAU_CONNEXIONS()
-        sym_CONNEXIONS.CARREFOURSAFEUX = self.export_CAFS()
+        str_path_to_child, sym_CONNEXIONS = pyxbDecorator.get_path_instance(*args)
+        # print 'sym_CONNEXIONS: ', sym_CONNEXIONS
+        sym_CONNEXIONS.CARREFOURSAFEUX = self.export_CARREFOURSAFEUX(str_path_to_child)
+
         return sym_CONNEXIONS
 
-    def export_CAFS(self):
+    @pyxbDecorator(pyxb_parser)
+    def export_CARREFOURSAFEUX(self, *args):
         """
 
         :param node_id:
         :return:
-        """
-        sym_CAFS = CTD_CAFS()
+        # """
+        str_path_to_child, sym_CAFS = pyxbDecorator.get_path_instance(*args)
         for node_id in self.dict_nodes:
             self.select_node(node_id)
-            sym_CAFS.append(self.export_CAF())
+            sym_CAFS.append(self.export_CARREFOURAFEUX('CARREFOURSAFEUX'))
         return sym_CAFS
 
-    def export_CAF(self):
+    @pyxbDecorator(pyxb_parser)
+    def export_CARREFOURAFEUX(self, *args):
         """
 
         :return:
         """
         sym_CAF = None
         #
-        nb_edges_connected = len(self.cur_sg3_node['edge_ids'])
+        nb_edges_connected = len(self.cursor_symuvia['sg3_node']['edge_ids'])
         b_node_is_CAF = nb_edges_connected > 2  # dummy test
         if b_node_is_CAF:
-            sym_CAF = self.init_CAF(self.cur_node_id)
+            str_path_to_child, sym_CAF = pyxbDecorator.get_path_instance(*args)
             #
-            sym_CAF.MOUVEMENTS_AUTORISES = self.export_MOUVEMENTS_AUTORISES()
-            sym_CAF.ENTREES_CAF = self.export_ENTREES_CAF()
+            self.select_CAF(sym_CAF)
+            #
+            sym_CAF.id = self.build_id_for_CAF(self.cursor_symuvia['node_id'])
+            sym_CAF.vit_max = "1"
+            #
+            sym_CAF.MOUVEMENTS_AUTORISES = self.export_MOUVEMENTS_AUTORISES(str_path_to_child)
+            sym_CAF.ENTREES_CAF = self.export_ENTREES_CAF(str_path_to_child)
         #
-        # print 'node_id: ', self.cur_node_id
-        # print 'sg3_node: ', self.cur_sg3_node
-        # print "sg3_node['edge_ids']:", self.cur_sg3_node['edge_ids']
+        # print 'node_id: ', self.current['node_id']
+        # print 'sg3_node: ', self.current['sg3_node']
+        # print "sg3_node['edge_ids']:", self.current['sg3_node']['edge_ids']
         # print 'nb_edges_connected: ', nb_edges_connected
         #
         return sym_CAF
 
-    def export_MOUVEMENTS_AUTORISES(self):
+    @pyxbDecorator(pyxb_parser)
+    def export_MOUVEMENTS_AUTORISES(self, *args):
         """
 
         :param node_id:
         :return:
         """
-        sym_MOUVEMENTS_AUTORISES = CTD_CAF_MOUVEMENTS_AUTORISES()
-        for mvt_autorise in self.export_MOUVEMENT_AUTORISE():
+        str_path_to_child, sym_MOUVEMENTS_AUTORISES = pyxbDecorator.get_path_instance(*args)
+        for mvt_autorise in self.export_MOUVEMENT_AUTORISE(str_path_to_child):
             sym_MOUVEMENTS_AUTORISES.append(mvt_autorise)
         return sym_MOUVEMENTS_AUTORISES
 
-    def export_MOUVEMENT_AUTORISE(self):
+    @pyxbDecorator(pyxb_parser)
+    def export_MOUVEMENT_AUTORISE(self, *args):
         """
 
         :return:
         """
+        str_path_to_child = pyxbDecorator.get_path(*args)
         list_mvt_autorise = []
 
         # CAF - IN
-        for sym_troncon in self.cur_sg3_node['CAF']['in']:
-            sym_MOUVEMENT_AUTORISE = CTD_CAF_MOUVEMENT_AUTORISE()
+        for sym_troncon in self.cursor_symuvia['sg3_node']['CAF']['in']:
+            sym_MOUVEMENT_AUTORISE = pyxbDecorator.get_instance(*args)
             sym_MOUVEMENT_AUTORISE.id_troncon_amont = sym_troncon.id
-            sym_MOUVEMENT_AUTORISE.MOUVEMENT_SORTIES = self.export_MOUVEMENT_SORTIES()
+            # [TOPO] - Link between TRONCON & CAF
+            sym_troncon.id_eltaval = self.get_CAF().id
+            #
+            sym_MOUVEMENT_AUTORISE.MOUVEMENT_SORTIES = self.export_MOUVEMENT_SORTIES(str_path_to_child)
             #
             list_mvt_autorise.append(sym_MOUVEMENT_AUTORISE)
         return list_mvt_autorise
 
-    def export_MOUVEMENT_SORTIES(self):
+    @pyxbDecorator(pyxb_parser)
+    def export_MOUVEMENT_SORTIES(self, *args):
         """
 
         :return:
+
         """
-        sym_MOUVEMENT_SORTIES = CTD_MOUVEMENT_SORTIES()
-        for mvt_sortie in self.export_MOUVEMENT_SORTIE():
+        str_path_to_child, sym_MOUVEMENT_SORTIES = pyxbDecorator.get_path_instance(*args)
+        for mvt_sortie in self.export_MOUVEMENT_SORTIE(str_path_to_child):
             sym_MOUVEMENT_SORTIES.append(mvt_sortie)
         return sym_MOUVEMENT_SORTIES
 
-    def export_MOUVEMENT_SORTIE(self):
+    @pyxbDecorator(pyxb_parser)
+    def export_MOUVEMENT_SORTIE(self, *args):
         """
 
         :return:
+
         """
         list_mvt_sortie = []
         # CAF - OUT
-        for sym_troncon in self.cur_sg3_node['CAF']['out']:
-            sym_MOUVEMENT_SORTIE = CTD_MOUVEMENT_SORTIE()
+        for sym_troncon in self.cursor_symuvia['sg3_node']['CAF']['out']:
+            sym_MOUVEMENT_SORTIE = pyxbDecorator.get_instance(*args)
             sym_MOUVEMENT_SORTIE.id_troncon_aval = sym_troncon.id
+            # [TOPO] - Link between TRONCON & CAF
+            sym_troncon.id_eltamont = self.get_CAF().id
             #
             list_mvt_sortie.append(sym_MOUVEMENT_SORTIE)
         return list_mvt_sortie
 
-    def export_ENTREES_CAF(self):
+    @pyxbDecorator(pyxb_parser)
+    def export_ENTREES_CAF(self, *args):
         """
 
         :param node_id:
         :return:
+
         """
-        sym_ENTREES_CAF = CTD_ENTREES_CAF()
-        for entree_caf in self.export_ENTREE_CAF():
+        str_path_to_child, sym_ENTREES_CAF = pyxbDecorator.get_path_instance(*args)
+        for entree_caf in self.export_ENTREE_CAF(str_path_to_child):
             sym_ENTREES_CAF.append(entree_caf)
         return sym_ENTREES_CAF
 
-    def export_ENTREE_CAF(self):
+    @pyxbDecorator(pyxb_parser)
+    def export_ENTREE_CAF(self, *args):
         """
 
         :return:
-        """
-        list_entree_caf = []
 
+        """
+        str_path_to_child = pyxbDecorator.get_path(*args)
+        list_entree_caf = []
         # CAF - IN
-        for sym_troncon in self.cur_sg3_node['CAF']['in']:
-            sym_ENTREE_CAF = CTD_ENTREE_CAF()
+        for sym_troncon in self.cursor_symuvia['sg3_node']['CAF']['in']:
+            sym_ENTREE_CAF = pyxbDecorator.get_instance(*args)
             sym_ENTREE_CAF.id_troncon_amont = sym_troncon.id
-            sym_ENTREE_CAF.MOUVEMENTS = self.export_ENTREE_CAF_MOUVEMENTS()
+            # [TOPO] - Link between TRONCON & CAF
+            sym_troncon.id_eltaval = self.get_CAF().id
+            #
+            sym_ENTREE_CAF.MOUVEMENTS = self.export_MOUVEMENTS(str_path_to_child)
             #
             list_entree_caf.append(sym_ENTREE_CAF)
         return list_entree_caf
 
-    def export_ENTREE_CAF_MOUVEMENTS(self):
+    @pyxbDecorator(pyxb_parser)
+    def export_MOUVEMENTS(self, *args):
         """
 
         :return:
+
         """
-        sym_MOUVEMENTS = CTD_ENTREE_CAF_MOUVEMENTS()
-        for mouvement in self.export_ENTREE_CAF_MOUVEMENT():
+        str_path_to_child, sym_MOUVEMENTS = pyxbDecorator.get_path_instance(*args)
+        for mouvement in self.export_MOUVEMENT(str_path_to_child):
             sym_MOUVEMENTS.append(mouvement)
         return sym_MOUVEMENTS
 
-    def export_ENTREE_CAF_MOUVEMENT(self):
+    @pyxbDecorator(pyxb_parser)
+    def export_MOUVEMENT(self, *args):
         """
 
         :return:
+
         """
         list_mouvement = []
         # CAF - OUT
-        for sym_troncon in self.cur_sg3_node['CAF']['out']:
-            sym_MOUVEMENT = CTD_ENTREE_CAF_MOUVEMENT()
+        for sym_troncon in self.cursor_symuvia['sg3_node']['CAF']['out']:
+            sym_MOUVEMENT = pyxbDecorator.get_instance(*args)
             sym_MOUVEMENT.id_troncon_aval = sym_troncon.id
+            # [TOPO] - Link between TRONCON & CAF
+            sym_troncon.id_eltamont = self.get_CAF().id
             #
             list_mouvement.append(sym_MOUVEMENT)
         return list_mouvement
 
-    def export_TRONCONS(self):
+    @pyxbDecorator(pyxb_parser)
+    def export_TRONCONS(self, *args):
         """
 
         :return:
 
         """
-        sym_TRONCONS = CTD_RESEAU_TRONCONS()
+        str_path_to_child, sym_TRONCONS = pyxbDecorator.get_path_instance(*args)
         for edge_id in self.dict_lanes:
-            for sym_TRONCON in self.export_TRONCON(edge_id):
+            for sym_TRONCON in self.export_TRONCON(edge_id, str_path_to_child):
                 sym_TRONCONS.append(sym_TRONCON)
         return sym_TRONCONS
 
-    def export_TRONCON(self, edge_id):
+    @pyxbDecorator(pyxb_parser)
+    def export_TRONCON(self, edge_id, *args):
         """
 
         :param edge_id:
         :return: [] : list of sym_TRONCON
 
         """
+        str_path_to_child = pyxbDecorator.get_path(*args)
+
         list_troncons = []
+
+        def update_list_troncon(sym_TRONCON, sg3_edge):
+            """
+            Update de liste_troncon:
+                liste_troncon est le resultat de la fonction donc elle insere ou non des troncons dans le systeme
+                L'update regarde si le troncon n'a pas deja ete calculee (prealablement)
+                si oui: on met a jour les donnees sans rajouter un nouvel object (nouvelle adresse memoire)
+                si non: on rajoute l'object (sym_TRONCON) dans la liste (instance de l'object)
+                L'update permet de garder une coherence avec les liens topologiques calcules pour les nodes/CAF
+                ps: a revoir, une forte impression que c'est tres foireux (meme si impression de deja vu dans les
+                codes transmis par LICIT)
+            """
+            try:
+                list_sym_TRONCON = filter(lambda x: x.id == sym_TRONCON.id, sg3_edge['sg3_to_symuvia'])
+            except:
+                # la cle 'sg3_to_symuvia' n'existe pas donc on est dans l'init (premiere passe)
+                list_troncons.append(sym_TRONCON)
+            else:
+                if len(list_sym_TRONCON) == 0:
+                    # nouveau troncon
+                    list_troncons.append(sym_TRONCON)
+                else:
+                    # le troncon est deja present
+                    # ps: faudrait updater le TRONCON
+                    list_troncons.append(list_sym_TRONCON[0])
 
         sg3_edge = self.dict_edges[edge_id]
 
@@ -333,34 +426,39 @@ class trafipolluImp_EXPORT(object):
                 cur_id_lane = 0
                 for id_group_lane in grouped_lanes:
                     nb_lanes = id_group_lane
-                    sym_TRONCON = self.init_TRONCON(sg3_edge)
+
+                    sym_TRONCON = self.build_TRONCON(sg3_edge, *args)
+
                     if nb_lanes > 1:
                         # groupe de plusieurs voies dans la meme direction
-                        self.build_TRONCON_lanes_in_groups(sym_TRONCON, edge_id, cur_id_lane, nb_lanes)
+                        self.build_TRONCON_lanes_in_groups(sym_TRONCON, edge_id, cur_id_lane, nb_lanes, str_path_to_child)
                     else:
                         # groupe d'une seule voie (pour une direction)
-                        self.build_TRONCON_lane_in_groups(sym_TRONCON, edge_id, cur_id_lane, nb_lanes)
-                    #
-                    list_troncons.append(sym_TRONCON)
+                        self.build_TRONCON_lane_in_groups(sym_TRONCON, edge_id, cur_id_lane, nb_lanes, str_path_to_child)
+
+                    # Update list_troncon (local function)
+                    update_list_troncon(sym_TRONCON, sg3_edge)
+
                     # next lanes group
                     cur_id_lane += nb_lanes
             else:
                 # le troncon possede 1 groupe de voies mono-directionnelles
                 nb_lanes = grouped_lanes[0]
                 #
-                sym_TRONCON = self.init_TRONCON(sg3_edge)
-                self.build_TRONCON_lanes_in_one_group(sym_TRONCON, sg3_edge, nb_lanes)
-                # Link SYMUVIA to SG3 [TOPO]
-                sym_TRONCON['symuvia_to_sg3'] = edge_id
-                #
-                list_troncons.append(sym_TRONCON)
+                sym_TRONCON = self.build_TRONCON(sg3_edge, *args)
+                self.build_TRONCON_lanes_in_one_group(sym_TRONCON, sg3_edge, nb_lanes, str_path_to_child)
+                # # Link SYMUVIA to SG3 [TOPO]
+                # sym_TRONCON['symuvia_to_sg3'] = edge_id
+
+                # Update list_troncon (local function)
+                update_list_troncon(sym_TRONCON, sg3_edge)
         finally:
-            # Link STREETGEN3 to SYMUVIA [TOPO]
+            # LINK STREETGEN3 to SYMUVIA (TOPO)
             sg3_edge['sg3_to_symuvia'] = list_troncons
             #
             return list_troncons
 
-    def build_TRONCON_lanes_in_groups(self, sym_TRONCON, edge_id, cur_id_lane, nb_lanes):
+    def build_TRONCON_lanes_in_groups(self, sym_TRONCON, edge_id, cur_id_lane, nb_lanes, *args):
         """
         1 Groupe de plusieurs voies (dans la meme direction) dans une serie de groupes (de voies) pour l'edge_sg3
         Pas encore finie, experimental car le cas n'est pas present dans le reseau (pas possible de tester directement
@@ -426,11 +524,12 @@ class trafipolluImp_EXPORT(object):
         # Comme la liste des coefficients 1D est triee,
         # on peut declarer le 1er et dernier point comme Amont/Aval
         sym_TRONCON.nb_voie = nb_lanes
-        sym_TRONCON.POINTS_INTERNES = self.build_POINTS_INTERNES(troncon_center_axis[1:-1])
+        str_parent = args[-1]
+        sym_TRONCON.POINTS_INTERNES = self.export_POINTS_INTERNES(troncon_center_axis[1:-1], str_parent)
         sym_TRONCON.extremite_amont = troncon_center_axis[0]    # 1er point
         sym_TRONCON.extremite_aval = troncon_center_axis[-1]    # dernier point
 
-    def build_TRONCON_lanes_in_one_group(self, sym_TRONCON, sg3_edge, nb_lanes):
+    def build_TRONCON_lanes_in_one_group(self, sym_TRONCON, sg3_edge, nb_lanes, *args):
         """
         Plusieurs voies (meme direction) dans 1 unique groupe pour une edge_sg3
         L'idee dans ce cas est d'utiliser les informations geometriques d'edge_sg3 (centre de l'axe de l'edge)
@@ -463,13 +562,13 @@ class trafipolluImp_EXPORT(object):
         #     if coef_point >= coef_amont and coef_point <= coef_aval:
         #         troncon_center_axis.append(point)
         # print "++ troncon_center_axis: ", troncon_center_axis
-
-        sym_TRONCON.POINTS_INTERNES = self.build_POINTS_INTERNES(troncon_center_axis)
+        str_parent = args[-1]
+        sym_TRONCON.POINTS_INTERNES = self.export_POINTS_INTERNES(troncon_center_axis, str_parent)
         #
         sym_TRONCON.extremite_amont = sg3_edge['amont']
         sym_TRONCON.extremite_aval = sg3_edge['aval']
 
-    def build_TRONCON_lane_in_groups(self, sym_TRONCON, edge_id, cur_id_lane, nb_lanes):
+    def build_TRONCON_lane_in_groups(self, sym_TRONCON, edge_id, cur_id_lane, nb_lanes, *args):
         """
         1 voie dans une serie de groupe.
         Cas le plus simple, on recupere les informations directement de la voie_sg3 (correspondance directe)
@@ -489,18 +588,17 @@ class trafipolluImp_EXPORT(object):
         sym_TRONCON.extremite_amont = edge_center_axis[0]
         sym_TRONCON.extremite_aval = edge_center_axis[-1]
         # transfert des points internes (eventuellement)
-        sym_TRONCON.POINTS_INTERNES = self.build_POINTS_INTERNES(edge_center_axis[1:-1])
+        str_parent = args[-1]
+        sym_TRONCON.POINTS_INTERNES = self.export_POINTS_INTERNES(edge_center_axis[1:-1], str_parent)
 
     @staticmethod
-    def init_TRONCON(sg3_edge):
+    def build_TRONCON(sg3_edge, *args):
         """
 
         :param sg3_edge:
         :return:
         """
-        # sym_TRONCON = network.typeTroncon()
-        sym_TRONCON = CTD_TRONCON()
-        #
+        sym_TRONCON = pyxbDecorator.get_instance(*args)
         sym_TRONCON.id = sg3_edge['ign_id']
         sym_TRONCON.largeur_voie = sg3_edge['road_width'] / sg3_edge['lane_number']
         sym_TRONCON.id_eltamont = "-1"
@@ -508,33 +606,30 @@ class trafipolluImp_EXPORT(object):
         #
         return sym_TRONCON
 
-    @staticmethod
-    def build_POINTS_INTERNES(list_points):
+    @pyxbDecorator(pyxb_parser)
+    def export_POINTS_INTERNES(self, list_points, *args):
         """
 
         :param :
         :return:
+
         """
-        # print "list_points: ", list_points
-        points_internes = network.typePointsInternes()
-        [points_internes.append(CTD_POINT_INTERNE(coordonnees=[x[0], x[1]])) for x in list_points]
+        str_path_to_child, sym_POINTS_INTERNES = pyxbDecorator.get_path_instance(*args)
+
+        [sym_POINTS_INTERNES.append(self.export_POINT_INTERNE(x, str_path_to_child)) for x in list_points]
         # alternative approach:
         # [points_internes.append(pyxb.BIND(coordonnees=[x[0], x[1]])) for x in list_points]
-        return points_internes
+        return sym_POINTS_INTERNES
 
-    def init_CAF(self, node_id):
+    @pyxbDecorator(pyxb_parser)
+    def export_POINT_INTERNE(self, *args):
         """
 
-        :param sg3_node:
+        :param args:
         :return:
         """
-        sym_CAF = CTD_CAF()
-        #
-
-        sym_CAF.id = self.build_id_for_CAF(node_id)
-        sym_CAF.vit_max = "1"
-        #
-        return sym_CAF
+        x = args[0]
+        return pyxbDecorator.get_instance(*args, coordonnees=[x[0], x[1]])
 
     @staticmethod
     def build_id_for_CAF(node_id):

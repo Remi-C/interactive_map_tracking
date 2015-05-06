@@ -80,11 +80,16 @@ def build_topo_for_nodes(dict_nodes, dict_edges, dict_lanes):
             list_symuvia_edges = [pyxb_troncon for pyxb_troncon in sge_edge['sg3_to_symuvia']]
             for symuvia_troncon in list_symuvia_edges:
                 symuvia_troncon_id = symuvia_troncon.id
-                id_in_list = int(symuvia_troncon_id[symuvia_troncon_id.find(str_key_for_lane)+l_str_key_for_lane:])
-                oncoming = dict_lanes[edge_id]['id_list'][id_in_list].oncoming
-                # '!=' est l'operateur XOR en Python
-                id_caf_inout = int((sge_edge['start_node'] == node_id) != oncoming)
-                caf_entrees_sorties[id_caf_inout].append(symuvia_troncon)
+                try:
+                    id_in_list = int(symuvia_troncon_id[symuvia_troncon_id.find(str_key_for_lane)+l_str_key_for_lane:])
+                except:
+                    # print "PROBLEME! symuvia_troncon_id: %s - probleme de conversion en 'int'" % symuvia_troncon_id
+                    id_in_list = 0
+                finally:
+                    oncoming = dict_lanes[edge_id]['id_list'][id_in_list].oncoming
+                    # '!=' est l'operateur XOR en Python
+                    id_caf_inout = int((sge_edge['start_node'] == node_id) != oncoming)
+                    caf_entrees_sorties[id_caf_inout].append(symuvia_troncon)
                 # print 'id_caf_inout: ', id_caf_inout
                 # print "sge_edge['start_node']: ", sge_edge['start_node']
                 # print 'id_in_list: ', id_in_list
@@ -94,10 +99,10 @@ def build_topo_for_nodes(dict_nodes, dict_edges, dict_lanes):
         #
         dict_nodes[node_id].setdefault('CAF', {'in': caf_entrees, 'out': caf_sorties})
         #
-        print "node_id: ", node_id
+        # print "node_id: ", node_id
         # print "-> caf_entrees (SYMUVIA): ", caf_entrees
         # print "-> caf_sorties (SYMUVIA): ", caf_sorties
-        print "-> dict_nodes[node_id]: ", dict_nodes[node_id]
+        # print "-> dict_nodes[node_id]: ", dict_nodes[node_id]
 
 def load_geom_with_shapely_from_dict(dict_objects_from_sql_request):
     """
@@ -155,7 +160,7 @@ def dump_lanes(objects_from_sql_request, dict_edges, dict_lanes):
         # print 'id: ', id
     # print "** _dict_sides:", self.__dict_sides
 
-    # create the dict: __dict_grouped_lanes
+    # create the dict: dict_grouped_lanes
     # contain : for each edge_id list of lanes in same direction
     dict_grouped_lanes = {}
     map(lambda x, y: dict_grouped_lanes.__setitem__(x, {'grouped_lanes': y}),

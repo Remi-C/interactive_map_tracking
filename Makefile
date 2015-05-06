@@ -57,6 +57,7 @@ SOURCES = \
 	trafipolluImp_SQL.py \
 	trafipolluImp_DUMP.py \
 	trafipolluImp_EXPORT.py \
+	trafipolluImp_PYXB.py \
 	decorators.py
 
 PLUGINNAME = interactive_map_tracking
@@ -81,6 +82,7 @@ PY_FILES = \
 	trafipolluImp_SQL.py \
 	trafipolluImp_DUMP.py \
 	trafipolluImp_EXPORT.py \
+	trafipolluImp_PYXB.py \
 	decorators.py \
 	__init__.py
 
