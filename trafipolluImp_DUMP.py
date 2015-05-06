@@ -56,11 +56,10 @@ def dump_for_nodes(objects_from_sql_request, dict_nodes):
     """
     for object_from_sql_request in objects_from_sql_request:
         node_id = object_from_sql_request['node_id']
-        # edge_id = object_from_sql_request['edge_id1']
-        # dict_nodes.setdefault(node_id, []).append(edge_id)
-        dict_nodes[node_id] = object_from_sql_request['edge_ids']
+        edge_ids = object_from_sql_request['edge_ids']
+        dict_nodes.setdefault(node_id, {'edge_ids': edge_ids})
     #
-    print 'self.dict_nodes: ', dict_nodes
+    # print 'self.dict_nodes: ', dict_nodes
 
 def build_topo_for_nodes(dict_nodes, dict_edges, dict_lanes):
     """
@@ -69,36 +68,36 @@ def build_topo_for_nodes(dict_nodes, dict_edges, dict_lanes):
     :param dict_edges:
     :return:
     """
-    for node_id, edges_id in dict_nodes.iteritems():
-        # caf_entrees = filter(
-        #     lambda x: dict_edges[x]['end_node'] == node_id,
-        #     edges_id)
-        # caf_sorties = filter(
-        #     lambda x: dict_edges[x]['start_node'] == node_id,
-        #     edges_id)
-        # #
-        # print "node_id: ", node_id
-        # print "-> caf_entrees (SG3): ", caf_entrees
-        # print "-> caf_sorties (SG3): ", caf_sorties
-        #
+    str_key_for_lane = '_lane'
+    l_str_key_for_lane = len(str_key_for_lane)
+
+    for node_id, dict_values in dict_nodes.iteritems():
         caf_entrees = []
         caf_sorties = []
         caf_entrees_sorties = [caf_entrees, caf_sorties]
-        for edge_id in edges_id:
+        for edge_id in dict_values['edge_ids']:
             sge_edge = dict_edges[edge_id]
-            list_symuvia_edges = [pyxb_troncon.id for pyxb_troncon in sge_edge['sg3_to_symuvia']]
-            for symuvia_edge_id in list_symuvia_edges:
-                id_in_list = int(symuvia_edge_id[symuvia_edge_id.find('_lane')+5:])
+            list_symuvia_edges = [pyxb_troncon for pyxb_troncon in sge_edge['sg3_to_symuvia']]
+            for symuvia_troncon in list_symuvia_edges:
+                symuvia_troncon_id = symuvia_troncon.id
+                id_in_list = int(symuvia_troncon_id[symuvia_troncon_id.find(str_key_for_lane)+l_str_key_for_lane:])
                 oncoming = dict_lanes[edge_id]['id_list'][id_in_list].oncoming
                 # '!=' est l'operateur XOR en Python
-                caf_entrees_sorties[(sge_edge['start_node'] == node_id) != oncoming].append(symuvia_edge_id)
+                id_caf_inout = int((sge_edge['start_node'] == node_id) != oncoming)
+                caf_entrees_sorties[id_caf_inout].append(symuvia_troncon)
+                # print 'id_caf_inout: ', id_caf_inout
+                # print "sge_edge['start_node']: ", sge_edge['start_node']
                 # print 'id_in_list: ', id_in_list
                 # print 'oncoming: ', oncoming
-            print "id edge in SG3: ", edge_id
-            print "-> id edges in SYMUVIA: ", list_symuvia_edges
+            # print "id edge in SG3: ", edge_id
+            # print "-> id edges in SYMUVIA: ", list_symuvia_edges
         #
-        print "-> caf_entrees (SYMUVIA): ", caf_entrees
-        print "-> caf_sorties (SYMUVIA): ", caf_sorties
+        dict_nodes[node_id].setdefault('CAF', {'in': caf_entrees, 'out': caf_sorties})
+        #
+        print "node_id: ", node_id
+        # print "-> caf_entrees (SYMUVIA): ", caf_entrees
+        # print "-> caf_sorties (SYMUVIA): ", caf_sorties
+        print "-> dict_nodes[node_id]: ", dict_nodes[node_id]
 
 def load_geom_with_shapely_from_dict(dict_objects_from_sql_request):
     """

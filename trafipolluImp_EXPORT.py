@@ -10,57 +10,55 @@ import parser_symuvia_xsd_2_04_pyxb as network
 ### ALIAS des classes de binding
 ### verifier les liens si problemes d'export!
 ###################################################
-# def format_string(str):
-#     """
-#     retire les espaces :
-#     - plus de 2 reduit a 1
-#     - en debut et fin de string
-#     les tabulations, les retours a la ligne
-#     :param str:
-#     :return:
-#     """
-#     str = unicode(str).encode('ascii', 'replace')
-#     import re
-#     str = re.sub(' +', ' ', str)
-#     str = re.sub('\n', '', str)
-#     str = re.sub('\t', '', str)
-#     str = str.rstrip().lstrip()
-#     return str
-#
-#
-# def get_class_from_parser(str_doc_class):
-#     """
-#
-#     :param str_doc_class:
-#     :return:
-#     """
-#     return_class = None
-#     try:
-#         return_class = network.__dict__[
-#             filter(lambda x: format_string(network.__dict__[x].__doc__) == str_doc_class, dir(network))[0]]
-#     except:
-#         print "ERROR! Can't find the class with doc class string:", str_doc_class, " from Parser (SYMUVIA) !!!"
-#         return_class = None
-#     else:
-#         print "Found the class with doc class string:", str_doc_class, " from Parser (SYMUVIA) !!!"
-#         print "-> ", return_class
-#     finally:
-#         return return_class
-#
-# CTD_SYMUVIA_TRONCONS = get_class_from_parser(u'Liste des tron?ons')
-# CTD_SYMUVIA_POINT_INTERNE_TRONCON = get_class_from_parser(u"Description d'un point interne du tron?on")
-
 ### NEW TECHNIQUES !
 PYXB_SYMUVIA_ROOT_SYMUBRUIT = network.ROOT_SYMUBRUIT
 PYXB_SYMUVIA_RESEAUX = PYXB_SYMUVIA_ROOT_SYMUBRUIT.memberElement('RESEAUX')
 PYXB_SYMUVIA_RESEAU = PYXB_SYMUVIA_RESEAUX.memberElement('RESEAU')
+#
 PYXB_RESEAU_TRONCONS = PYXB_SYMUVIA_RESEAU.memberElement('TRONCONS')
+PYXB_RESEAU_CONNEXIONS = PYXB_SYMUVIA_RESEAU.memberElement('CONNEXIONS')
+#
+PYXB_CONNEXIONS_CARREFOURSAFEUX = PYXB_RESEAU_CONNEXIONS.memberElement('CARREFOURSAFEUX')
+PYXB_CARREFOURSAFEUX_CAF = PYXB_CONNEXIONS_CARREFOURSAFEUX.memberElement('CARREFOURAFEUX')
+#
+PYXB_CAF_MOUVEMENTS_AUTORISES = PYXB_CARREFOURSAFEUX_CAF.memberElement('MOUVEMENTS_AUTORISES')
+PYXB_CAF_MOUVEMENT_AUTORISE = PYXB_CAF_MOUVEMENTS_AUTORISES.memberElement('MOUVEMENT_AUTORISE')
+#
+PYXB_MOUVEMENT_SORTIES = PYXB_CAF_MOUVEMENT_AUTORISE.memberElement('MOUVEMENT_SORTIES')
+PYXB_MOUVEMENT_SORTIE = PYXB_MOUVEMENT_SORTIES.memberElement('MOUVEMENT_SORTIE')
+#
+PYXB_CAF_ENTREES_CAF = PYXB_CARREFOURSAFEUX_CAF.memberElement('ENTREES_CAF')
+PYXB_CAF_ENTREE_CAF = PYXB_CAF_ENTREES_CAF.memberElement('ENTREE_CAF')
+#
+PYXB_ENTREE_CAF_MOUVEMENTS = PYXB_CAF_ENTREE_CAF.memberElement('MOUVEMENTS')
+PYXB_ENTREE_CAF_MOUVEMENT = PYXB_ENTREE_CAF_MOUVEMENTS.memberElement('MOUVEMENT')
 # on recupere a partir du type: typePointsInternes
 # c'est un raccourci (au lieu de faire comme au dessus avec l'arborescence)
 PYXB_POINT_INTERNE = network.typePointsInternes._ElementBindingDeclForName('POINT_INTERNE')[0]
-
+#
+PYXB_TRONCON = PYXB_RESEAU_TRONCONS.memberElement('TRONCON')
+#
+#
 CTD_RESEAU_TRONCONS = PYXB_RESEAU_TRONCONS.typeDefinition()
+CTD_RESEAU_CONNEXIONS = PYXB_RESEAU_CONNEXIONS.typeDefinition()
+#
+CTD_TRONCON = PYXB_TRONCON.typeDefinition()
 CTD_POINT_INTERNE = PYXB_POINT_INTERNE.typeDefinition()
+#
+CTD_CAFS = PYXB_CONNEXIONS_CARREFOURSAFEUX.typeDefinition()
+CTD_CAF = PYXB_CARREFOURSAFEUX_CAF.typeDefinition()
+#
+CTD_CAF_MOUVEMENTS_AUTORISES = PYXB_CAF_MOUVEMENTS_AUTORISES.typeDefinition()
+CTD_CAF_MOUVEMENT_AUTORISE = PYXB_CAF_MOUVEMENT_AUTORISE.typeDefinition()
+#
+CTD_MOUVEMENT_SORTIES = PYXB_MOUVEMENT_SORTIES.typeDefinition()
+CTD_MOUVEMENT_SORTIE = PYXB_MOUVEMENT_SORTIE.typeDefinition()
+#
+CTD_ENTREES_CAF = PYXB_CAF_ENTREES_CAF.typeDefinition()
+CTD_ENTREE_CAF = PYXB_CAF_ENTREE_CAF.typeDefinition()
+#
+CTD_ENTREE_CAF_MOUVEMENTS = PYXB_ENTREE_CAF_MOUVEMENTS.typeDefinition()
+CTD_ENTREE_CAF_MOUVEMENT = PYXB_ENTREE_CAF_MOUVEMENT.typeDefinition()
 
 ###################################################
 
@@ -75,12 +73,24 @@ class trafipolluImp_EXPORT(object):
     """
 
     """
-    def __init__(self, dict_edges, dict_lanes):
+    def __init__(self, dict_edges, dict_lanes, dict_nodes):
         """
 
         """
         self.dict_edges = dict_edges
         self.dict_lanes = dict_lanes
+        self.dict_nodes = dict_nodes
+
+        self.cur_sg3_node = None
+        self.cur_node_id = 0
+
+    def select_node(self, node_id):
+        """
+
+        :param node_id:
+        """
+        self.cur_node_id = node_id
+        self.cur_sg3_node = self.dict_nodes[node_id]
 
     def export(self, infilename=infilename_for_symuvia, outfilename=outfilename_for_symuvia):
         """
@@ -94,8 +104,12 @@ class trafipolluImp_EXPORT(object):
         print "Open file: ", infilename, "[DONE]"
 
         print "Export SG3 to SYMUVIA ..."
+        #
         sym_ROOT.RESEAUX.RESEAU[0].TRONCONS.reset()
         sym_ROOT.RESEAUX.RESEAU[0].TRONCONS = self.export_TRONCONS()
+        #
+        sym_ROOT.RESEAUX.RESEAU[0].CONNEXIONS = self.export_CONNEXIONS()
+        #
         print "Export SG3 to SYMUVIA [DONE]"
 
         self.save_ROOT(sym_ROOT, outfilename)
@@ -124,6 +138,9 @@ class trafipolluImp_EXPORT(object):
             except pyxb.IncompleteElementContentError as e:
                 print '*** ERROR : IncompleteElementContentError'
                 print '- Details error: ', e.details()
+            except pyxb.MissingAttributeError as e:
+                print '*** ERROR : MissingAttributeError'
+                print '- Details error: ', e.details()
             else:
                 str_xml = dom.toprettyxml(indent="\t", newl="\n", encoding='utf-8')
         else:
@@ -132,6 +149,151 @@ class trafipolluImp_EXPORT(object):
         f.write(str_xml)
         f.close()
         print "Write in file: ", outfilename, "[DONE]"
+
+    def export_CONNEXIONS(self):
+        """
+
+        :return:
+        """
+        sym_CONNEXIONS = CTD_RESEAU_CONNEXIONS()
+        sym_CONNEXIONS.CARREFOURSAFEUX = self.export_CAFS()
+        return sym_CONNEXIONS
+
+    def export_CAFS(self):
+        """
+
+        :param node_id:
+        :return:
+        """
+        sym_CAFS = CTD_CAFS()
+        for node_id in self.dict_nodes:
+            self.select_node(node_id)
+            sym_CAFS.append(self.export_CAF())
+        return sym_CAFS
+
+    def export_CAF(self):
+        """
+
+        :return:
+        """
+        sym_CAF = None
+        #
+        nb_edges_connected = len(self.cur_sg3_node['edge_ids'])
+        b_node_is_CAF = nb_edges_connected > 2  # dummy test
+        if b_node_is_CAF:
+            sym_CAF = self.init_CAF(self.cur_node_id)
+            #
+            sym_CAF.MOUVEMENTS_AUTORISES = self.export_MOUVEMENTS_AUTORISES()
+            sym_CAF.ENTREES_CAF = self.export_ENTREES_CAF()
+        #
+        # print 'node_id: ', self.cur_node_id
+        # print 'sg3_node: ', self.cur_sg3_node
+        # print "sg3_node['edge_ids']:", self.cur_sg3_node['edge_ids']
+        # print 'nb_edges_connected: ', nb_edges_connected
+        #
+        return sym_CAF
+
+    def export_MOUVEMENTS_AUTORISES(self):
+        """
+
+        :param node_id:
+        :return:
+        """
+        sym_MOUVEMENTS_AUTORISES = CTD_CAF_MOUVEMENTS_AUTORISES()
+        for mvt_autorise in self.export_MOUVEMENT_AUTORISE():
+            sym_MOUVEMENTS_AUTORISES.append(mvt_autorise)
+        return sym_MOUVEMENTS_AUTORISES
+
+    def export_MOUVEMENT_AUTORISE(self):
+        """
+
+        :return:
+        """
+        list_mvt_autorise = []
+
+        # CAF - IN
+        for sym_troncon in self.cur_sg3_node['CAF']['in']:
+            sym_MOUVEMENT_AUTORISE = CTD_CAF_MOUVEMENT_AUTORISE()
+            sym_MOUVEMENT_AUTORISE.id_troncon_amont = sym_troncon.id
+            sym_MOUVEMENT_AUTORISE.MOUVEMENT_SORTIES = self.export_MOUVEMENT_SORTIES()
+            #
+            list_mvt_autorise.append(sym_MOUVEMENT_AUTORISE)
+        return list_mvt_autorise
+
+    def export_MOUVEMENT_SORTIES(self):
+        """
+
+        :return:
+        """
+        sym_MOUVEMENT_SORTIES = CTD_MOUVEMENT_SORTIES()
+        for mvt_sortie in self.export_MOUVEMENT_SORTIE():
+            sym_MOUVEMENT_SORTIES.append(mvt_sortie)
+        return sym_MOUVEMENT_SORTIES
+
+    def export_MOUVEMENT_SORTIE(self):
+        """
+
+        :return:
+        """
+        list_mvt_sortie = []
+        # CAF - OUT
+        for sym_troncon in self.cur_sg3_node['CAF']['out']:
+            sym_MOUVEMENT_SORTIE = CTD_MOUVEMENT_SORTIE()
+            sym_MOUVEMENT_SORTIE.id_troncon_aval = sym_troncon.id
+            #
+            list_mvt_sortie.append(sym_MOUVEMENT_SORTIE)
+        return list_mvt_sortie
+
+    def export_ENTREES_CAF(self):
+        """
+
+        :param node_id:
+        :return:
+        """
+        sym_ENTREES_CAF = CTD_ENTREES_CAF()
+        for entree_caf in self.export_ENTREE_CAF():
+            sym_ENTREES_CAF.append(entree_caf)
+        return sym_ENTREES_CAF
+
+    def export_ENTREE_CAF(self):
+        """
+
+        :return:
+        """
+        list_entree_caf = []
+
+        # CAF - IN
+        for sym_troncon in self.cur_sg3_node['CAF']['in']:
+            sym_ENTREE_CAF = CTD_ENTREE_CAF()
+            sym_ENTREE_CAF.id_troncon_amont = sym_troncon.id
+            sym_ENTREE_CAF.MOUVEMENTS = self.export_ENTREE_CAF_MOUVEMENTS()
+            #
+            list_entree_caf.append(sym_ENTREE_CAF)
+        return list_entree_caf
+
+    def export_ENTREE_CAF_MOUVEMENTS(self):
+        """
+
+        :return:
+        """
+        sym_MOUVEMENTS = CTD_ENTREE_CAF_MOUVEMENTS()
+        for mouvement in self.export_ENTREE_CAF_MOUVEMENT():
+            sym_MOUVEMENTS.append(mouvement)
+        return sym_MOUVEMENTS
+
+    def export_ENTREE_CAF_MOUVEMENT(self):
+        """
+
+        :return:
+        """
+        list_mouvement = []
+        # CAF - OUT
+        for sym_troncon in self.cur_sg3_node['CAF']['out']:
+            sym_MOUVEMENT = CTD_ENTREE_CAF_MOUVEMENT()
+            sym_MOUVEMENT.id_troncon_aval = sym_troncon.id
+            #
+            list_mouvement.append(sym_MOUVEMENT)
+        return list_mouvement
 
     def export_TRONCONS(self):
         """
@@ -188,10 +350,12 @@ class trafipolluImp_EXPORT(object):
                 #
                 sym_TRONCON = self.init_TRONCON(sg3_edge)
                 self.build_TRONCON_lanes_in_one_group(sym_TRONCON, sg3_edge, nb_lanes)
+                # Link SYMUVIA to SG3 [TOPO]
+                sym_TRONCON['symuvia_to_sg3'] = edge_id
                 #
                 list_troncons.append(sym_TRONCON)
         finally:
-            # LINK STREETGEN3 to SYMUVIA (TOPO)
+            # Link STREETGEN3 to SYMUVIA [TOPO]
             sg3_edge['sg3_to_symuvia'] = list_troncons
             #
             return list_troncons
@@ -334,7 +498,8 @@ class trafipolluImp_EXPORT(object):
         :param sg3_edge:
         :return:
         """
-        sym_TRONCON = network.typeTroncon()
+        # sym_TRONCON = network.typeTroncon()
+        sym_TRONCON = CTD_TRONCON()
         #
         sym_TRONCON.id = sg3_edge['ign_id']
         sym_TRONCON.largeur_voie = sg3_edge['road_width'] / sg3_edge['lane_number']
@@ -356,3 +521,26 @@ class trafipolluImp_EXPORT(object):
         # alternative approach:
         # [points_internes.append(pyxb.BIND(coordonnees=[x[0], x[1]])) for x in list_points]
         return points_internes
+
+    def init_CAF(self, node_id):
+        """
+
+        :param sg3_node:
+        :return:
+        """
+        sym_CAF = CTD_CAF()
+        #
+
+        sym_CAF.id = self.build_id_for_CAF(node_id)
+        sym_CAF.vit_max = "1"
+        #
+        return sym_CAF
+
+    @staticmethod
+    def build_id_for_CAF(node_id):
+        """
+
+        :param node_id:
+        :return:
+        """
+        return 'CAF_' + str(node_id)

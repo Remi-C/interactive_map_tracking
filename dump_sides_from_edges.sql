@@ -10,14 +10,14 @@
 SELECT
 --
   DISTINCT
-  edges.edge_id,
+  e_s.edge_id,
   lane.lane_side,
   lane.lane_position,
   ST_AsEWKB(lane.lane_center_axis) AS lane_center_axis
 FROM
-  test.edges_selected AS edges
-  JOIN
+  test.edges_selected AS e_s
+  INNER JOIN
   street_amp.visu_result_lane AS lane
     ON
-      edges.edge_id = lane.edge_id
-ORDER BY edges.edge_id
+      e_s.edge_id = lane.edge_id
+ORDER BY e_s.edge_id
