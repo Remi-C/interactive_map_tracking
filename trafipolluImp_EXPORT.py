@@ -20,27 +20,30 @@ class pyxbDecorator(object):
     """
     def __init__(self, parser_pyxb):
         self.parser_pyxb = parser_pyxb
+        self.pyxb_result = ()
 
     def __call__(self, f):
         """
         """
-        str_child_name = f.__name__[7:]     # 7 = len('export_')
-        print 'str_child_name: ', str_child_name
-
         def wrapped_f(*args):
             """
             """
-            str_parent = args[-1]
-            if type(str_parent) is tuple:
-                str_parent = str_parent[0]
-
-            str_path_to_child = str_parent+'/'+str_child_name
-            sym_NODE = self.parser_pyxb.get_instance(str_path_to_child)
-            # print 'str_parent: ', str_parent
-            # print 'str_path_to_child: ', str_path_to_child
-            # print 'sym_NODE: ', sym_NODE
+            if self.pyxb_result == ():
+                str_child_name = f.__name__[7:]     # 7 = len('export_')
+                # print 'str_child_name: ', str_child_name
+                str_parent = args[-1]
+                if type(str_parent) is tuple:
+                    str_parent = str_parent[0]
+                str_path_to_child = str_parent+'/'+str_child_name
+                sym_NODE = self.parser_pyxb.get_instance(str_path_to_child)
+                # print 'str_parent: ', str_parent
+                # print 'str_path_to_child: ', str_path_to_child
+                # print 'sym_NODE: ', sym_NODE
+                self.pyxb_result = (str_child_name, sym_NODE)
+            # update de la liste des arguments
+            # on rajoute en fin de liste le tuple : (nom du child, instance de l'element)
             args = list(args)
-            args.append((str_child_name, sym_NODE))
+            args.append(self.pyxb_result)
             args = iter(args)
             # print 'args: ', args
             return f(*args)
@@ -122,7 +125,8 @@ class trafipolluImp_EXPORT(object):
     def export(self, infilename=infilename_for_symuvia, outfilename=outfilename_for_symuvia):
         """
 
-        :param filename:
+        :param infilename:
+        :param outfilename:
         :return:
         """
         print "Open file: ", infilename, "..."
@@ -153,9 +157,12 @@ class trafipolluImp_EXPORT(object):
     def save_SYMUVIA_Node(element_name, sym_node, outfilename, prettyxml=True):
         """
 
+        :param element_name:
         :param sym_node:
         :param outfilename:
+        :param prettyxml:
         :return:
+
         """
         print "Write in file: ", outfilename, "..."
         f = open(outfilename, "w")
@@ -255,8 +262,10 @@ class trafipolluImp_EXPORT(object):
 
         # CAF - IN
         for sym_troncon in self.cursor_symuvia['sg3_node']['CAF']['in']:
-            sym_MOUVEMENT_AUTORISE = pyxbDecorator.get_instance(*args)
-            sym_MOUVEMENT_AUTORISE.id_troncon_amont = sym_troncon.id
+            sym_MOUVEMENT_AUTORISE = pyxbDecorator.get_instance(
+                *args,
+                id_troncon_amont=sym_troncon.id
+            )
             # [TOPO] - Link between TRONCON & CAF
             sym_troncon.id_eltaval = self.get_CAF().id
             #
@@ -287,8 +296,10 @@ class trafipolluImp_EXPORT(object):
         list_mvt_sortie = []
         # CAF - OUT
         for sym_troncon in self.cursor_symuvia['sg3_node']['CAF']['out']:
-            sym_MOUVEMENT_SORTIE = pyxbDecorator.get_instance(*args)
-            sym_MOUVEMENT_SORTIE.id_troncon_aval = sym_troncon.id
+            sym_MOUVEMENT_SORTIE = pyxbDecorator.get_instance(
+                *args,
+                id_troncon_aval=sym_troncon.id
+            )
             # [TOPO] - Link between TRONCON & CAF
             sym_troncon.id_eltamont = self.get_CAF().id
             #
@@ -319,8 +330,10 @@ class trafipolluImp_EXPORT(object):
         list_entree_caf = []
         # CAF - IN
         for sym_troncon in self.cursor_symuvia['sg3_node']['CAF']['in']:
-            sym_ENTREE_CAF = pyxbDecorator.get_instance(*args)
-            sym_ENTREE_CAF.id_troncon_amont = sym_troncon.id
+            sym_ENTREE_CAF = pyxbDecorator.get_instance(
+                *args,
+                id_troncon_amont=sym_troncon.id
+            )
             # [TOPO] - Link between TRONCON & CAF
             sym_troncon.id_eltaval = self.get_CAF().id
             #
@@ -351,8 +364,10 @@ class trafipolluImp_EXPORT(object):
         list_mouvement = []
         # CAF - OUT
         for sym_troncon in self.cursor_symuvia['sg3_node']['CAF']['out']:
-            sym_MOUVEMENT = pyxbDecorator.get_instance(*args)
-            sym_MOUVEMENT.id_troncon_aval = sym_troncon.id
+            sym_MOUVEMENT = pyxbDecorator.get_instance(
+                *args,
+                id_troncon_aval=sym_troncon.id
+            )
             # [TOPO] - Link between TRONCON & CAF
             sym_troncon.id_eltamont = self.get_CAF().id
             #
@@ -427,14 +442,15 @@ class trafipolluImp_EXPORT(object):
                 for id_group_lane in grouped_lanes:
                     nb_lanes = id_group_lane
 
-                    sym_TRONCON = self.build_TRONCON(sg3_edge, *args)
+                    # sym_TRONCON = self.build_TRONCON(sg3_edge, *args)
+                    sym_TRONCON = None
 
                     if nb_lanes > 1:
                         # groupe de plusieurs voies dans la meme direction
-                        self.build_TRONCON_lanes_in_groups(sym_TRONCON, edge_id, cur_id_lane, nb_lanes, str_path_to_child)
+                        sym_TRONCON = self.build_TRONCON_lanes_in_groups(edge_id, cur_id_lane, nb_lanes, str_path_to_child)
                     else:
                         # groupe d'une seule voie (pour une direction)
-                        self.build_TRONCON_lane_in_groups(sym_TRONCON, edge_id, cur_id_lane, nb_lanes, str_path_to_child)
+                        sym_TRONCON = self.build_TRONCON_lane_in_groups(edge_id, cur_id_lane, nb_lanes, str_path_to_child)
 
                     # Update list_troncon (local function)
                     update_list_troncon(sym_TRONCON, sg3_edge)
@@ -445,8 +461,8 @@ class trafipolluImp_EXPORT(object):
                 # le troncon possede 1 groupe de voies mono-directionnelles
                 nb_lanes = grouped_lanes[0]
                 #
-                sym_TRONCON = self.build_TRONCON(sg3_edge, *args)
-                self.build_TRONCON_lanes_in_one_group(sym_TRONCON, sg3_edge, nb_lanes, str_path_to_child)
+                # sym_TRONCON = self.build_TRONCON(sg3_edge, *args)
+                sym_TRONCON = self.build_TRONCON_lanes_in_one_group(sg3_edge, nb_lanes, str_path_to_child)
                 # # Link SYMUVIA to SG3 [TOPO]
                 # sym_TRONCON['symuvia_to_sg3'] = edge_id
 
@@ -458,11 +474,15 @@ class trafipolluImp_EXPORT(object):
             #
             return list_troncons
 
-    def build_TRONCON_lanes_in_groups(self, sym_TRONCON, edge_id, cur_id_lane, nb_lanes, *args):
+    def build_TRONCON_lanes_in_groups(self, edge_id, cur_id_lane, nb_lanes, *args):
         """
         1 Groupe de plusieurs voies (dans la meme direction) dans une serie de groupes (de voies) pour l'edge_sg3
         Pas encore finie, experimental car le cas n'est pas present dans le reseau (pas possible de tester directement
         cet algo).
+        :param edge_id:
+        :param cur_id_lane:
+        :param nb_lanes:
+        :param args:
         :return:
         """
         lanes_center_axis = []
@@ -501,7 +521,7 @@ class trafipolluImp_EXPORT(object):
         # On recupere 'une sorte d'axe median' des voies (du meme groupe)
         #
         # coefficient de normalisation depend du nombre de voies qu'on utilise pour la moyenne
-        norm_lanes_center_axis = 1.0 / len(lanes_center_axis)
+        norm_lanes_center_axis = 1.0/len(lanes_center_axis)
         troncon_center_axis = []
         # pour chaque coefficient 1D
         for coef_point in list_1D_coefficients:
@@ -523,20 +543,23 @@ class trafipolluImp_EXPORT(object):
 
         # Comme la liste des coefficients 1D est triee,
         # on peut declarer le 1er et dernier point comme Amont/Aval
-        sym_TRONCON.nb_voie = nb_lanes
         str_parent = args[-1]
-        sym_TRONCON.POINTS_INTERNES = self.export_POINTS_INTERNES(troncon_center_axis[1:-1], str_parent)
-        sym_TRONCON.extremite_amont = troncon_center_axis[0]    # 1er point
-        sym_TRONCON.extremite_aval = troncon_center_axis[-1]    # dernier point
+        return self.build_TRONCON(
+            self.dict_edges[edge_id],
+            *args,
+            nb_voie=nb_lanes,
+            POINTS_INTERNES=self.export_POINTS_INTERNES(troncon_center_axis[1:-1], str_parent),
+            extremite_amont=troncon_center_axis[0],
+            extremite_aval=troncon_center_axis[-1]
+        )
 
-    def build_TRONCON_lanes_in_one_group(self, sym_TRONCON, sg3_edge, nb_lanes, *args):
+    def build_TRONCON_lanes_in_one_group(self, sg3_edge, nb_lanes, *args):
         """
         Plusieurs voies (meme direction) dans 1 unique groupe pour une edge_sg3
         L'idee dans ce cas est d'utiliser les informations geometriques d'edge_sg3 (centre de l'axe de l'edge)
         Faut faire attention au clipping pour ne recuperer qu'a partir d'amont/aval du troncon correspondant
         :return:
         """
-        sym_TRONCON.nb_voie = nb_lanes
         #
         edge_center_axis = LineString(sg3_edge['linez_geom'])
         # note : on pourrait recuperer le sens avec les attributs 'left' 'right' des lanes_sg3
@@ -550,7 +573,6 @@ class trafipolluImp_EXPORT(object):
         # print "++ list_amont_aval_proj: ", list_amont_aval_proj
         # on recupere les coefficients 1D des amont/aval
         coef_amont, coef_aval = list_amont_aval_proj
-        troncon_center_axis = []
         # liste des points formant l'axe de l'edge_sg3
         troncon_center_axis = filter(
             lambda x: coef_amont <= edge_center_axis.project(Point(x)) <= coef_aval,
@@ -562,11 +584,16 @@ class trafipolluImp_EXPORT(object):
         #     if coef_point >= coef_amont and coef_point <= coef_aval:
         #         troncon_center_axis.append(point)
         # print "++ troncon_center_axis: ", troncon_center_axis
+
         str_parent = args[-1]
-        sym_TRONCON.POINTS_INTERNES = self.export_POINTS_INTERNES(troncon_center_axis, str_parent)
-        #
-        sym_TRONCON.extremite_amont = sg3_edge['amont']
-        sym_TRONCON.extremite_aval = sg3_edge['aval']
+        return self.build_TRONCON(
+            sg3_edge,
+            *args,
+            nb_voie=nb_lanes,
+            POINTS_INTERNES=self.export_POINTS_INTERNES(troncon_center_axis, str_parent),
+            extremite_amont=sg3_edge['amont'],
+            extremite_aval=sg3_edge['aval']
+        )
 
     def build_TRONCON_lane_in_groups(self, sym_TRONCON, edge_id, cur_id_lane, nb_lanes, *args):
         """
@@ -579,32 +606,37 @@ class trafipolluImp_EXPORT(object):
         :param nb_lanes:
         :return:
         """
-        sym_TRONCON.nb_voie = nb_lanes  # == 1
-        # TODO: besoin d'un generateur d'id pour les troncons nouvellement generes
-        sym_TRONCON.id += '_lane' + str(cur_id_lane)
-
+        str_parent = args[-1]
         # le nouveau troncon est identique a l'unique voie
         edge_center_axis = self.dict_lanes[edge_id]['lane_center_axis'][cur_id_lane]
-        sym_TRONCON.extremite_amont = edge_center_axis[0]
-        sym_TRONCON.extremite_aval = edge_center_axis[-1]
-        # transfert des points internes (eventuellement)
-        str_parent = args[-1]
-        sym_TRONCON.POINTS_INTERNES = self.export_POINTS_INTERNES(edge_center_axis[1:-1], str_parent)
+        sym_TRONCON = self.build_TRONCON(
+            self.dict_edges[edge_id],
+            *args,
+            nb_voie=nb_lanes,
+            extremite_amont=edge_center_axis[0],
+            extremite_aval=edge_center_axis[-1],
+            POINTS_INTERNES=self.export_POINTS_INTERNES(edge_center_axis[1:-1], str_parent)
+        )
+        # TODO: besoin d'un generateur d'id pour les troncons nouvellement generes
+        sym_TRONCON.id += '_lane' + str(cur_id_lane)
+        #
+        return sym_TRONCON
 
     @staticmethod
-    def build_TRONCON(sg3_edge, *args):
+    def build_TRONCON(sg3_edge, *args, **kwargs):
         """
 
         :param sg3_edge:
         :return:
         """
-        sym_TRONCON = pyxbDecorator.get_instance(*args)
-        sym_TRONCON.id = sg3_edge['ign_id']
-        sym_TRONCON.largeur_voie = sg3_edge['road_width'] / sg3_edge['lane_number']
-        sym_TRONCON.id_eltamont = "-1"
-        sym_TRONCON.id_eltaval = "-1"
-        #
-        return sym_TRONCON
+        return pyxbDecorator.get_instance(
+            *args,
+            id=sg3_edge['ign_id'],
+            largeur_voie=sg3_edge['road_width'] / sg3_edge['lane_number'],
+            id_eltamont="-1",
+            id_eltaval="-1",
+            **kwargs
+        )
 
     @pyxbDecorator(pyxb_parser)
     def export_POINTS_INTERNES(self, list_points, *args):
@@ -615,10 +647,7 @@ class trafipolluImp_EXPORT(object):
 
         """
         str_path_to_child, sym_POINTS_INTERNES = pyxbDecorator.get_path_instance(*args)
-
         [sym_POINTS_INTERNES.append(self.export_POINT_INTERNE(x, str_path_to_child)) for x in list_points]
-        # alternative approach:
-        # [points_internes.append(pyxb.BIND(coordonnees=[x[0], x[1]])) for x in list_points]
         return sym_POINTS_INTERNES
 
     @pyxbDecorator(pyxb_parser)
@@ -628,8 +657,11 @@ class trafipolluImp_EXPORT(object):
         :param args:
         :return:
         """
-        x = args[0]
-        return pyxbDecorator.get_instance(*args, coordonnees=[x[0], x[1]])
+        point = args[0]
+        return pyxbDecorator.get_instance(
+            *args,
+            coordonnees=[point[0], point[1]]
+        )
 
     @staticmethod
     def build_id_for_CAF(node_id):
