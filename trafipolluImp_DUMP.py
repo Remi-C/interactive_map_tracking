@@ -68,41 +68,55 @@ def build_topo_for_nodes(dict_nodes, dict_edges, dict_lanes):
     :param dict_edges:
     :return:
     """
+
+    # !!!!! FAUDRAIT CLEAN LE RESEAU des troncons sans voies, ou node/caf avec de tel troncons !!!!
+
     str_key_for_lane = '_lane'
     l_str_key_for_lane = len(str_key_for_lane)
-
+    list_remove_nodes = []
     for node_id, dict_values in dict_nodes.iteritems():
         caf_entrees = []
         caf_sorties = []
         caf_entrees_sorties = [caf_entrees, caf_sorties]
         for edge_id in dict_values['edge_ids']:
             sge_edge = dict_edges[edge_id]
-            list_symuvia_edges = [pyxb_troncon for pyxb_troncon in sge_edge['sg3_to_symuvia']]
-            for symuvia_troncon in list_symuvia_edges:
-                symuvia_troncon_id = symuvia_troncon.id
-                try:
-                    id_in_list = int(symuvia_troncon_id[symuvia_troncon_id.find(str_key_for_lane)+l_str_key_for_lane:])
-                except:
-                    # print "PROBLEME! symuvia_troncon_id: %s - probleme de conversion en 'int'" % symuvia_troncon_id
-                    id_in_list = 0
-                finally:
-                    oncoming = dict_lanes[edge_id]['id_list'][id_in_list].oncoming
-                    # '!=' est l'operateur XOR en Python
-                    id_caf_inout = int((sge_edge['start_node'] == node_id) != oncoming)
-                    caf_entrees_sorties[id_caf_inout].append(symuvia_troncon)
-                # print 'id_caf_inout: ', id_caf_inout
-                # print "sge_edge['start_node']: ", sge_edge['start_node']
-                # print 'id_in_list: ', id_in_list
-                # print 'oncoming: ', oncoming
-            # print "id edge in SG3: ", edge_id
-            # print "-> id edges in SYMUVIA: ", list_symuvia_edges
-        #
-        dict_nodes[node_id].setdefault('CAF', {'in': caf_entrees, 'out': caf_sorties})
+            try:
+                list_symuvia_edges = [pyxb_troncon for pyxb_troncon in sge_edge['sg3_to_symuvia']]
+            except Exception, e:
+                print 'build_topo_for_nodes - EXCEPTION: ', e
+                # remove this node
+                list_remove_nodes.append(node_id)
+            else:
+                for symuvia_troncon in list_symuvia_edges:
+                    symuvia_troncon_id = symuvia_troncon.id
+                    try:
+                        id_in_list = int(symuvia_troncon_id[symuvia_troncon_id.find(str_key_for_lane)+l_str_key_for_lane:])
+                    except:
+                        print "PROBLEME! symuvia_troncon_id: %s - probleme de conversion en 'int'" % symuvia_troncon_id
+                        id_in_list = 0
+                    finally:
+                        oncoming = dict_lanes[edge_id]['id_list'][id_in_list].oncoming
+                        # '!=' est l'operateur XOR en Python
+                        id_caf_inout = int((sge_edge['start_node'] == node_id) != oncoming)
+                        caf_entrees_sorties[id_caf_inout].append(symuvia_troncon)
+                    # print 'id_caf_inout: ', id_caf_inout
+                    # print "sge_edge['start_node']: ", sge_edge['start_node']
+                    # print 'id_in_list: ', id_in_list
+                    # print 'oncoming: ', oncoming
+                # print "id edge in SG3: ", edge_id
+                # print "-> id edges in SYMUVIA: ", list_symuvia_edges
+                #
+                dict_nodes[node_id].setdefault('CAF', {'in': caf_entrees, 'out': caf_sorties})
         #
         # print "node_id: ", node_id
         # print "-> caf_entrees (SYMUVIA): ", caf_entrees
         # print "-> caf_sorties (SYMUVIA): ", caf_sorties
         # print "-> dict_nodes[node_id]: ", dict_nodes[node_id]
+    # remove nodes
+    nodes_removed = [dict_nodes.pop(k, None) for k in list_remove_nodes]
+    print 'nodes_removed: ', nodes_removed
+    print 'dict_nodes: ', dict_nodes
+
 
 def load_geom_with_shapely_from_dict(dict_objects_from_sql_request):
     """
@@ -130,20 +144,20 @@ def dump_lanes(objects_from_sql_request, dict_edges, dict_lanes):
     # get sides informations for each 'edge'/'troncon'
     for object_from_sql_request in objects_from_sql_request:
         #
-        id_edge = object_from_sql_request['edge_id']
+        edge_id = object_from_sql_request['edge_id']
         lane_side = object_from_sql_request['lane_side']
         #
-        nb_lanes = dict_edges[id_edge]['lane_number']
-        dict_lanes.setdefault(id_edge,
+        nb_lanes = dict_edges[edge_id]['lane_number']
+        dict_lanes.setdefault(edge_id,
                               {
                                   'id_list': [None] * nb_lanes  # pre-allocate size for list
                               })
         #
         lane_center_axis = object_from_sql_request['lane_center_axis']
         lane_center_axis = np.asarray(sp_wkb_loads(bytes(lane_center_axis)))
-        dict_lanes[id_edge].setdefault('lane_center_axis', []).append(lane_center_axis)
+        dict_lanes[edge_id].setdefault('lane_center_axis', []).append(lane_center_axis)
         oncoming = edges_is_same_orientation(
-            dict_edges[id_edge]['amont_to_aval'],
+            dict_edges[edge_id]['amont_to_aval'],
             compute_direction_linestring(lane_center_axis)
         )
         # update list sides for (grouping)
@@ -154,7 +168,7 @@ def dump_lanes(objects_from_sql_request, dict_edges, dict_lanes):
         # revient a tester le bit de point faible
         even = not(nb_lanes & 1)
         id_in_list = lambda_generate_id(nb_lanes_by_2, position, even)
-        dict_lanes[id_edge]['id_list'][id_in_list] = NT_LANESIDE_OUTCOMING(lane_side, oncoming)
+        dict_lanes[edge_id]['id_list'][id_in_list] = NT_LANESIDE_OUTCOMING(lane_side, oncoming)
         #
         # print 'position: ', position
         # print 'id: ', id
@@ -166,9 +180,9 @@ def dump_lanes(objects_from_sql_request, dict_edges, dict_lanes):
     map(lambda x, y: dict_grouped_lanes.__setitem__(x, {'grouped_lanes': y}),
         dict_lanes,
         [
-            [sum(1 for i in g) for id_edge, g in
-             groupby(dict_lanes[id_edge]['id_list'], lambda x: x.oncoming)]
-            for id_edge in dict_lanes
+            [sum(1 for i in g) for edge_id, g in
+             groupby(dict_lanes[edge_id]['id_list'], lambda x: x.oncoming)]
+            for edge_id in dict_lanes
         ])
     # print "** self._dict_grouped_lanes:", dict_grouped_lanes
 
@@ -179,8 +193,8 @@ def dump_lanes(objects_from_sql_request, dict_edges, dict_lanes):
     #     dict_edges,
     #     dict_grouped_lanes
     # )
-    for id_edge, grouped_lanes in dict_grouped_lanes.items():
-        dict_edges[id_edge].update(grouped_lanes)
+    for edge_id, grouped_lanes in dict_grouped_lanes.items():
+        dict_edges[edge_id].update(grouped_lanes)
         # print "** self._dict_edges: ", dict_edges
 
 def edges_is_same_orientation(edge0, edge1):

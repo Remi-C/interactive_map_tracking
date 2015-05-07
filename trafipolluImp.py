@@ -102,7 +102,7 @@ class TrafiPolluImp(object):
 
         :return:
         """
-        self.module_export.export()
+        self.module_export.export(True)
 
     def slot_Pickled_TrafiPollu(self):
         """
