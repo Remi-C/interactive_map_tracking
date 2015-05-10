@@ -108,9 +108,6 @@ class trafipolluImp_EXPORT(object):
         xml = open(infilename).read()
         self.symu_ROOT = symuvia_parser.CreateFromDocument(xml)
         print "trafipolluImp_EXPORT - Open file: ", infilename, "[DONE]"
-        # self.symu_ROOT.RESEAUX.RESEAU[0].TRONCONS.reset()
-        # self.symu_ROOT.RESEAUX.RESEAU[0].CONNEXIONS.reset()
-        # self.symu_ROOT.TRAFICS.reset()
         #
         self.symu_ROOT_RESEAU_TRONCONS = None
         self.symu_ROOT_RESEAU_CONNEXIONS = None
@@ -186,7 +183,6 @@ class trafipolluImp_EXPORT(object):
             if self.list_symu_troncons != []:
                 self.symu_ROOT.RESEAUX.RESEAU[0].TRONCONS = self.symu_ROOT_RESEAU_TRONCONS
                 b_add_trafics = True
-            print 'self.list_symu_connexions: ', self.list_symu_connexions
             if self.list_symu_connexions != []:
                 self.symu_ROOT.RESEAUX.RESEAU[0].CONNEXIONS = self.symu_ROOT_RESEAU_CONNEXIONS
                 b_add_trafics = True
@@ -342,6 +338,7 @@ class trafipolluImp_EXPORT(object):
         #
         nb_edges_connected = len(self.cursor_symuvia['sg3_node']['edge_ids'])
         b_node_is_CAF = nb_edges_connected > 2  # dummy test
+        # b_node_is_CAF = True
         if b_node_is_CAF:
             str_path_to_child, sym_CAF = pyxbDecorator.get_path_instance(*args)
             #
@@ -383,14 +380,16 @@ class trafipolluImp_EXPORT(object):
 
         # CAF - IN
         for sym_troncon in self.cursor_symuvia['sg3_node']['CAF']['in']:
-            sym_MOUVEMENT_AUTORISE = pyxbDecorator.get_instance(*args)
-            sym_MOUVEMENT_AUTORISE.id_troncon_amont = sym_troncon.id
-            # [TOPO] - Link between TRONCON & CAF
-            sym_troncon.id_eltaval = self.get_CAF().id
-            #
-            sym_MOUVEMENT_AUTORISE.MOUVEMENT_SORTIES = self.export_MOUVEMENT_SORTIES(str_path_to_child)
-            #
-            list_mouvement_autorise.append(sym_MOUVEMENT_AUTORISE)
+            for id_lane in range(sym_troncon.nb_voie):
+                sym_MOUVEMENT_AUTORISE = pyxbDecorator.get_instance(*args)
+                sym_MOUVEMENT_AUTORISE.id_troncon_amont = sym_troncon.id
+                sym_MOUVEMENT_AUTORISE.num_voie_amont = str(id_lane+1)
+                # [TOPO] - Link between TRONCON & CAF
+                sym_troncon.id_eltaval = self.get_CAF().id
+                #
+                sym_MOUVEMENT_AUTORISE.MOUVEMENT_SORTIES = self.export_MOUVEMENT_SORTIES(str_path_to_child)
+                #
+                list_mouvement_autorise.append(sym_MOUVEMENT_AUTORISE)
         return list_mouvement_autorise
 
     @pyxbDecorator(pyxb_parser)
@@ -415,12 +414,14 @@ class trafipolluImp_EXPORT(object):
         list_mvt_sortie = []
         # CAF - OUT
         for sym_troncon in self.cursor_symuvia['sg3_node']['CAF']['out']:
-            sym_MOUVEMENT_SORTIE = pyxbDecorator.get_instance(*args)
-            sym_MOUVEMENT_SORTIE.id_troncon_aval = sym_troncon.id
-            # [TOPO] - Link between TRONCON & CAF
-            sym_troncon.id_eltamont = self.get_CAF().id
-            #
-            list_mvt_sortie.append(sym_MOUVEMENT_SORTIE)
+            for id_lane in range(sym_troncon.nb_voie):
+                sym_MOUVEMENT_SORTIE = pyxbDecorator.get_instance(*args)
+                sym_MOUVEMENT_SORTIE.id_troncon_aval = sym_troncon.id
+                sym_MOUVEMENT_SORTIE.num_voie_aval = str(id_lane+1)
+                # [TOPO] - Link between TRONCON & CAF
+                sym_troncon.id_eltamont = self.get_CAF().id
+                #
+                list_mvt_sortie.append(sym_MOUVEMENT_SORTIE)
         return list_mvt_sortie
 
     @pyxbDecorator(pyxb_parser)
@@ -447,14 +448,17 @@ class trafipolluImp_EXPORT(object):
         list_entree_caf = []
         # CAF - IN
         for sym_troncon in self.cursor_symuvia['sg3_node']['CAF']['in']:
-            sym_ENTREE_CAF = pyxbDecorator.get_instance(*args)
-            sym_ENTREE_CAF.id_troncon_amont = sym_troncon.id
-            # [TOPO] - Link between TRONCON & CAF
-            sym_troncon.id_eltaval = self.get_CAF().id
-            #
-            sym_ENTREE_CAF.MOUVEMENTS = self.export_MOUVEMENTS(str_path_to_child)
-            #
-            list_entree_caf.append(sym_ENTREE_CAF)
+            for id_lane in range(sym_troncon.nb_voie):
+                sym_ENTREE_CAF = pyxbDecorator.get_instance(*args)
+                #
+                sym_ENTREE_CAF.id_troncon_amont = sym_troncon.id
+                sym_ENTREE_CAF.num_voie_amont = str(id_lane+1)
+                # [TOPO] - Link between TRONCON & CAF
+                sym_troncon.id_eltaval = self.get_CAF().id
+                #
+                sym_ENTREE_CAF.MOUVEMENTS = self.export_MOUVEMENTS(str_path_to_child)
+                #
+                list_entree_caf.append(sym_ENTREE_CAF)
         return list_entree_caf
 
     @pyxbDecorator(pyxb_parser)
@@ -479,12 +483,15 @@ class trafipolluImp_EXPORT(object):
         list_mouvement = []
         # CAF - OUT
         for sym_troncon in self.cursor_symuvia['sg3_node']['CAF']['out']:
-            sym_MOUVEMENT = pyxbDecorator.get_instance(*args)
-            sym_MOUVEMENT.id_troncon_aval = sym_troncon.id
-            # [TOPO] - Link between TRONCON & CAF
-            sym_troncon.id_eltamont = self.get_CAF().id
-            #
-            list_mouvement.append(sym_MOUVEMENT)
+            for id_lane in range(sym_troncon.nb_voie):
+                sym_MOUVEMENT = pyxbDecorator.get_instance(*args)
+                #
+                sym_MOUVEMENT.id_troncon_aval = sym_troncon.id
+                sym_MOUVEMENT.num_voie_aval = str(id_lane+1)
+                # [TOPO] - Link between TRONCON & CAF
+                sym_troncon.id_eltamont = self.get_CAF().id
+                #
+                list_mouvement.append(sym_MOUVEMENT)
         return list_mouvement
 
     @pyxbDecorator(pyxb_parser)
@@ -659,7 +666,7 @@ class trafipolluImp_EXPORT(object):
         cur_id_lane = 0
         self.update_pyxb_node(
             sym_TRONCON,
-            id=sym_TRONCON.id+'_lane'+str(cur_id_lane),
+            id=self.build_id_for_TRONCON(sym_TRONCON, cur_id_lane),
             nb_voie=nb_lanes,
             extremite_amont=troncon_center_axis[0],
             extremite_aval=troncon_center_axis[-1]
@@ -705,7 +712,7 @@ class trafipolluImp_EXPORT(object):
         cur_id_lane = 0
         self.update_pyxb_node(
             sym_TRONCON,
-            id=sym_TRONCON.id+'_lane'+str(cur_id_lane),
+            id=self.build_id_for_TRONCON(sym_TRONCON, cur_id_lane),
             nb_voie=nb_lanes,
             extremite_amont=sg3_edge['amont'],
             extremite_aval=sg3_edge['aval']
@@ -738,8 +745,7 @@ class trafipolluImp_EXPORT(object):
             self.update_pyxb_node(
                 sym_TRONCON,
                 nb_voie=nb_lanes,
-                # TODO: besoin d'un generateur d'id pour les troncons nouvellement generes
-                id=sym_TRONCON.id+'_lane'+str(cur_id_lane),
+                id=self.build_id_for_TRONCON(sym_TRONCON, cur_id_lane),
                 extremite_amont=edge_center_axis[0],
                 extremite_aval=edge_center_axis[-1]
             )
@@ -801,3 +807,12 @@ class trafipolluImp_EXPORT(object):
         :return:
         """
         return 'CAF_' + str(node_id)
+
+    @staticmethod
+    def build_id_for_TRONCON(sym_TRONCON, lane_id):
+        """
+
+        :param node_id:
+        :return:
+        """
+        return sym_TRONCON.id + '_lane_' + str(lane_id)

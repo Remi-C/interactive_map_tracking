@@ -86,10 +86,23 @@ class trafipolluImp_SQL(object):
         # print "* extent_src_crs.postgisSrid: ", extent_src_crs.postgisSrid()
         # print ""
 
+        dict_params_server = {
+            'IGN': {
+                'host': "172.16.3.50",
+                'port': "5432",
+                'user': "street_gen_3",
+                'password': "street_gen_3",
+            },
+            'LOCAL': {
+                'host': "localhost",
+                'port': "5433",
+                'user': "postgres",
+                'password': "postgres"
+            }
+        }
         connection = psycopg2.connect(database="bdtopo_topological",
                                       dbname="street_gen_3",
-                                      user="streetgen", password="streetgen",
-                                      host="172.16.3.50")
+                                      **dict_params_server['LOCAL'])
 
         # cursor = connection.cursor()
         # cursor = connection.cursor(cursor_factory=psycopg2.extras.NamedTupleCursor)
@@ -146,7 +159,8 @@ class trafipolluImp_SQL(object):
             except:
                 pass
             else:
-                tpi_DUMP.dump_for_edges(objects_from_sql_request, self.dict_edges)
+                # tpi_DUMP.dump_for_edges(objects_from_sql_request, self.dict_edges)
+                self.dict_edges.update(tpi_DUMP.dump_for_edges(objects_from_sql_request))
 
     def __request_for_nodes(self, **kwargs):
         """
@@ -165,8 +179,8 @@ class trafipolluImp_SQL(object):
             except:
                 pass
             else:
-                tpi_DUMP.dump_for_nodes(objects_from_sql_request, self.dict_nodes)
-                # TEST
+                self.dict_nodes.update(tpi_DUMP.dump_for_nodes(objects_from_sql_request))
+                # construct TOPO here
                 tpi_DUMP.build_topo_for_nodes(self.dict_nodes, self.dict_edges, self.dict_lanes)
 
     def __request_for_lanes(self, **kwargs):
