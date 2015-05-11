@@ -10,15 +10,15 @@
 
 SELECT
 --
-  DISTINCT edges.edge_id
-  ,edges.ign_id
-  ,edges.start_node
-  ,edges.end_node
-  ,ST_AsEWKB(edges.geom)               AS linez_geom
-  ,ST_AsEWKB(axis.intersection_limit1) AS point_amont
-  ,ST_AsEWKB(axis.intersection_limit2) AS point_aval
-  ,axis.road_width
-  ,axis.lane_number
+  DISTINCT edges.edge_id                AS str_edge_id
+  ,edges.ign_id                         AS str_ign_id
+  ,edges.start_node                     AS ui_start_node
+  ,edges.end_node                       AS ui_end_node
+  ,ST_AsEWKB(edges.geom)                AS wkb_edge_center_axis
+  ,ST_AsEWKB(axis.intersection_limit1)  AS wkb_amont
+  ,ST_AsEWKB(axis.intersection_limit2)  AS wkb_aval
+  ,axis.road_width                      AS f_road_width
+  ,axis.lane_number                     AS ui_lane_number
 FROM
   test.edges_selected AS edges
   JOIN

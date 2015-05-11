@@ -8,7 +8,8 @@
 -- retrieve (dump) 'informations' from nodes selected in QGIS client
 
 SELECT
-  nodes_selected.node_id, array_agg(oepnp.edge_id1) as edge_ids
+  nodes_selected.node_id      AS str_node_id
+  ,array_agg(oepnp.edge_id1)  AS str_edge_ids
 FROM 
   bdtopo_topological.ordered_edges_per_node_pair as oepnp
 JOIN

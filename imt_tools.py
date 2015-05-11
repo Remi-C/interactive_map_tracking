@@ -25,6 +25,7 @@ __author__ = 'latty'
 
 from qgis.core import *
 import os
+# from socket import gethostbyname, gethostname
 import socket
 
 from PyQt4.QtCore import QSettings
@@ -61,16 +62,23 @@ def get_lan_ip():
     :return: String of the IP
     :rtype: str
     """
-    ip = socket.gethostbyname(socket.gethostname())
-    if ip.startswith("127.") and os.name != "nt":
-        interfaces = ["eth0", "eth1", "eth2", "wlan0", "wlan1", "wifi0", "ath0", "ath1", "ppp0"]
-        for ifname in interfaces:
-            try:
-                ip = get_interface_ip(ifname)
-                break;
-            except IOError:
-                pass
-    return ip
+    # print 'gethostname(): ', socket.gethostname()
+    # print 'gethostbyname: ', socket.gethostbyname
+    try:
+        ip = socket.gethostbyname(socket.gethostname())
+    except:
+        print 'get_lan_ip - WARNING: probleme avec "gethostbyname"'
+        ip = '127.0.0.1'
+    finally:
+        if ip.startswith("127.") and os.name != "nt":
+            interfaces = ["eth0", "eth1", "eth2", "wlan0", "wlan1", "wifi0", "ath0", "ath1", "ppp0"]
+            for ifname in interfaces:
+                try:
+                    ip = get_interface_ip(ifname)
+                    break
+                except IOError:
+                    pass
+        return ip
 
 
 def find_index_field_by_name(field_names, field_name):

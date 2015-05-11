@@ -39,16 +39,16 @@ def dump_for_edges(objects_from_sql_request):
             load_arrays_with_numpely(
                 dict_sql_request,
                 [
-                    ('amont', 'point_amont'),
-                    ('aval', 'point_aval'),
-                    ('linez_geom', 'linez_geom')
+                    ('wkb_amont', 'np_amont'),
+                    ('wkb_aval', 'np_aval'),
+                    ('wkb_edge_center_axis', 'np_edge_center_axis')
                 ]
             )
         )
 
-        dict_sql_request['amont_to_aval'] = dict_sql_request['aval'] - dict_sql_request['amont']
+        dict_sql_request['np_amont_to_aval'] = dict_sql_request['np_aval'] - dict_sql_request['np_amont']
 
-        edge_id = object_from_sql_request['edge_id']
+        edge_id = object_from_sql_request['str_edge_id']
         dict_edges.update({edge_id: dict_sql_request})
     #
     print '# dump_for_edge - nb edges added: ', len(dict_edges.keys())
@@ -63,80 +63,13 @@ def dump_for_nodes(objects_from_sql_request):
     """
     dict_nodes = {}
     for object_from_sql_request in objects_from_sql_request:
-        node_id = object_from_sql_request['node_id']
-        edge_ids = object_from_sql_request['edge_ids']
-        dict_nodes[node_id] = {'edge_ids': edge_ids}
+        node_id = object_from_sql_request['str_node_id']
+        array_str_edge_ids = object_from_sql_request['str_edge_ids']
+        dict_nodes[node_id] = {'array_str_edge_ids': array_str_edge_ids}
     #
     print '# dump_for_nodes - nb nodes added: ', len(dict_nodes.keys())
     #
     return dict_nodes
-
-
-def build_topo_for_nodes(dict_nodes, dict_edges, dict_lanes):
-    """
-
-    :param dict_nodes:
-    :param dict_edges:
-    :return:
-    """
-
-    # !!!!! FAUDRAIT CLEAN LE RESEAU des troncons sans voies, ou node/caf avec de tel troncons !!!!
-
-    str_key_for_lane = '_lane_'
-    l_str_key_for_lane = len(str_key_for_lane)
-
-    def get_id_lane_from_id_name(symu_troncon):
-        """
-        """
-        id_in_list = 0
-        symu_troncon_id = symu_troncon.id
-        try:
-            id_in_list = int(symu_troncon_id[symu_troncon_id.find(str_key_for_lane)+l_str_key_for_lane:])
-        except:
-            print "# build_topo_for_nodes - PROBLEME! symuvia_troncon_id: %s - probleme de conversion en 'int'" % symu_troncon_id
-        finally:
-            return id_in_list
-
-    list_remove_nodes = []
-    for node_id, dict_values in dict_nodes.iteritems():
-        caf_entrees = []
-        caf_sorties = []
-        caf_entrees_sorties = [caf_entrees, caf_sorties]
-        #
-        for edge_id in dict_values['edge_ids']:
-            sg3_edge = dict_edges[edge_id]
-            try:
-                # list_symu_edges = [edges for edges in sge_edge['sg3_to_symuvia']]
-                list_symu_edges = sg3_edge['sg3_to_symuvia']
-            except Exception, e:
-                print '# build_topo_for_nodes - EXCEPTION: ', e
-                # remove this node
-                list_remove_nodes.append(node_id)
-            else:
-                for symu_troncon in list_symu_edges:
-                    id_in_list = get_id_lane_from_id_name(symu_troncon)
-                    oncoming = dict_lanes[edge_id]['id_list'][id_in_list].oncoming
-                    # '!=' est l'operateur XOR en Python
-                    id_caf_in_out = int((sg3_edge['start_node'] == node_id) != oncoming)
-                    caf_entrees_sorties[id_caf_in_out].append(symu_troncon)
-                    # print 'id_caf_inout: ', id_caf_inout
-                    # print "sge_edge['start_node']: ", sge_edge['start_node']
-                    # print 'id_in_list: ', id_in_list
-                    # print 'oncoming: ', oncoming
-                # print "id edge in SG3: ", edge_id
-                # print "-> id edges in SYMUVIA: ", list_symuvia_edges
-                #
-                dict_nodes[node_id].setdefault('CAF', {'in': caf_entrees, 'out': caf_sorties})
-        #
-        # print "node_id: ", node_id
-        # print "-> caf_entrees (SYMUVIA): ", caf_entrees
-        # print "-> caf_sorties (SYMUVIA): ", caf_sorties
-        # print "-> dict_nodes[node_id]: ", dict_nodes[node_id]
-    # remove nodes
-    nodes_removed = [dict_nodes.pop(k, None) for k in list_remove_nodes]
-    print '# build_topo_for_nodes - nb nodes_removed: ', len(nodes_removed)
-    print '# build_topo_for_nodes - nb nodes : ', len(dict_nodes.keys())
-
 
 def load_arrays_with_numpely(dict_sql_request, list_params_to_convert):
     """
@@ -146,7 +79,7 @@ def load_arrays_with_numpely(dict_sql_request, list_params_to_convert):
     :return:
     """
     dict_arrays_loaded = {}
-    for column_name, param_name in list_params_to_convert:
+    for param_name, column_name in list_params_to_convert:
         dict_arrays_loaded[column_name] = np.asarray(dict_sql_request[param_name])
     return dict_arrays_loaded
 
@@ -182,7 +115,7 @@ def dump_lanes(objects_from_sql_request, dict_edges, dict_lanes):
         edge_id = object_from_sql_request['edge_id']
         lane_side = object_from_sql_request['lane_side']
         #
-        nb_lanes = dict_edges[edge_id]['lane_number']
+        nb_lanes = dict_edges[edge_id]['ui_lane_number']
         dict_lanes.setdefault(edge_id,
                               {
                                   'id_list': [None] * nb_lanes  # pre-allocate size for list
@@ -192,7 +125,7 @@ def dump_lanes(objects_from_sql_request, dict_edges, dict_lanes):
         lane_center_axis = np.asarray(sp_wkb_loads(bytes(lane_center_axis)))
         dict_lanes[edge_id].setdefault('lane_center_axis', []).append(lane_center_axis)
         oncoming = edges_is_same_orientation(
-            dict_edges[edge_id]['amont_to_aval'],
+            dict_edges[edge_id]['np_amont_to_aval'],
             compute_direction_linestring(lane_center_axis)
         )
         # update list sides for (grouping)

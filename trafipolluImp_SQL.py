@@ -90,8 +90,8 @@ class trafipolluImp_SQL(object):
             'IGN': {
                 'host': "172.16.3.50",
                 'port': "5432",
-                'user': "street_gen_3",
-                'password': "street_gen_3",
+                'user': "streetgen",
+                'password': "streetgen",
             },
             'LOCAL': {
                 'host': "localhost",
@@ -102,7 +102,8 @@ class trafipolluImp_SQL(object):
         }
         connection = psycopg2.connect(database="bdtopo_topological",
                                       dbname="street_gen_3",
-                                      **dict_params_server['LOCAL'])
+                                      # **dict_params_server['LOCAL'])
+                                      **dict_params_server['IGN'])
 
         # cursor = connection.cursor()
         # cursor = connection.cursor(cursor_factory=psycopg2.extras.NamedTupleCursor)
@@ -181,7 +182,7 @@ class trafipolluImp_SQL(object):
             else:
                 self.dict_nodes.update(tpi_DUMP.dump_for_nodes(objects_from_sql_request))
                 # construct TOPO here
-                tpi_DUMP.build_topo_for_nodes(self.dict_nodes, self.dict_edges, self.dict_lanes)
+                # tpi_DUMP.build_topo_for_nodes(self.dict_nodes, self.dict_edges, self.dict_lanes)
 
     def __request_for_lanes(self, **kwargs):
         """
