@@ -8,6 +8,9 @@ import math
 # - http://docs.scipy.org/doc/scipy/reference/tutorial/interpolate.html#d-interpolation-interp1d
 # - http://stackoverflow.com/questions/11018433/is-there-any-non-scipy-code-out-there-that-will-create-smooth-interpolations-of
 
+
+# inspiration pour la generation de la courbe de Bezier
+# url : http://www.codeproject.com/Articles/25237/Bezier-Curves-Made-Simple
 FactorialLookup = [
     1.0,
     1.0,
@@ -90,12 +93,12 @@ def create_bezier_curve_from_list_PC(list_PC, nbSegments=30):
     """
     npts = len(list_PC)
     tstep = 1.0/(nbSegments+1)
-    return np.array(
-        [
-            reduce(lambda x, y: x+y, [Bernstein(npts-1, i, t) * list_PC[i] for i in range(0, npts, 1)])
-            for t in np.arange(0.0, 1.0+tstep, tstep)
-        ]
-    )
+    np_points_bezier = [list_PC[0]]
+    list_interpoled_points = [
+        reduce(lambda x, y: x+y, [Bernstein(npts-1, i, t) * list_PC[i] for i in range(0, npts, 1)])
+        for t in np.arange(0.0, 1.0+tstep, tstep)
+    ]
+    return np.array(list_interpoled_points)
 
 
 def line(p1, p2):
@@ -241,16 +244,14 @@ def create_bezier_curve_with_list_PC(
     line_P3P2 = line(P3, P2)
     #
     list_PC = np_array_points[2:-2]
-    if not list_PC:
+    if not list_PC.size:
         lambdas_compute_PC = [
             lambda: intersection(line_P0P1, line_P3P2),
             lambda: (P1 + P2) * 0.5
         ]
         list_PC = lambdas_compute_PC[is_parallel_lines(line_P0P1, line_P3P2, threshold_acos_angle)]()
-    #
-    list_PC = np.array([P1, list_PC, P2])
     # Calcul des points intermediaires
-    return create_bezier_curve_from_list_PC(list_PC, nbSegments), list_PC[1:-1]
+    return create_bezier_curve_from_list_PC(np_array_points[1:-1], nbSegments), np_array_points[2:-2]
 
 # TEST
 # >>> import numpy as np
@@ -322,3 +323,45 @@ def create_bezier_curve_with_list_PC(
 #        [ 1.99583767,  1.12486993],
 #        [ 1.99895942,  1.06347555],
 #        [ 2.        ,  1.        ]]), array([[2, 2]]))
+
+# >>> np_array_points
+# array([[ 0. ,  2. ],
+#        [ 1. ,  2. ],
+#        [ 1.5,  2. ],
+#        [ 2. ,  1.5],
+#        [ 2. ,  1. ],
+#        [ 2. ,  0. ]])
+# >> bezier.create_bezier_curve_with_list_PC(np_array_points)
+# (array([[ 1.        ,  2.        ],
+#        [ 1.04837031,  1.99845591],
+#        [ 1.09663992,  1.99389077],
+#        [ 1.14470813,  1.98640529],
+#        [ 1.19247424,  1.97610016],
+#        [ 1.23983753,  1.9630761 ],
+#        [ 1.28669732,  1.94743379],
+#        [ 1.33295291,  1.92927394],
+#        [ 1.37850357,  1.90869726],
+#        [ 1.42324863,  1.88580444],
+#        [ 1.46708738,  1.86069618],
+#        [ 1.5099191 ,  1.8334732 ],
+#        [ 1.55164311,  1.80423618],
+#        [ 1.59215871,  1.77308583],
+#        [ 1.63136518,  1.74012286],
+#        [ 1.66916183,  1.70544795],
+#        [ 1.70544795,  1.66916183],
+#        [ 1.74012286,  1.63136518],
+#        [ 1.77308583,  1.59215871],
+#        [ 1.80423618,  1.55164311],
+#        [ 1.8334732 ,  1.5099191 ],
+#        [ 1.86069618,  1.46708738],
+#        [ 1.88580444,  1.42324863],
+#        [ 1.90869726,  1.37850357],
+#        [ 1.92927394,  1.33295291],
+#        [ 1.94743379,  1.28669732],
+#        [ 1.9630761 ,  1.23983753],
+#        [ 1.97610016,  1.19247424],
+#        [ 1.98640529,  1.14470813],
+#        [ 1.99389077,  1.09663992],
+#        [ 1.99845591,  1.04837031],
+#        [ 2.        ,  1.        ]]), array([[ 1.5,  2. ],
+#        [ 2. ,  1.5]]))
