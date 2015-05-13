@@ -20,6 +20,14 @@ class trafipolluImp_TOPO(object):
         self.list_symu_connexions = []
         #
 
+    def clear(self):
+        """
+
+        :return:
+        """
+        self.list_pyxb_symutroncons = []
+        self.list_symu_connexions = []
+
     def convert_sg3_edges_to_pyxb_symutroncons(self):
         """
 

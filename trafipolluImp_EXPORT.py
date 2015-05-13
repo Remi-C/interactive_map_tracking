@@ -1,10 +1,8 @@
 __author__ = 'latty'
 
-from shapely.geometry import Point, LineString
 import pyxb
 import parser_symuvia_xsd_2_04_pyxb as symuvia_parser
 import trafipolluImp_PYXB as module_pyxb_parser
-import trafipolluImp_TOPO as tpi_TOPO
 
 import os
 qgis_plugins_directory = os.path.normcase(os.path.dirname(__file__))
@@ -86,7 +84,7 @@ class trafipolluImp_EXPORT(object):
     """
 
     """
-    def __init__(self, dict_edges, dict_lanes, dict_nodes, infilename=infilename_for_symuvia):
+    def __init__(self, dict_edges, dict_lanes, dict_nodes, module_topo, infilename=infilename_for_symuvia):
         """
 
         """
@@ -114,7 +112,7 @@ class trafipolluImp_EXPORT(object):
         self.symu_ROOT_RESEAU_CONNEXIONS = None
         self.symu_ROOT_TRAFICS = None
 
-        self.module_topo = tpi_TOPO.trafipolluImp_TOPO(self.dict_edges, self.dict_lanes, self.dict_nodes)
+        self.module_topo = module_topo  # tpi_TOPO.trafipolluImp_TOPO(self.dict_edges, self.dict_lanes, self.dict_nodes)
 
     def select_node(self, node_id):
         """

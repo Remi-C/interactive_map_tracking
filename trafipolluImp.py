@@ -7,6 +7,7 @@ from signalsmanager import SignalsManager
 import imt_tools
 from trafipolluImp_SQL import trafipolluImp_SQL
 import trafipolluImp_EXPORT as tpi_EXPORT
+import trafipolluImp_TOPO as tpi_TOPO
 
 
 class TrafiPolluImp(object):
@@ -26,7 +27,12 @@ class TrafiPolluImp(object):
         self.__dict_nodes = {}
         #
         self.module_SQL = trafipolluImp_SQL(iface, self.__dict_edges, self.__dict_lanes, self.__dict_nodes)
-        self.module_export = tpi_EXPORT.trafipolluImp_EXPORT(self.__dict_edges, self.__dict_lanes, self.__dict_nodes)
+        self.module_topo = tpi_TOPO.trafipolluImp_TOPO(self.__dict_edges, self.__dict_lanes, self.__dict_nodes)
+        self.module_export = tpi_EXPORT.trafipolluImp_EXPORT(
+            self.__dict_edges,
+            self.__dict_lanes,
+            self.__dict_nodes,
+            self.module_topo)
 
     def _clean_(self):
         """
@@ -38,6 +44,8 @@ class TrafiPolluImp(object):
         self.__dict_edges.clear()
         self.__dict_lanes.clear()
         self.__dict_nodes.clear()
+        #
+        self.module_topo.clear()
 
     def slot_clean(self):
         """
