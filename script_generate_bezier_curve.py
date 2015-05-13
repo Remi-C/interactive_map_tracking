@@ -48,9 +48,9 @@ FactorialLookup = [
 ]
 
 
-# just check if n is appropriate, then return the result
 def factorial(n):
     """
+    just check if n is appropriate, then return the result
 
     :param n:
     :return: returns the value n! as a SUMORealing point number
@@ -62,6 +62,12 @@ def factorial(n):
 
 
 def Ni(n, i):
+    """
+
+    :param n:
+    :param i:
+    :return:
+    """
     a1 = factorial(n)
     a2 = factorial(i)
     a3 = factorial(n - i)
@@ -69,8 +75,15 @@ def Ni(n, i):
     return ni
 
 
-# Calculate Bernstein basis
 def Bernstein(n, i, t):
+    """
+    Calculate Bernstein basis
+
+    :param n:
+    :param i:
+    :param t:
+    :return:
+    """
     ti = 1.0
     if not (t == 0.0 and i == 0):
         ti = math.pow(t, i)
@@ -98,7 +111,7 @@ def create_bezier_curve_from_list_PC(list_PC, nbSegments=30):
         reduce(lambda x, y: x+y, [Bernstein(npts-1, i, t) * list_PC[i] for i in range(0, npts, 1)])
         for t in np.arange(0.0, 1.0+tstep, tstep)
     ]
-    return np.array(list_interpoled_points)
+    return np.array(list_interpoled_points), list_PC[1:-1]
 
 
 def line(p1, p2):
@@ -131,6 +144,7 @@ def intersection(L1, L2):
     y = Dy * inv_D
     return x, y
 
+
 def is_parallel_lines(line0, line1, threshold_acos_angle=0.875):
     """
 
@@ -148,6 +162,7 @@ def is_parallel_lines(line0, line1, threshold_acos_angle=0.875):
     cos_angle = np.dot(vec_dir_P0P1, vec_dir_P3P2)
     #
     return abs(cos_angle) >= threshold_acos_angle
+
 
 def create_bezier_curve_from_3points(
         point_start,
@@ -179,6 +194,7 @@ def create_bezier_curve_from_3points(
         for berstein in [[(1-t)**2, (2*t)*(1-t), t**2] for t in np.arange(0.0, 1.0, tstep)]
     ])
 
+
 def create_bezier_curve(
         np_array_points,
         threshold_acos_angle=0.875,
@@ -195,9 +211,9 @@ def create_bezier_curve(
         Par defaut on est sur un angle limite de PI/8 => 1.0 - acos(PI/8) ~= 0.875
     :param nbSegments:
         Indice de discretisation du segment de bezier genere
-    :return: tuple(list_points=np_array, PC=[x, y])
+    :return: tuple(list_points=np_array(2D Point), PC=np_array(2D Point))
         np array de la liste des points representant le segment de bezier
-        point de controle utilise pour calculer le segment de bezier
+        np array de la liste des points de controle (dans le cas de cette methode: liste d'1 seul PC)
     """
     P0, P1, P2, P3 = np_array_points
     #
@@ -213,7 +229,8 @@ def create_bezier_curve(
     # Calcul des points intermediaires
     np_segment_bezier = create_bezier_curve_from_3points(P1, P2, PC, nbSegments)
 
-    return np_segment_bezier, PC
+    return np_segment_bezier, np.array([PC])
+
 
 def create_bezier_curve_with_list_PC(
         np_array_points,
@@ -225,7 +242,7 @@ def create_bezier_curve_with_list_PC(
     :param np_array_points: [P0, P1, PC0, PC1, ..., PC(n-1), P2, P3]
         [P0, P1]: segment du troncon 1 (amont vers aval)
         [P3, P2]: segment du troncon 2 (amont vers aval)
-        PC0, PC1, ..., PC(n-1): liste des points de controle pour la spline (en plus de P1 et P2)
+        PC0, PC1, ..., PC(n-1): liste des points de controles pour la spline (en plus de P1 et P2)
     :param threshold_acos_angle:
         Seuil limite pour qualifier les segments comme etant paralleles.
         On envoie directement le acos de l'angle (optim).
@@ -234,26 +251,18 @@ def create_bezier_curve_with_list_PC(
         Indice de discretisation du segment de bezier genere
     :return: tuple(list_points=np_array, PC=[x, y])
         np array de la liste des points representant le segment de bezier
-        point de controle utilise pour calculer le segment de bezier
+        np array de la liste des points de controle (de 1 a (n-1))
     """
-    #
-    P0, P1 = np_array_points[:2]
-    P2, P3 = np_array_points[-2:]
-    #
-    line_P0P1 = line(P0, P1)
-    line_P3P2 = line(P3, P2)
-    #
     list_PC = np_array_points[1:-1]
-    if list_PC.size == 4:
-        lambdas_compute_PC = [
-            lambda: intersection(line_P0P1, line_P3P2),
-            lambda: (P1 + P2) * 0.5
-        ]
-        PC = lambdas_compute_PC[is_parallel_lines(line_P0P1, line_P3P2, threshold_acos_angle)]()
-        # url: http://docs.scipy.org/doc/numpy/reference/generated/numpy.insert.html
-        list_PC = np.insert(list_PC, 1, PC, axis=0)
-    # Calcul des points intermediaires
-    return create_bezier_curve_from_list_PC(list_PC, nbSegments), list_PC[1:-1]
+    list_func_generate_spline = [
+        (create_bezier_curve_from_list_PC, [list_PC, nbSegments]),
+        (create_bezier_curve, [np_array_points, threshold_acos_angle, nbSegments])
+    ]
+    # list_PC.size == 4 <=> list_PC = [P1, P2]
+    tuple_func_params = list_func_generate_spline[list_PC.size == 4]
+    # on renvoit la liste des points generes par la spline d'interpolation
+    # et la liste des points de controles
+    return tuple_func_params[0](*tuple_func_params[1])
 
 # TEST
 # >>> import numpy as np
