@@ -34,7 +34,23 @@ class TrafiPolluImp(object):
             self.__dict_nodes,
             self.module_topo)
 
-    def _clean_(self):
+    def _init_signals_(self):
+        """
+
+        """
+        self.signals_manager.add_clicked(self.dlg.execute_sql_commands, self.slot_execute_SQL_commands, "GUI")
+        self.signals_manager.add_clicked(self.dlg.refreshSqlScriptList, self.slot_refreshSqlScriptList, "GUI")
+        self.signals_manager.add_clicked(self.dlg.pickle_trafipollu, self.slot_Pickled_TrafiPollu, "GUI")
+        self.signals_manager.add_clicked(self.dlg.export_to_symuvia, self.slot_export_to_symuvia, "GUI")
+        self.signals_manager.add_clicked(self.dlg.tf_dump_topo_export, self.slot_dump_topo_export, "GUI")
+        self.signals_manager.add_clicked(self.dlg.tf_clear, self.slot_clear, "GUI")
+        #
+        self.signals_manager.add(self.dlg.combobox_sql_scripts,
+                                  "currentIndexChanged (int)",
+                                  self.slot_currentIndexChanged_SQL,
+                                  "GUI")
+
+    def _clear_(self):
         """
 
         :return:
@@ -47,28 +63,12 @@ class TrafiPolluImp(object):
         #
         self.module_topo.clear()
 
-    def slot_clean(self):
+    def slot_clear(self):
         """
 
         :return:
         """
-        self._clean_()
-
-    def _init_signals_(self):
-        """
-
-        """
-        self.signals_manager.add_clicked(self.dlg.execute_sql_commands, self.slot_execute_SQL_commands, "GUI")
-        self.signals_manager.add_clicked(self.dlg.refreshSqlScriptList, self.slot_refreshSqlScriptList, "GUI")
-        self.signals_manager.add_clicked(self.dlg.pickle_trafipollu, self.slot_Pickled_TrafiPollu, "GUI")
-        self.signals_manager.add_clicked(self.dlg.export_to_symuvia, self.slot_export_to_symuvia, "GUI")
-        self.signals_manager.add_clicked(self.dlg.tf_dump_topo_export, self.slot_dump_topo_export, "GUI")
-        self.signals_manager.add_clicked(self.dlg.tf_clean, self.slot_clean, "GUI")
-        #
-        self.signals_manager.add(self.dlg.combobox_sql_scripts,
-                                  "currentIndexChanged (int)",
-                                  self.slot_currentIndexChanged_SQL,
-                                  "GUI")
+        self._clear_()
 
     def _enable_trafipollu_(self):
         """

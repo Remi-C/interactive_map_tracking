@@ -16,8 +16,9 @@ class trafipolluImp_TOPO(object):
         self.dict_lanes = dict_lanes
         self.dict_nodes = dict_nodes
         #
-        self.list_pyxb_symutroncons = []
-        self.list_symu_connexions = []
+        # self.list_pyxb_symutroncons = []
+        self.dict_pyxb_symutroncons = {}
+        self.dict_pyxb_symuconnexions = []
         #
 
     def clear(self):
@@ -25,8 +26,8 @@ class trafipolluImp_TOPO(object):
 
         :return:
         """
-        self.list_pyxb_symutroncons = []
-        self.list_symu_connexions = []
+        self.dict_pyxb_symutroncons = []
+        self.dict_pyxb_symuconnexions = []
 
     def convert_sg3_edges_to_pyxb_symutroncons(self):
         """
@@ -35,9 +36,10 @@ class trafipolluImp_TOPO(object):
 
         """
         for sg3_edge_id in self.dict_lanes:
-            self.list_pyxb_symutroncons.extend(self.convert_sg3_edge_to_pyxb_symutroncon(sg3_edge_id))
+            # self.list_pyxb_symutroncons.extend(self.convert_sg3_edge_to_pyxb_symutroncon(sg3_edge_id))
+            self.dict_pyxb_symutroncons.update(self.convert_sg3_edge_to_pyxb_symutroncon(sg3_edge_id))
         #
-        print 'convert_sg3_edges_to_pyxb_symutroncons - %d troncons added' % len(self.list_pyxb_symutroncons)
+        print 'convert_sg3_edges_to_pyxb_symutroncons - %d troncons added' % len(self.dict_pyxb_symutroncons.keys())
         #
 
     def convert_sg3_edge_to_pyxb_symutroncon(self, sg3_edge_id):
@@ -46,7 +48,7 @@ class trafipolluImp_TOPO(object):
         :param sg3_edge_id:
         :return:
         """
-        list_troncons = []
+        dict_pyxb_simuTroncons = {}
 
         def update_list_troncon(pyxb_simuTroncon, sg3_edge):
             """
@@ -63,15 +65,15 @@ class trafipolluImp_TOPO(object):
                 list_pyxb_simuTRONCON = filter(lambda x: x.id == pyxb_simuTroncon.id, sg3_edge['sg3_to_symuvia'])
             except:
                 # la cle 'sg3_to_symuvia' n'existe pas donc on est dans l'init (premiere passe)
-                list_troncons.append(pyxb_simuTroncon)
+                dict_pyxb_simuTroncons[pyxb_simuTroncon.id] = pyxb_simuTroncon
             else:
                 if len(list_pyxb_simuTRONCON) == 0:
                     # nouveau troncon
-                    list_troncons.append(pyxb_simuTroncon)
+                    dict_pyxb_simuTroncons[pyxb_simuTroncon.id] = pyxb_simuTroncon
                 else:
                     # le troncon est deja present
-                    # ps: faudrait updater le TRONCON
-                    list_troncons.append(list_pyxb_simuTRONCON[0])
+                    # TODO: il faudrait updater le TRONCON
+                    dict_pyxb_simuTroncons[list_pyxb_simuTRONCON[0].id] = list_pyxb_simuTRONCON[0]
 
         sg3_edge = self.dict_edges[sg3_edge_id]
 
@@ -127,9 +129,9 @@ class trafipolluImp_TOPO(object):
                 update_list_troncon(pyxb_symuTRONCON, sg3_edge)
         finally:
             # LINK STREETGEN3 to SYMUVIA (TOPO)
-            sg3_edge['sg3_to_symuvia'] = list_troncons
+            sg3_edge['sg3_to_symuvia'] = dict_pyxb_simuTroncons.values()
             #
-            return list_troncons
+            return dict_pyxb_simuTroncons
 
     def update_TRONCON_with_lanes_in_groups(self, pyxb_symuTRONCON, sg3_edge_id, cur_id_lane, nb_lanes):
         """

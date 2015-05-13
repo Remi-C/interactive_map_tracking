@@ -301,7 +301,8 @@ class trafipolluImp_EXPORT(object):
         # print 'TRAFICS - self.list_troncons: ', self.list_troncons
         # sym_TRAFICS.append(export_TRAFIC(self.list_symu_troncons, self.list_symu_connexions, str_path_to_child))
         sym_TRAFICS.append(
-            export_TRAFIC(self.module_topo.list_pyxb_symutroncons, self.list_symu_connexions, str_path_to_child)
+            # export_TRAFIC(self.module_topo.list_pyxb_symutroncons, self.list_symu_connexions, str_path_to_child)
+            export_TRAFIC(self.module_topo.list_pyxb_symutroncons.values(), self.list_symu_connexions, str_path_to_child)
         )
         return sym_TRAFICS
 
@@ -524,7 +525,8 @@ class trafipolluImp_EXPORT(object):
         self.module_topo.convert_sg3_edges_to_pyxb_symutroncons()
 
         sym_TRONCONS = pyxbDecorator.get_instance(*args)
-        for pyxb_symuTRONCON in self.module_topo.list_pyxb_symutroncons:
+        # for pyxb_symuTRONCON in self.module_topo.list_pyxb_symutroncons:
+        for pyxb_symuTRONCON in self.module_topo.list_pyxb_symutroncons.values():
             sym_TRONCONS.append(pyxb_symuTRONCON)
         #
         return sym_TRONCONS
