@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>543</width>
-    <height>353</height>
+    <width>547</width>
+    <height>364</height>
    </rect>
   </property>
   <property name="minimumSize">
@@ -312,7 +312,7 @@ p, li { white-space: pre-wrap; }
        <string>TrafiPollu</string>
       </attribute>
       <layout class="QGridLayout" name="gridLayout_6">
-       <item row="0" column="0">
+       <item row="0" column="0" colspan="2">
         <layout class="QGridLayout" name="gridLayout_5">
          <property name="sizeConstraint">
           <enum>QLayout::SetFixedSize</enum>
@@ -361,7 +361,7 @@ p, li { white-space: pre-wrap; }
          </item>
         </layout>
        </item>
-       <item row="0" column="1" rowspan="2" colspan="2">
+       <item row="0" column="2" rowspan="2" colspan="3">
         <widget class="QPlainTextEdit" name="plainTextEdit_sql_script">
          <property name="minimumSize">
           <size>
@@ -379,22 +379,6 @@ p, li { white-space: pre-wrap; }
          </property>
         </widget>
        </item>
-       <item row="0" column="3">
-        <spacer name="horizontalSpacer_6">
-         <property name="orientation">
-          <enum>Qt::Horizontal</enum>
-         </property>
-         <property name="sizeType">
-          <enum>QSizePolicy::Minimum</enum>
-         </property>
-         <property name="sizeHint" stdset="0">
-          <size>
-           <width>1</width>
-           <height>1</height>
-          </size>
-         </property>
-        </spacer>
-       </item>
        <item row="1" column="0">
         <spacer name="verticalSpacer_8">
          <property name="orientation">
@@ -408,7 +392,7 @@ p, li { white-space: pre-wrap; }
          </property>
         </spacer>
        </item>
-       <item row="2" column="1">
+       <item row="2" column="0">
         <spacer name="horizontalSpacer_5">
          <property name="orientation">
           <enum>Qt::Horizontal</enum>
@@ -421,7 +405,25 @@ p, li { white-space: pre-wrap; }
          </property>
         </spacer>
        </item>
-       <item row="2" column="2" colspan="2">
+       <item row="2" column="1" colspan="2">
+        <layout class="QFormLayout" name="formLayout_3">
+         <item row="0" column="0">
+          <widget class="QPushButton" name="tf_dump_topo_export">
+           <property name="text">
+            <string>Dump - Topo - Export</string>
+           </property>
+          </widget>
+         </item>
+         <item row="1" column="0">
+          <widget class="QPushButton" name="tf_clean">
+           <property name="text">
+            <string>Clean</string>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+       <item row="2" column="3">
         <layout class="QFormLayout" name="formLayout_10">
          <property name="fieldGrowthPolicy">
           <enum>QFormLayout::FieldsStayAtSizeHint</enum>
@@ -440,7 +442,11 @@ p, li { white-space: pre-wrap; }
            </property>
           </widget>
          </item>
-         <item row="0" column="1">
+        </layout>
+       </item>
+       <item row="2" column="4">
+        <layout class="QFormLayout" name="formLayout_5">
+         <item row="0" column="0">
           <widget class="QPushButton" name="pickle_trafipollu">
            <property name="sizePolicy">
             <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
@@ -463,7 +469,7 @@ p, li { white-space: pre-wrap; }
       </attribute>
       <layout class="QGridLayout" name="gridLayout_3">
        <item row="0" column="0" rowspan="2" colspan="2">
-        <widget class="QWebView" name="webView_userdoc">
+        <widget class="QWebView" name="webView_userdoc" native="true">
          <property name="sizePolicy">
           <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
            <horstretch>0</horstretch>
@@ -473,7 +479,7 @@ p, li { white-space: pre-wrap; }
          <property name="autoFillBackground">
           <bool>false</bool>
          </property>
-         <property name="url">
+         <property name="url" stdset="0">
           <url>
            <string>https://github.com/Remi-C/interactive_map_tracking/wiki/[User]-User-Guide</string>
           </url>
@@ -552,7 +558,7 @@ p, li { white-space: pre-wrap; }
         </spacer>
        </item>
        <item row="0" column="0">
-        <widget class="QWebView" name="webView_about">
+        <widget class="QWebView" name="webView_about" native="true">
          <property name="enabled">
           <bool>true</bool>
          </property>
@@ -565,7 +571,7 @@ p, li { white-space: pre-wrap; }
          <property name="autoFillBackground">
           <bool>false</bool>
          </property>
-         <property name="url">
+         <property name="url" stdset="0">
           <url>
            <string>https://github.com/Remi-C/interactive_map_tracking/wiki</string>
           </url>

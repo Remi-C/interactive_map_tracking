@@ -28,6 +28,24 @@ class TrafiPolluImp(object):
         self.module_SQL = trafipolluImp_SQL(iface, self.__dict_edges, self.__dict_lanes, self.__dict_nodes)
         self.module_export = tpi_EXPORT.trafipolluImp_EXPORT(self.__dict_edges, self.__dict_lanes, self.__dict_nodes)
 
+    def _clean_(self):
+        """
+
+        :return:
+        """
+        print 'clean ressources ...'
+        #
+        self.__dict_edges.clear()
+        self.__dict_lanes.clear()
+        self.__dict_nodes.clear()
+
+    def slot_clean(self):
+        """
+
+        :return:
+        """
+        self._clean_()
+
     def _init_signals_(self):
         """
 
@@ -36,6 +54,9 @@ class TrafiPolluImp(object):
         self.signals_manager.add_clicked(self.dlg.refreshSqlScriptList, self.slot_refreshSqlScriptList, "GUI")
         self.signals_manager.add_clicked(self.dlg.pickle_trafipollu, self.slot_Pickled_TrafiPollu, "GUI")
         self.signals_manager.add_clicked(self.dlg.export_to_symuvia, self.slot_export_to_symuvia, "GUI")
+        self.signals_manager.add_clicked(self.dlg.tf_dump_topo_export, self.slot_dump_topo_export, "GUI")
+        self.signals_manager.add_clicked(self.dlg.tf_clean, self.slot_clean, "GUI")
+        #
         self.signals_manager.add(self.dlg.combobox_sql_scripts,
                                   "currentIndexChanged (int)",
                                   self.slot_currentIndexChanged_SQL,
@@ -58,9 +79,16 @@ class TrafiPolluImp(object):
 
         :return:
         """
-        sqlFile = self.dlg.plainTextEdit_sql_script.toPlainText()
-        sql_choice_combobox = imt_tools.get_itemText(self.dlg.combobox_sql_scripts)
+        self._execute_SQL_commands(
+            self.dlg.plainTextEdit_sql_script.toPlainText(),
+            imt_tools.get_itemText(self.dlg.combobox_sql_scripts)
+        )
 
+    def _execute_SQL_commands(self, sqlFile, sql_choice_combobox):
+        """
+
+        :return:
+        """
         self.module_SQL.execute_SQL_commands(sqlFile, sql_choice_combobox)
 
     def slot_refreshSqlScriptList(self):
@@ -80,22 +108,39 @@ class TrafiPolluImp(object):
             for i in files if i.endswith('.sql')
         ]
 
-    def slot_currentIndexChanged_SQL(self, id_index):
+    def get_sql_filename(self, sql_name):
         """
 
-        :param id_index:
+        :param sql_name:
+        :return:
+        """
+        path = os.path.normcase(os.path.dirname(__file__))
+        return path + '/' + sql_name + '.sql'
+
+    def get_sql_file(self, sql_filename):
+        """
+
+        :return:
         """
         sqlFile = ""
         fd = None
         try:
-            fd = open(imt_tools.get_itemData(self.dlg.combobox_sql_scripts))
+            fd = open(sql_filename)
             if fd:
                 sqlFile = fd.read()
                 fd.close()
         except:
             sqlFile = "Error ! Can't read the SQL file"
+        #
+        return sqlFile
 
-        self.dlg.plainTextEdit_sql_script.setPlainText(sqlFile)
+    def slot_currentIndexChanged_SQL(self, id_index):
+        """
+
+        :param id_index:
+        """
+        sql_filename = imt_tools.get_itemData(self.dlg.combobox_sql_scripts)
+        self.dlg.plainTextEdit_sql_script.setPlainText(self.get_sql_file(sql_filename))
 
     def slot_export_to_symuvia(self):
         """
@@ -103,6 +148,38 @@ class TrafiPolluImp(object):
         :return:
         """
         self.module_export.export(True)
+
+    def _dump_topo_export_(self):
+        """
+
+        :return:
+        """
+        #
+        list_sql_commands = [
+            'update_table_edges_from_qgis',
+            'dump_informations_from_edges',
+            'dump_sides_from_edges',
+            'dump_informations_from_nodes',
+        ]
+        #
+        for sql_command in list_sql_commands:
+            sql_filename = self.get_sql_filename(sql_command)
+            sql_file = self.get_sql_file(sql_filename)
+            print 'sql_filename: ', sql_filename
+            print 'sql_file: ', sql_file
+            self._execute_SQL_commands(
+                sql_file,
+                sql_command
+            )
+        #
+        self.module_export.export(True)
+
+    def slot_dump_topo_export(self):
+        """
+
+        :return:
+        """
+        self._dump_topo_export_()
 
     def slot_Pickled_TrafiPollu(self):
         """
