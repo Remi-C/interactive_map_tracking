@@ -2,6 +2,10 @@ __author__ = 'latty'
 
 import numpy as np
 import math
+import timeit
+
+
+bc_nbSegments = 32
 
 # from Scipy.interpolate import interp1d
 # urls:
@@ -97,21 +101,21 @@ def Bernstein(n, i, t):
     return basis
 
 
-def create_bezier_curve_from_list_PC(list_PC, nbSegments=30):
+def build_bezier_curve_from_PCs(list_PCs, nbSegments=30):
     """
 
-    :param list_PC:
+    :param list_PCs:
     :param nbSegments:
     :return:
     """
-    npts = len(list_PC)
+    # print 'nbSegments: ', nbSegments
+    npts = len(list_PCs)
     tstep = 1.0/(nbSegments+1)
-    np_points_bezier = [list_PC[0]]
     list_interpoled_points = [
-        reduce(lambda x, y: x+y, [Bernstein(npts-1, i, t) * list_PC[i] for i in range(0, npts, 1)])
+        reduce(lambda x, y: x+y, [Bernstein(npts-1, i, t) * list_PCs[i] for i in range(0, npts, 1)])
         for t in np.arange(0.0, 1.0+tstep, tstep)
     ]
-    return np.array(list_interpoled_points), list_PC[1:-1]
+    return np.array(list_interpoled_points), list_PCs[1:-1]
 
 
 def line(p1, p2):
@@ -234,8 +238,7 @@ def create_bezier_curve(
 
 def create_bezier_curve_with_list_PC(
         np_array_points,
-        threshold_acos_angle=0.875,
-        nbSegments=30
+        threshold_acos_angle=0.875
 ):
     """
 
@@ -255,8 +258,8 @@ def create_bezier_curve_with_list_PC(
     """
     list_PC = np_array_points[1:-1]
     list_func_generate_spline = [
-        (create_bezier_curve_from_list_PC, [list_PC, nbSegments]),
-        (create_bezier_curve, [np_array_points, threshold_acos_angle, nbSegments])
+        (build_bezier_curve_from_PCs, [list_PC, bc_nbSegments]),
+        (create_bezier_curve, [np_array_points, threshold_acos_angle, bc_nbSegments])
     ]
     # list_PC.size == 4 <=> list_PC = [P1, P2]
     tuple_func_params = list_func_generate_spline[list_PC.size == 4]
@@ -264,7 +267,233 @@ def create_bezier_curve_with_list_PC(
     # et la liste des points de controles
     return tuple_func_params[0](*tuple_func_params[1])
 
+def build_bezier_curve_from_Troncons_PCs(
+        np_array_points
+):
+    """
+
+    :param np_array_points: [P0, P1, PC0, PC1, ..., PC(n-1), P2, P3]
+        [P0, P1]: segment du troncon 1 (amont vers aval)
+        [P3, P2]: segment du troncon 2 (amont vers aval)
+        PC0, PC1, ..., PC(n-1): liste des points de controles pour la spline (en plus de P1 et P2), n>0
+    :param threshold_acos_angle:
+        Seuil limite pour qualifier les segments comme etant paralleles.
+        On envoie directement le acos de l'angle (optim).
+        Par defaut on est sur un angle limite de PI/8 => 1.0 - acos(PI/8) ~= 0.875
+    :return: tuple(list_points=np_array, PC=[x, y])
+        np array de la liste des points representant le segment de bezier
+        np array de la liste des points de controle (de 1 a (n-1))
+    """
+    return build_bezier_curve_from_PCs(np_array_points[1:-1], bc_nbSegments)
+
+import multiprocessing as mp
+
+def mp_map_build_bezier_curves_from_Troncons_PCs(
+        np_array_Troncons_PCs,
+        processes=4,
+        nbSegments=30
+):
+    """
+
+    :param np_array_Troncons_PCs: [[P0, P1, PC0, PC1, ..., PC(n-1), P2, P3]+]
+        [P0, P1]: segment du troncon 1 (amont vers aval)
+        [P3, P2]: segment du troncon 2 (amont vers aval)
+        PC0, PC1, ..., PC(n-1): liste des points de controles pour la spline (en plus de P1 et P2), n > 0
+    :param nbSegments:
+        Indice de discretisation du segment de bezier genere
+    :return: tuple(list_points=np_array, PC=[x, y])
+        np array de la liste des points representant le segment de bezier
+        np array de la liste des points de controle (de 1 a (n-1))
+    """
+    global bc_nbSegments
+    bc_nbSegments = nbSegments
+
+    pool = mp.Pool(processes=processes)
+    mp_results = pool.map(build_bezier_curve_from_Troncons_PCs, np_array_Troncons_PCs)
+    # url: http://stackoverflow.com/questions/20914828/python-multiprocessing-pool-join-not-waiting-to-go-on
+    # on termine les calculs, et clean les processus
+    pool.close()
+    pool.join()
+    # on renvoie le resultat
+    return mp_results
+
+def mp_create_bezier_curve_with_list_PC(
+        np_array_list_points,
+        processes=4,
+        nbSegments=30
+):
+    """
+
+    :param np_array_list_points: [[P0, P1, PC0, PC1, ..., PC(n-1), P2, P3]+]
+        [P0, P1]: segment du troncon 1 (amont vers aval)
+        [P3, P2]: segment du troncon 2 (amont vers aval)
+        PC0, PC1, ..., PC(n-1): liste des points de controles pour la spline (en plus de P1 et P2), n > 0
+    :param threshold_acos_angle:
+        Seuil limite pour qualifier les segments comme etant paralleles.
+        On envoie directement le acos de l'angle (optim).
+        Par defaut on est sur un angle limite de PI/8 => 1.0 - acos(PI/8) ~= 0.875
+    :param nbSegments:
+        Indice de discretisation du segment de bezier genere
+    :return: tuple(list_points=np_array, PC=[x, y])
+        np array de la liste des points representant le segment de bezier
+        np array de la liste des points de controle (de 1 a (n-1))
+    """
+    global bc_nbSegments
+    bc_nbSegments = nbSegments
+
+    pool = mp.Pool(processes=processes)
+    mp_results = [
+        pool.apply_async(build_bezier_curve_from_Troncons_PCs, args=([np_array_points]))
+        for np_array_points in np_array_list_points
+    ]
+    # clean les processus
+    # url: http://stackoverflow.com/questions/20914828/python-multiprocessing-pool-join-not-waiting-to-go-on
+    pool.close()
+    pool.join()
+    # on recupere les resultats (pour etre sure de synchroniser les asynch processus)
+    mp_results = [p.get() for p in mp_results]
+    return mp_results
+
+def serial_create_bezier_curve_with_list_PC(
+        np_array_list_points,
+        nbSegments=30
+):
+    """
+
+    :param np_array_list_points: [[P0, P1, PC0, PC1, ..., PC(n-1), P2, P3]+]
+        [P0, P1]: segment du troncon 1 (amont vers aval)
+        [P3, P2]: segment du troncon 2 (amont vers aval)
+        PC0, PC1, ..., PC(n-1): liste des points de controles pour la spline (en plus de P1 et P2), n > 0
+    :param threshold_acos_angle:
+        Seuil limite pour qualifier les segments comme etant paralleles.
+        On envoie directement le acos de l'angle (optim).
+        Par defaut on est sur un angle limite de PI/8 => 1.0 - acos(PI/8) ~= 0.875
+    :param nbSegments:
+        Indice de discretisation du segment de bezier genere
+    :return: tuple(list_points=np_array, PC=[x, y])
+        np array de la liste des points representant le segment de bezier
+        np array de la liste des points de controle (de 1 a (n-1))
+    """
+    global bc_nbSegments
+    bc_nbSegments = nbSegments
+
+    return [
+        build_bezier_curve_from_Troncons_PCs(np_array_points)
+        for np_array_points in np_array_list_points
+    ]
+
 # TEST
+
+results = {}
+np_array_troncons_pcs = []
+
+def benchmark(n=2**12, nbSegments=32, processus=4, b_plot_curves=True):
+    """
+
+    :param n:
+    :return:
+    """
+    global results
+    global np_array_troncons_pcs
+
+    results = {}
+    np_array_troncons_pcs = []
+
+    #url: http://sebastianraschka.com/Articles/2014_multiprocessing_intro.html
+    for i in range(0, n):
+        np_array_troncons_pcs.append(np.array([[0, 2], [1, 2], [1.5, 2], [2, 1.5], [2, 1], [2, 0]]))
+
+    benchmark_results = [
+        timeit.Timer(
+            "results['serial'] = serial_create_bezier_curve_with_list_PC(np_array_troncons_pcs, %s)" % nbSegments,
+            'from script_generate_bezier_curve import serial_create_bezier_curve_with_list_PC, np_array_troncons_pcs, results'
+        ).timeit(number=1),
+        timeit.Timer(
+            "results['mp'] = mp_create_bezier_curve_with_list_PC(np_array_troncons_pcs, %s, %s)" % (processus, nbSegments),
+            'from script_generate_bezier_curve import mp_create_bezier_curve_with_list_PC, np_array_troncons_pcs, results'
+        ).timeit(number=1),
+        timeit.Timer(
+            "results['mp_map'] = mp_map_build_bezier_curves_from_Troncons_PCs(np_array_troncons_pcs, %s, %s)" % (processus, nbSegments),
+            'from script_generate_bezier_curve import mp_map_build_bezier_curves_from_Troncons_PCs, np_array_troncons_pcs, results'
+        ).timeit(number=1),
+    ]
+
+    nb_cpu = mp.cpu_count()
+
+    # url: http://docs.scipy.org/doc/numpy/reference/generated/numpy.array_equal.html
+    # print "results['mp'][1][0]:", results['mp'][1][0]
+    # print "results['serial'][1][0]:", results['serial'][1][0]
+    print 'test results: ', np.array_equal(results['serial'][1][0], results['mp'][1][0])
+    print 'benchmark_results: ', benchmark_results
+    print 'Perfs: '
+    ratio_mp = benchmark_results[0]/benchmark_results[1]
+    ratio_mp_map = benchmark_results[0]/benchmark_results[2]
+    print '- ratio par rapport au serial: x%.2f x%.2f' % (
+        ratio_mp,
+        ratio_mp_map
+    )
+    print '- %% de rendement par rapport au nombre de cpu: %.2f%% %.2f%%' % (
+        (ratio_mp/nb_cpu)*100,
+        (ratio_mp_map/nb_cpu)*100
+    )
+
+    total_points_computed = len(np_array_troncons_pcs) * nbSegments
+    print 'speed for serial method: %d point/s' % (total_points_computed/benchmark_results[0])
+    print 'speed for mp method: %d points/s' % (total_points_computed/benchmark_results[1])
+    print 'speed for mp_map method: %d points/s' % (total_points_computed/benchmark_results[2])
+
+    if b_plot_curves:
+        import matplotlib.pyplot as plt
+        import random
+        random.seed(123)
+        indice_curve = int(random.random()*(len(results['mp'])-1))
+        print 'indice curve: ', indice_curve
+        bezier_curves = [
+            results['mp'][indice_curve][0],
+            results['mp_map'][indice_curve][0],
+            results['serial'][indice_curve][0]
+        ]
+        plt.plot(
+            bezier_curves[0][:, 0], bezier_curves[0][:, 1],
+            'bx',
+            bezier_curves[0][:, 0], bezier_curves[0][:, 1],
+            'bo',
+            bezier_curves[1][:, 0], bezier_curves[1][:, 1],
+            'gx',
+            bezier_curves[1][:, 0], bezier_curves[1][:, 1],
+            'go',
+            bezier_curves[2][:, 0], bezier_curves[2][:, 1],
+            'rx',
+            bezier_curves[2][:, 0], bezier_curves[2][:, 1],
+            'ro'
+        )
+        plt.show()
+
+import platform
+
+def print_sysinfo():
+    print('\n')
+    print('Python version  :', platform.python_version())
+    print('compiler        :', platform.python_compiler())
+    print('\n')
+    print('system     :', platform.system())
+    print('release    :', platform.release())
+    print('machine    :', platform.machine())
+    print('processor  :', platform.processor())
+    #url: https://docs.python.org/3/library/multiprocessing.html
+    print('CPU count  :', mp.cpu_count())
+    print('interpreter:', platform.architecture()[0])
+    print('\n\n')
+
+from multiprocessing import cpu_count
+default_nprocs = cpu_count()
+def distribute(nitems, nprocs=None):
+    if nprocs is None:
+        nprocs = default_nprocs
+    nitems_per_proc = (nitems+nprocs-1)/nprocs
+    return [(i, min(nitems, i+nitems_per_proc))
+            for i in range(0, nitems, nitems_per_proc)]
+
 # >>> import numpy as np
 # >>> import script_generate_bezier_curve as bc
 # >>> bc.create_bezier_curve(np.array([[0,2],[1,2],[2,1],[2,0]]))
@@ -395,3 +624,6 @@ def create_bezier_curve_with_list_PC(
 #     'go'
 # )
 # plt.show()
+
+# import script_generate_bezier_curve as bc
+# >>> bc.benchmark(2**12, 2**7, 8, True)
