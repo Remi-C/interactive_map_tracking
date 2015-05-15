@@ -6,6 +6,8 @@ import timeit
 
 
 bc_nbSegments = 32
+results = {}
+np_array_troncons_pcs = []
 
 # from Scipy.interpolate import interp1d
 # urls:
@@ -101,6 +103,94 @@ def Bernstein(n, i, t):
     return basis
 
 
+# url: http://people.sc.fsu.edu/~jburkardt/cpp_src/bernstein_polynomial/bernstein_polynomial.html
+def bernstein_poly_01(n, x):
+    """
+    ****************************************************************************
+
+      Purpose:
+
+        BERNSTEIN_POLY_01 evaluates the Bernstein polynomials based in [0,1].
+
+      Discussion:
+
+        The Bernstein polynomials are assumed to be based on [0,1].
+
+        The formula is:
+
+          B(N,I)(X) = [N!/(I!*(N-I)!)] * (1-X)^(N-I) * X^I
+
+      First values:
+
+        B(0,0)(X) = 1
+
+        B(1,0)(X) =      1-X
+        B(1,1)(X) =                X
+
+        B(2,0)(X) =     (1-X)^2
+        B(2,1)(X) = 2 * (1-X)    * X
+        B(2,2)(X) =                X^2
+
+        B(3,0)(X) =     (1-X)^3
+        B(3,1)(X) = 3 * (1-X)^2 * X
+        B(3,2)(X) = 3 * (1-X)   * X^2
+        B(3,3)(X) =               X^3
+
+        B(4,0)(X) =     (1-X)^4
+        B(4,1)(X) = 4 * (1-X)^3 * X
+        B(4,2)(X) = 6 * (1-X)^2 * X^2
+        B(4,3)(X) = 4 * (1-X)   * X^3
+        B(4,4)(X) =               X^4
+
+      Special values:
+
+        B(N,I)(X) has a unique maximum value at X = I/N.
+
+        B(N,I)(X) has an I-fold zero at 0 and and N-I fold zero at 1.
+
+        B(N,I)(1/2) = C(N,K) / 2^N
+
+        For a fixed X and N, the polynomials add up to 1:
+
+          Sum ( 0 <= I <= N ) B(N,I)(X) = 1
+
+      Licensing:
+
+        This code is distributed under the GNU LGPL license.
+
+      Modified:
+
+        29 July 2011
+
+      Author:
+
+        John Burkardt
+
+      Parameters:
+
+        Input, int N, the degree of the Bernstein polynomials
+        to be used.  For any N, there is a set of N+1 Bernstein polynomials,
+        each of degree N, which form a basis for polynomials on [0,1].
+
+        Input, double X, the evaluation point.
+
+        Output, double BERNSTEIN_POLY[N+1], the values of the N+1
+        Bernstein polynomials at X.
+    """
+    coefs_bernstein = [0.0]*(n+1)
+
+    # if n == 0:
+    # elif 0 < n:
+    coefs_bernstein[0] = 1.0 - x
+    coefs_bernstein[1] = x
+
+    for i in range(2, n+1):
+        coefs_bernstein[i] = x * coefs_bernstein[i-1]
+        for j in range(i-1, 0, -1):
+            coefs_bernstein[j] = x * coefs_bernstein[j-1] + (1.0 - x) * coefs_bernstein[j]
+        coefs_bernstein[0] *= 1.0 - x
+    return coefs_bernstein
+
 def build_bezier_curve_from_PCs(list_PCs, nbSegments=30):
     """
 
@@ -117,6 +207,20 @@ def build_bezier_curve_from_PCs(list_PCs, nbSegments=30):
     ]
     return np.array(list_interpoled_points), list_PCs[1:-1]
 
+def build_bezier_curve_from_PCs_with_optim_bernstein(list_PCs, nbSegments=30):
+    """
+
+    :param list_PCs:
+    :param nbSegments:
+    :return:
+    """
+    npts = len(list_PCs)
+    tstep = 1.0/(nbSegments+1)
+    list_interpoled_points = [
+        sum(coef_bernstein*pc for coef_bernstein, pc in zip(bernstein_poly_01(npts, t), list_PCs))
+        for t in np.arange(0.0, 1.0+tstep, tstep)
+    ]
+    return np.array(list_interpoled_points), list_PCs[1:-1]
 
 def line(p1, p2):
     """
@@ -286,6 +390,17 @@ def build_bezier_curve_from_Troncons_PCs(
     """
     return build_bezier_curve_from_PCs(np_array_points[1:-1], bc_nbSegments)
 
+def build_bezier_curves_from_Troncons_PCs(
+        np_array_Troncons_PCs
+):
+    """
+    """
+    def wrapper_map(np_Troncons_PCs):
+        # return build_bezier_curve_from_PCs(np_Troncons_PCs[1:-1], bc_nbSegments)
+        return build_bezier_curve_from_PCs_with_optim_bernstein(np_Troncons_PCs[1:-1], bc_nbSegments)
+
+    return [map(wrapper_map, np_array_Troncons_PCs)]
+
 import multiprocessing as mp
 
 def mp_map_build_bezier_curves_from_Troncons_PCs(
@@ -308,12 +423,60 @@ def mp_map_build_bezier_curves_from_Troncons_PCs(
     global bc_nbSegments
     bc_nbSegments = nbSegments
 
+    mp_results = None
+
     pool = mp.Pool(processes=processes)
-    mp_results = pool.map(build_bezier_curve_from_Troncons_PCs, np_array_Troncons_PCs)
-    # url: http://stackoverflow.com/questions/20914828/python-multiprocessing-pool-join-not-waiting-to-go-on
-    # on termine les calculs, et clean les processus
-    pool.close()
-    pool.join()
+    try:
+        mp_results = pool.map(build_bezier_curve_from_Troncons_PCs, np_array_Troncons_PCs)
+    finally:
+        # url: http://stackoverflow.com/questions/20914828/python-multiprocessing-pool-join-not-waiting-to-go-on
+        # on termine les calculs, et clean les processus
+        pool.close()
+        pool.join()
+
+    # on renvoie le resultat
+    return mp_results
+
+def mp_map_sliced_build_bezier_curves_from_Troncons_PCs(
+        np_array_Troncons_PCs,
+        processes=4,
+        nbSegments=30
+):
+    """
+
+    :param np_array_Troncons_PCs: [[P0, P1, PC0, PC1, ..., PC(n-1), P2, P3]+]
+        [P0, P1]: segment du troncon 1 (amont vers aval)
+        [P3, P2]: segment du troncon 2 (amont vers aval)
+        PC0, PC1, ..., PC(n-1): liste des points de controles pour la spline (en plus de P1 et P2), n > 0
+    :param nbSegments:
+        Indice de discretisation du segment de bezier genere
+    :return: tuple(list_points=np_array, PC=[x, y])
+        np array de la liste des points representant le segment de bezier
+        np array de la liste des points de controle (de 1 a (n-1))
+    """
+    global bc_nbSegments
+    bc_nbSegments = nbSegments
+
+    mp_compact_results = None
+    list_slices_on_datas = distribute(len(np_array_Troncons_PCs), processes)
+    datas_sliced = []
+    for slice in list_slices_on_datas:
+        datas_sliced.append(np_array_Troncons_PCs[slice[0]:slice[1]])
+
+    pool = mp.Pool(processes=processes)
+    try:
+        mp_compact_results = pool.map(build_bezier_curves_from_Troncons_PCs, datas_sliced)
+    finally:
+        # url: http://stackoverflow.com/questions/20914828/python-multiprocessing-pool-join-not-waiting-to-go-on
+        # on termine les calculs, et clean les processus
+        pool.close()
+        pool.join()
+
+    # flat the results
+    # url: http://stackoverflow.com/questions/952914/making-a-flat-list-out-of-list-of-lists-in-python
+    # print 'mp_compact_results: ', mp_compact_results
+    mp_results = [item for sublist in mp_compact_results for item in sublist[0]]
+
     # on renvoie le resultat
     return mp_results
 
@@ -341,17 +504,21 @@ def mp_create_bezier_curve_with_list_PC(
     global bc_nbSegments
     bc_nbSegments = nbSegments
 
+    mp_results = None
     pool = mp.Pool(processes=processes)
-    mp_results = [
-        pool.apply_async(build_bezier_curve_from_Troncons_PCs, args=([np_array_points]))
-        for np_array_points in np_array_list_points
-    ]
-    # clean les processus
-    # url: http://stackoverflow.com/questions/20914828/python-multiprocessing-pool-join-not-waiting-to-go-on
-    pool.close()
-    pool.join()
-    # on recupere les resultats (pour etre sure de synchroniser les asynch processus)
-    mp_results = [p.get() for p in mp_results]
+    try:
+        mp_results = [
+            pool.apply_async(build_bezier_curve_from_Troncons_PCs, args=([np_array_points]))
+            for np_array_points in np_array_list_points
+        ]
+    finally:
+        # clean les processus
+        # url: http://stackoverflow.com/questions/20914828/python-multiprocessing-pool-join-not-waiting-to-go-on
+        pool.close()
+        pool.join()
+        # on recupere les resultats (pour etre sure de synchroniser les asynch processus)
+        mp_results = [p.get() for p in mp_results]
+
     return mp_results
 
 def serial_create_bezier_curve_with_list_PC(
@@ -377,16 +544,9 @@ def serial_create_bezier_curve_with_list_PC(
     global bc_nbSegments
     bc_nbSegments = nbSegments
 
-    return [
-        build_bezier_curve_from_Troncons_PCs(np_array_points)
-        for np_array_points in np_array_list_points
-    ]
+    return map(build_bezier_curve_from_Troncons_PCs, np_array_list_points)
 
 # TEST
-
-results = {}
-np_array_troncons_pcs = []
-
 def benchmark(n=2**12, nbSegments=32, processus=4, b_plot_curves=True):
     """
 
@@ -421,9 +581,10 @@ def benchmark(n=2**12, nbSegments=32, processus=4, b_plot_curves=True):
     nb_cpu = mp.cpu_count()
 
     # url: http://docs.scipy.org/doc/numpy/reference/generated/numpy.array_equal.html
-    # print "results['mp'][1][0]:", results['mp'][1][0]
-    # print "results['serial'][1][0]:", results['serial'][1][0]
+    print "len(results['mp_map']): ", len(results['mp_map'])
+    print "len(results['mp']): ", len(results['mp'])
     print 'test results: ', np.array_equal(results['serial'][1][0], results['mp'][1][0])
+    print 'test results: ', np.array_equal(results['serial'][1][0], results['mp_map'][1][0])
     print 'benchmark_results: ', benchmark_results
     print 'Perfs: '
     ratio_mp = benchmark_results[0]/benchmark_results[1]
@@ -468,6 +629,21 @@ def benchmark(n=2**12, nbSegments=32, processus=4, b_plot_curves=True):
             'ro'
         )
         plt.show()
+
+def benchmark_bernstein(n=32, nb_times=10000):
+    """
+
+    :param n:
+    :param nb_times:
+    :return:
+    """
+    t = timeit.Timer("bc.bernstein_poly_01(%d, 0.5)" % n, "import script_generate_bezier_curve as bc")
+    perf_0 = t.timeit(nb_times)
+    t = timeit.Timer("[bc.Bernstein(%d, i, 0.5) for i in range(0, %d)]" % (n, n+1), "import script_generate_bezier_curve as bc")
+    perf_1 = t.timeit(nb_times)
+
+    # print 'ratio perf: %.2f' % (perf_0/perf_1)
+    return perf_0/perf_1
 
 import platform
 
@@ -627,3 +803,10 @@ def distribute(nitems, nprocs=None):
 
 # import script_generate_bezier_curve as bc
 # >>> bc.benchmark(2**12, 2**7, 8, True)
+
+# >>> t = timeit.Timer("bc.bernstein_poly_01(3, 0.5)", "import script_generate_bezier_curve as bc")
+# >>> t.timeit()
+# 1.8391380310058594
+# >>> t = timeit.Timer("[bc.Bernstein(3, i, 0.5) for i in range(0, 3+1)]", "import script_generate_bezier_curve as bc")
+# >>> t.timeit()
+# 4.111564874649048
