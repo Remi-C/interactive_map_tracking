@@ -645,6 +645,18 @@ def benchmark_bernstein(n=32, nb_times=10000):
     # print 'ratio perf: %.2f' % (perf_0/perf_1)
     return perf_0/perf_1
 
+def bench_bernstein(n=32, nb_times=10000):
+    """
+
+    :param n:
+    :param nb_times:
+    :return:
+    """
+    nb_points = 1
+    for result in [benchmark_bernstein(i) for i in range(1, 33)]:
+        print 'ratio perf: %.2f for %d points' % (result, nb_points)
+        nb_points += 1
+
 import platform
 
 def print_sysinfo():
