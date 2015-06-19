@@ -34,6 +34,7 @@ try:
     import cPickle as pickle
 except:
     import pickle
+
 import qgis_log_tools
 
 defaultQtDateFormatString = "yyyy-MM-ddThh:mm:ss.zzz"
@@ -42,6 +43,7 @@ defaultQtDateFormatString = "yyyy-MM-ddThh:mm:ss.zzz"
 if os.name != "nt":
     import fcntl
     import struct
+
     def get_interface_ip(ifname):
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         return socket.inet_ntoa(fcntl.ioctl(
@@ -60,11 +62,11 @@ def get_lan_ip():
     """
     ip = socket.gethostbyname(socket.gethostname())
     if ip.startswith("127.") and os.name != "nt":
-        interfaces = ["eth0","eth1","eth2","wlan0","wlan1","wifi0","ath0","ath1","ppp0"]
+        interfaces = ["eth0", "eth1", "eth2", "wlan0", "wlan1", "wifi0", "ath0", "ath1", "ppp0"]
         for ifname in interfaces:
             try:
                 ip = get_interface_ip(ifname)
-                break;
+                break
             except IOError:
                 pass
     return ip
@@ -98,6 +100,7 @@ def get_os_username():
     :return:
     """
     import getpass
+
     return getpass.getuser()
 
 
@@ -110,23 +113,24 @@ def get_timestamp():
 def convert_timestamp_to_qdatetime(timestamp):
     from PyQt4.QtCore import QDateTime
     from math import modf
+
     timestamp_frac, timestamp_whole = modf(timestamp)
     # Qt time
     qdatetime = QDateTime()
     qdatetime.setTime_t(int(timestamp_whole))
-    qdatetime = qdatetime.addMSecs(int(timestamp_frac*1000))
+    qdatetime = qdatetime.addMSecs(int(timestamp_frac * 1000))
     #
     return qdatetime
 
 
 # def convert_timestamp_to_qt_string_format(timestamp, QtDateFormat):
-#     # String Qt time
+# # String Qt time
 #     return convert_timestamp_to_qdatetime(timestamp).toString(QtDateFormat)
 
 
-def convert_timestamp_to_qt_string_format(timestamp, QtDateFormatString=defaultQtDateFormatString):
+def convert_timestamp_to_qt_string_format(timestamp, qtdate_format_string=defaultQtDateFormatString):
     # String Qt time
-    return convert_timestamp_to_qdatetime(timestamp).toString(QtDateFormatString)
+    return convert_timestamp_to_qdatetime(timestamp).toString(qtdate_format_string)
 
 
 # def get_timestamp_from_qt_string_format(QtDateFormat):
@@ -149,8 +153,8 @@ def convert_timestamp_to_qt_string_format(timestamp, QtDateFormatString=defaultQ
 #     return convert_timestamp_to_qt_string_format(get_timestamp(), QtDateFormat)
 
 
-def get_timestamp_from_qt_string_format(QtDateFormatString=defaultQtDateFormatString):
-    return convert_timestamp_to_qt_string_format(get_timestamp(), QtDateFormatString)
+def get_timestamp_from_qt_string_format(qtdate_format_string=defaultQtDateFormatString):
+    return convert_timestamp_to_qt_string_format(get_timestamp(), qtdate_format_string)
 
 
 def construct_listpoints_from_extent(_extent):
@@ -197,7 +201,6 @@ import time
 
 
 class TpTimer:
-
     def __init__(self):
         self.currentTime = self.default_timers()
         self.dict_process_timeupdate = {}
@@ -224,7 +227,7 @@ class TpTimer:
     def delta(self):
         return self.currentTime[0] - self.currentTime[1]
 
-    def delta(self, key):
+    def delta_with_key(self, key):
         list_times = self.__getitem__(key)
         return list_times[0] - list_times[1]
 
@@ -268,10 +271,11 @@ def is_network_alive(url="www.google.com"):
 from PyQt4.QtNetwork import QTcpSocket
 
 
-def isConnected(url):
-    socket = QTcpSocket()
-    socket.connectToHost(url, 80)
-    return socket.waitForConnected(1000)
+def is_connected(url):
+    qtcp_socket = QTcpSocket()
+    qtcp_socket.connectToHost(url, 80)
+    return qtcp_socket.waitForConnected(1000)
+
 
 DEFAULT_SEGMENT_EPSILON = 1e-08
 
@@ -333,7 +337,7 @@ def serialize_list_checkbox(dlg, list_id_checkbox):
 def serialize_tabs_size(imt):
     """
 
-    :param dlg:
+    :param imt:
     :return:
     """
     return imt.dict_tabs_size
@@ -547,7 +551,7 @@ def update_list_checkbox_from_qsettings(imt):
 def restore_gui_states_from_qsettings(imt, b_launch_slot=True):
     """
 
-    :param list_dlg_id_slot:
+    :param imt:
     """
     s = imt.qsettings
     for tuple_dlg_id_slot in imt.list_tuples_dlg_id_slot:
@@ -578,3 +582,15 @@ def print_group_name_values_in_qsettings(group_name=""):
         print key, str(qsettings.value(key))
         # import qgis_log_tools
         # qgis_log_tools.logMessageINFO(str(key)+": "+str(qsettings.value(key)))
+
+
+def convert_freq_to_sec(freq):
+    """
+
+    :param freq:
+    :return:
+    """
+    return 1.0/freq
+
+def convert_s_to_ms(s):
+    return s * 1000

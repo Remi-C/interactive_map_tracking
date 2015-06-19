@@ -66,7 +66,8 @@ def commit_changes(layer, iface, s, bShowCommitError=True):
 
         #
         try:
-            qgis_log_tools.logMessageINFO("Try to commitChanges the layer: " + layer.name())
+            qgis_log_tools.logMessageINFO(
+                "Try to commitChanges the layer: " + layer.name())
             # send request to DB
             result_commit = layer.commitChanges()
 
@@ -75,7 +76,7 @@ def commit_changes(layer, iface, s, bShowCommitError=True):
             #
             result_commit = False
 
-        if result_commit == True:
+        if result_commit:
             # restore state
             layer.startEditing()
 
@@ -85,19 +86,24 @@ def commit_changes(layer, iface, s, bShowCommitError=True):
             # restore selected feature for the current (edit) layer
             # layer.setSelectedFeatures(layerSelectedFeatures)
         else:
-            qgis_log_tools.logMessageCRITICAL("Can't commitChanges the layer: " + layer.name())
+            qgis_log_tools.logMessageCRITICAL(
+                "Can't commitChanges the layer: " + layer.name())
 
             commit_error_string = layer.commitErrors()[2]
             qgis_log_tools.logMessageCRITICAL(">>> " + commit_error_string)
 
             if bShowCommitError:
                 # url : http://www.tutorialspoint.com/python/python_strings.htm
-                commitErrorStringShort = commit_error_string[commit_error_string.rfind(":")+2:]   # +2 to skip ': ' prefix of commitError msg
+                # +2 to skip ': ' prefix of commitError msg
+                commitErrorStringShort = commit_error_string[
+                    commit_error_string.rfind(":") + 2:]
 
-                # fonctionne sans probleme car integree directement dans QGIS (interne au mecanisme d'info/warning)
-                iface.messageBar().pushMessage("IMT. ERROR : " + "\"" + commitErrorStringShort + "\"",
-                                               "",
-                                               QgsMessageBar.CRITICAL, 0)
+                # fonctionne sans probleme car integree directement dans QGIS
+                # (interne au mecanisme d'info/warning)
+                iface.messageBar().pushMessage(
+                    "IMT. ERROR : " + "\"" + commitErrorStringShort + "\"",
+                    "",
+                    QgsMessageBar.CRITICAL, 0)
     #
     return result_commit
 
@@ -120,11 +126,19 @@ def commit_changes_and_refresh(layer, iface, s):
     bResultCommit = commit_changes(layer, iface, s)
     if bResultCommit:
         qgis_mapcanvas_tools.refreshMapCanvas(iface)    # use a trick here
-        # qgis_mapcanvas_tools.refreshLayer(layer, iface)   # don't work ... but we don't know why :'(
+        # qgis_mapcanvas_tools.refreshLayer(layer, iface)   # don't work ...
+        # but we don't know why :'(
     return bResultCommit
 
 
-def filter_layer_postgis(layer, list_filters=["PostgreSQL", "database", "PostGIS"]):
+def filter_layer_postgis(
+    layer,
+    list_filters=[
+        "PostgreSQL",
+        "database",
+        "PostGIS"
+    ]
+):
     """ Helper to decided if 'layer' is provided by PostGre with PostGIS extension.
 
         The storage type of this layer is PostGres with PostGIS extension ?
@@ -154,10 +168,12 @@ def filter_layer_postgis(layer, list_filters=["PostgreSQL", "database", "PostGIS
                 storageType = data_provider.storageType()
                 index = 0
                 len_list_filters = len(list_filters)
-                bContinue = (index < len_list_filters) and (storageType.find(list_filters[index]) != -1)
+                bContinue = (index < len_list_filters) and (
+                    storageType.find(list_filters[index]) != -1)
                 while bContinue:
                     index += 1
-                    bContinue = (index < len_list_filters) and (storageType.find(list_filters[index]) != -1)
+                    bContinue = (index < len_list_filters) and (
+                        storageType.find(list_filters[index]) != -1)
                 result = (index == len_list_filters)
     except:
         qgis_log_tools.logMessageWARNING("Problem with layer: " + layer.name())
@@ -189,7 +205,11 @@ def filter_layer_vectorlayer(layer, layertype=0):
 
 #
 def filter_layer_for_imt(layer,
-                         list_filters=[filter_layer_vectorlayer, filter_layer_postgis]):
+                         list_filters=[
+                             filter_layer_vectorlayer,
+                             filter_layer_postgis
+                         ]
+                         ):
     """ Helper to decided if 'layer' is acceptable for IMT (AutoSave&Refresh)
     i.e. 'layer' is a QGIS Vector Layer and 'layer' is provide by PostGres with PostGis extension
 
@@ -206,7 +226,10 @@ def filter_layer_for_imt(layer,
     # return filter_layer_vectorlayer(layer) and filter_layer_postgis(layer)
     # return filter_layer_vectorlayer(layer)
 
-def filter_layer_trackingposition_required_fields(layer, list_fields=["user_id", "w_time"]):
+
+def filter_layer_trackingposition_required_fields(
+        layer,
+        list_fields=["user_id", "w_time"]):
     """ Helper to decided if 'layer' has at least 2 fields :
     - 'user_id' [:text]
     - 'w_time' [:text]
@@ -223,10 +246,12 @@ def filter_layer_trackingposition_required_fields(layer, list_fields=["user_id",
         # get fields name from the layer
         field_names = [field.name() for field in fields]
         #
-        list_id_fields = [field_names.index(name_field) for name_field in list_fields]
+        list_id_fields = [
+            field_names.index(name_field) for name_field in list_fields]
     except:
-            return []
+        return []
     return list_id_fields
+
 
 def filter_layer_for_trackingposition(layer):
     """ Helper to decided if 'layer' is compatible for Tracking Position

@@ -33,14 +33,14 @@ log_tag = "Plugins/Interactive_Map_Tracking"
 log_enable = False
 
 
-def setLogging(bool=True):
+def setLogging(flag=True):
     """ Set the logging state (activate/desactivate logging) for IMT
 
-    :param bool: state of IMT logging [default=True]
+    :param flag: state of IMT logging [default=True]
     :rtype: bool
     """
     global log_enable
-    log_enable = bool
+    log_enable = flag
 
 
 def enableLogging():

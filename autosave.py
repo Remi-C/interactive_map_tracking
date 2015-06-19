@@ -53,6 +53,6 @@ class IAutoSave(AutoSaveImp):
         """
         return AutoSaveImp.slot_clicked_checkbox_autosave.__name__
 
-class AutoSave:
-    pass
+# class AutoSave:
+#     pass
 AutoSave = IAutoSave

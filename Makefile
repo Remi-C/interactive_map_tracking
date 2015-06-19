@@ -52,6 +52,8 @@ SOURCES = \
 	signalsmanagerImp.py \
 	autosave.py \
 	autosaveImp.py \
+	trackingposition.py \
+	trackingpositionImp.py \
 	decorators.py
 
 PLUGINNAME = interactive_map_tracking
@@ -71,6 +73,8 @@ PY_FILES = \
 	signalsmanagerImp.py \
 	autosave.py \
 	autosaveImp.py \
+	trackingposition.py \
+	trackingpositionImp.py \
 	decorators.py \
 	__init__.py
 

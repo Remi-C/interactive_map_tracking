@@ -130,7 +130,5 @@ class SingletonClassWithInheritanceSupport(object):
         return cls.__instance
 
 
-class Singleton: pass
-
-
+# class Singleton: pass
 Singleton = SingletonClassWithInheritanceSupport
