@@ -34,9 +34,13 @@ class SignalsManagerActionConnectImp(AbstractSignalsManagerWithSingletonPattern)
         :return:
         """
         action_connect = self.dict_actions['connect']
-        return self._action_with_test_({'key': key,
-                                        'func_test_action': action_connect['func_test_action'],
-                                        'func_perform_action': action_connect['func_perform_action']})
+        return self._action_with_test_(
+            {
+                'key': key,
+                'func_test_action': action_connect['func_test_action'],
+                'func_perform_action': action_connect['func_perform_action']
+            }
+        )
 
     def _connect_with_key_(self, key):
         """
@@ -45,8 +49,12 @@ class SignalsManagerActionConnectImp(AbstractSignalsManagerWithSingletonPattern)
         :return:
         """
         action_connect = self.dict_actions['connect']
-        return self._action_with_key_({'key': key,
-                                       'func_perform_action': action_connect['func_perform_action']})
+        return self._action_with_key_(
+            {
+                'key': key,
+                'func_perform_action': action_connect['func_perform_action']
+            }
+        )
 
 
 # ##################################################################################################
@@ -57,7 +65,8 @@ class SignalsManagerActionDisconnectImp(AbstractSignalsManagerWithSingletonPatte
     AbstractSignalsManagerWithSingletonPattern.dict_actions['disconnect'] = {
         'func_test_action': lambda x: not x['dict_values'].setdefault(
             SignalsManagerActionConnectImp.id_str_signal_is_connected, False),
-        'func_perform_action': lambda x: [
+        'func_perform_action': lambda x:
+        [
             QObject.disconnect(x['key'].qobject, x['dict_values']['Signal'], x['dict_values']['Slot']),
             x['dict_values'].__setitem__(SignalsManagerActionConnectImp.id_str_signal_is_connected, False)
         ]
@@ -71,9 +80,13 @@ class SignalsManagerActionDisconnectImp(AbstractSignalsManagerWithSingletonPatte
         :return:
         """
         action_disconnect = self.dict_actions['disconnect']
-        return self._action_with_test_({'key': key,
-                                        'func_test_action': action_disconnect['func_test_action'],
-                                        'func_perform_action': action_disconnect['func_perform_action']})
+        return self._action_with_test_(
+            {
+                'key': key,
+                'func_test_action': action_disconnect['func_test_action'],
+                'func_perform_action': action_disconnect['func_perform_action']
+            }
+        )
 
 
 # ##################################################################################################
@@ -94,10 +107,14 @@ class SignalsManagerActionStartImp(AbstractSignalsManagerWithSingletonPattern):
         :return:
         """
         action = self.dict_actions['start']
-        return self._action_with_test_({'key': key,
-                                        'func_test_action': action['func_test_action'],
-                                        'func_perform_action': action['func_perform_action'],
-                                        'interval': interval})
+        return self._action_with_test_(
+            {
+                'key': key,
+                'func_test_action': action['func_test_action'],
+                'func_perform_action': action['func_perform_action'],
+                'interval': interval
+            }
+        )
 
 
 # ##################################################################################################
@@ -118,6 +135,10 @@ class SignalsManagerActionStopImp(AbstractSignalsManagerWithSingletonPattern):
         :return:
         """
         action = self.dict_actions['stop']
-        return self._action_with_test_({'key': key,
-                                        'func_test_action': action['func_test_action'],
-                                        'func_perform_action': action['func_perform_action']})
+        return self._action_with_test_(
+            {
+                'key': key,
+                'func_test_action': action['func_test_action'],
+                'func_perform_action': action['func_perform_action']
+            }
+        )

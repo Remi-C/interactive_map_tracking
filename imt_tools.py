@@ -34,7 +34,6 @@ try:
     import cPickle as pickle
 except:
     import pickle
-
 import qgis_log_tools
 
 defaultQtDateFormatString = "yyyy-MM-ddThh:mm:ss.zzz"
@@ -66,7 +65,7 @@ def get_lan_ip():
         for ifname in interfaces:
             try:
                 ip = get_interface_ip(ifname)
-                break
+                break;
             except IOError:
                 pass
     return ip
@@ -125,12 +124,12 @@ def convert_timestamp_to_qdatetime(timestamp):
 
 # def convert_timestamp_to_qt_string_format(timestamp, QtDateFormat):
 # # String Qt time
-#     return convert_timestamp_to_qdatetime(timestamp).toString(QtDateFormat)
+# return convert_timestamp_to_qdatetime(timestamp).toString(QtDateFormat)
 
 
-def convert_timestamp_to_qt_string_format(timestamp, qtdate_format_string=defaultQtDateFormatString):
+def convert_timestamp_to_qt_string_format(timestamp, QtDateFormatString=defaultQtDateFormatString):
     # String Qt time
-    return convert_timestamp_to_qdatetime(timestamp).toString(qtdate_format_string)
+    return convert_timestamp_to_qdatetime(timestamp).toString(QtDateFormatString)
 
 
 # def get_timestamp_from_qt_string_format(QtDateFormat):
@@ -153,8 +152,8 @@ def convert_timestamp_to_qt_string_format(timestamp, qtdate_format_string=defaul
 #     return convert_timestamp_to_qt_string_format(get_timestamp(), QtDateFormat)
 
 
-def get_timestamp_from_qt_string_format(qtdate_format_string=defaultQtDateFormatString):
-    return convert_timestamp_to_qt_string_format(get_timestamp(), qtdate_format_string)
+def get_timestamp_from_qt_string_format(QtDateFormatString=defaultQtDateFormatString):
+    return convert_timestamp_to_qt_string_format(get_timestamp(), QtDateFormatString)
 
 
 def construct_listpoints_from_extent(_extent):
@@ -227,7 +226,7 @@ class TpTimer:
     def delta(self):
         return self.currentTime[0] - self.currentTime[1]
 
-    def delta_with_key(self, key):
+    def delta(self, key):
         list_times = self.__getitem__(key)
         return list_times[0] - list_times[1]
 
@@ -271,10 +270,10 @@ def is_network_alive(url="www.google.com"):
 from PyQt4.QtNetwork import QTcpSocket
 
 
-def is_connected(url):
-    qtcp_socket = QTcpSocket()
-    qtcp_socket.connectToHost(url, 80)
-    return qtcp_socket.waitForConnected(1000)
+def isConnected(url):
+    socket = QTcpSocket()
+    socket.connectToHost(url, 80)
+    return socket.waitForConnected(1000)
 
 
 DEFAULT_SEGMENT_EPSILON = 1e-08
@@ -337,7 +336,7 @@ def serialize_list_checkbox(dlg, list_id_checkbox):
 def serialize_tabs_size(imt):
     """
 
-    :param imt:
+    :param dlg:
     :return:
     """
     return imt.dict_tabs_size
@@ -551,7 +550,7 @@ def update_list_checkbox_from_qsettings(imt):
 def restore_gui_states_from_qsettings(imt, b_launch_slot=True):
     """
 
-    :param imt:
+    :param list_dlg_id_slot:
     """
     s = imt.qsettings
     for tuple_dlg_id_slot in imt.list_tuples_dlg_id_slot:
@@ -584,13 +583,50 @@ def print_group_name_values_in_qsettings(group_name=""):
         # qgis_log_tools.logMessageINFO(str(key)+": "+str(qsettings.value(key)))
 
 
-def convert_freq_to_sec(freq):
-    """
+# url: http://code.activestate.com/recipes/67107/
+import types
+import exceptions
 
-    :param freq:
-    :return:
-    """
-    return 1.0/freq
 
-def convert_s_to_ms(s):
+class EnumException(exceptions.Exception):
+    pass
+
+
+class Enumeration:
+    def __init__(self, name, enumList):
+        self.__doc__ = name
+        lookup = {}
+        reverseLookup = {}
+        i = 0
+        uniqueNames = []
+        uniqueValues = []
+        for x in enumList:
+            if isinstance(x, types.TupleType):
+                x, i = x
+            if not isinstance(x, types.StringType):
+                raise EnumException("enum name is not a string: " + x)
+            if not isinstance(i, types.IntType):
+                raise EnumException("enum value is not an integer: " + i)
+            if x in uniqueNames:
+                raise EnumException("enum name is not unique: " + x)
+            if i in uniqueValues:
+                raise EnumException("enum value is not unique for " + x)
+            uniqueNames.append(x)
+            uniqueValues.append(i)
+            lookup[x] = i
+            reverseLookup[i] = x
+            i += 1
+        self.lookup = lookup
+        self.reverseLookup = reverseLookup
+
+    def __getattr__(self, attr):
+        if not self.lookup.has_key(attr):
+            raise AttributeError
+        return self.lookup[attr]
+
+    def whatis(self, value):
+        return self.reverseLookup[value]
+
+
+def CONVERT_S_TO_MS(s):
     return s * 1000
