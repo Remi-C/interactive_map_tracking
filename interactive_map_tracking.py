@@ -1128,10 +1128,6 @@ class interactive_map_tracking:
             for id_layer in theLayerIds:
                 qgis_log_tools.logMessageINFO("id_layer: " + str(id_layer))
 
-            tp_dict_layers_to_commit_is_empty = True
-            tp_dict_key_l_values_et_is_empty = True
-            tp_dict_key_l_values_listfeatures_is_empty = True
-
             self.tp_mutex_on_layers.lockForWrite()  # release this lock in 'slot_LayersRemoved' slot
             # clean lists, dicts
 
@@ -1406,7 +1402,7 @@ class interactive_map_tracking:
                     self.TP_NAMEDTUPLE_ET(tp_tuple.extent, tp_tuple.w_time)
                 )
 
-            if size_tp_queue != 0:
+            if size_tp_queue:
                 qgis_log_tools.logMessageINFO("** Pack " + str(size_tp_queue) + " tuples for 1 call -> mem")
 
         #####################
