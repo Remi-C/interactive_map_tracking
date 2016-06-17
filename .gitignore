@@ -61,3 +61,6 @@ help/build/
 
 interactive_map_tracking_dialog_base.ui_
 interactive_map_tracking_dialog_base.ui.autosave
+
+# remove this ressource file
+resources_rc.py
